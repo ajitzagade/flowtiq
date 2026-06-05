@@ -4,7 +4,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Flowtiq - Workflow Management',
-  description: 'Enterprise workflow and project management platform',
+  description: 'Enterprise workflow and project management platform for modern teams',
   icons: { icon: '/favicon.ico' },
 };
 
