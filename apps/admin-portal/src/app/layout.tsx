@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Flowtiq - Workflow Management',
+  title: 'Flowtiq | Workflow Management',
   description: 'Enterprise workflow and project management platform for modern teams',
   icons: { icon: '/favicon.ico' },
 };
