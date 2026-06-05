@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "npm install -g pnpm && pnpm install",
+  "buildCommand": "pnpm --filter @flowtiq/admin-portal build",
+  "outputDirectory": "apps/admin-portal/.next"
+}
