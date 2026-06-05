@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, uploadFile } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -36,10 +36,19 @@ export default function SettingsPage() {
   const currentTenant = tenantData || tenant;
   const branding = currentTenant?.branding as { primaryColor?: string; secondaryColor?: string; logoUrl?: string } | undefined;
 
-  // Branding state
+  // Branding state — sync when tenant data loads
   const [primaryColor, setPrimaryColor] = useState(branding?.primaryColor || '#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState(branding?.secondaryColor || '#64748b');
   const [tenantName, setTenantName] = useState(currentTenant?.name || '');
+
+  useEffect(() => {
+    if (tenantData) {
+      const b = tenantData.branding as { primaryColor?: string; secondaryColor?: string } | undefined;
+      if (b?.primaryColor) setPrimaryColor(b.primaryColor);
+      if (b?.secondaryColor) setSecondaryColor(b.secondaryColor);
+      if (tenantData.name) setTenantName(tenantData.name);
+    }
+  }, [tenantData]);
 
   const saveMutation = useMutation({
     mutationFn: (data: object) =>

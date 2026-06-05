@@ -328,7 +328,7 @@ export default function ProjectDetailPage() {
           <div className="card">
             <div className="card-header">
               <h3>Project Documents</h3>
-              <Link href={`/documents?projectId=${project.id}`} className="btn-secondary text-xs py-1.5">
+              <Link href={`/documents?projectId=${project.id}&upload=true`} className="btn-secondary text-xs py-1.5">
                 <Upload size={14} /> Upload Document
               </Link>
             </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -11,9 +12,9 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import type { Document, Project } from '@flowtiq/shared-types';
 
-function UploadModal({ onClose }: { onClose: () => void }) {
+function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; initialProjectId?: string }) {
   const qc = useQueryClient();
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(initialProjectId);
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -142,10 +143,18 @@ const FILE_TYPE_ICONS: Record<string, string> = {
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [projectId, setProjectId] = useState('');
   const [page, setPage] = useState(1);
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadProjectId, setUploadProjectId] = useState('');
+
+  useEffect(() => {
+    const pid = searchParams.get('projectId') || '';
+    if (pid) setUploadProjectId(pid);
+    if (searchParams.get('upload') === 'true') setShowUpload(true);
+  }, [searchParams]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['documents', page, search, projectId],
@@ -175,7 +184,7 @@ export default function DocumentsPage() {
   return (
     <>
       <Header title="Documents" subtitle="Manage and track all uploaded documents" />
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
+      {showUpload && <UploadModal onClose={() => setShowUpload(false)} initialProjectId={uploadProjectId} />}
 
       <div className="p-6 space-y-4 animate-slide-in">
         <div className="card p-4">

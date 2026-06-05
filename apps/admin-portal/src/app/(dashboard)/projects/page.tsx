@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Plus, Search, FolderKanban, Edit, Eye, Trash2, X, ChevronLeft, ChevronRight, LayoutList, Kanban } from 'lucide-react';
+import { useAuthStore } from '@/store/auth';
 import { formatDate, getStatusBadgeClass, getPriorityBadgeClass, cn, truncate, getErrorMessage } from '@/lib/utils';
 import Link from 'next/link';
 import type { Project, User, WorkflowTemplate } from '@flowtiq/shared-types';
@@ -442,13 +443,15 @@ function ProjectModal({
 
 export default function ProjectsPage() {
   const qc = useQueryClient();
+  const { user } = useAuthStore();
+  const isAdmin = user?.isSuperAdmin || (user?.roles as Array<{ name: string }> | undefined)?.some((r) => r.name === 'Admin');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [view, setView] = useState<'list' | 'kanban'>('list');
+  const [view, setView] = useState<'list' | 'kanban'>('kanban');
 
   const { data, isLoading } = useQuery({
     queryKey: ['projects', page, search, status, priority],
@@ -540,7 +543,7 @@ export default function ProjectsPage() {
                   view === 'kanban' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
                 )}
               >
-                <Kanban size={15} /> Kanban
+                <Kanban size={15} /> Board
               </button>
             </div>
 
@@ -643,17 +646,19 @@ export default function ProjectsPage() {
                           >
                             <Edit size={16} />
                           </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('Cancel this project?')) {
-                                deleteMutation.mutate(project.id);
-                              }
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Cancel"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => {
+                                if (confirm('Cancel this project?')) {
+                                  deleteMutation.mutate(project.id);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Cancel"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
