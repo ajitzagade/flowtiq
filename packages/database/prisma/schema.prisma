@@ -1,0 +1,383 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// TENANT MANAGEMENT
+// =============================================
+
+model Tenant {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  domain             String?  @unique
+  branding           Json     @default("{\"primaryColor\":\"#3b82f6\",\"secondaryColor\":\"#64748b\",\"theme\":\"light\"}")
+  settings           Json     @default("{}")
+  subscriptionPlan   String   @default("starter")
+  subscriptionStatus String   @default("active")
+  maxUsers           Int      @default(10)
+  maxStorageBytes    BigInt   @default(10737418240)
+  usedStorageBytes   BigInt   @default(0)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  users         User[]
+  roles         Role[]
+  projects      Project[]
+  workflows     WorkflowTemplate[]
+  documents     Document[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@map("tenants")
+}
+
+// =============================================
+// USER MANAGEMENT
+// =============================================
+
+model User {
+  id           String    @id @default(cuid())
+  tenantId     String?
+  email        String
+  password     String
+  firstName    String
+  lastName     String
+  phone        String?
+  avatar       String?
+  isSuperAdmin Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id])
+  userRoles         UserRole[]
+  ownedProjects     Project[]         @relation("ProjectOwner")
+  ownedFollowUps    FollowUp[]        @relation("FollowUpOwner")
+  createdFollowUps  FollowUp[]        @relation("FollowUpCreator")
+  uploadedDocuments Document[]
+  notifications     Notification[]
+  stageHistories    StageHistory[]
+  followUpHistories FollowUpHistory[]
+  refreshTokens     RefreshToken[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// =============================================
+// ROLES & PERMISSIONS
+// =============================================
+
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  code        String @unique
+  name        String
+  description String?
+  module      String
+  action      String
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id        String  @id @default(cuid())
+  userId    String
+  roleId    String
+  projectId String?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, roleId, projectId])
+  @@map("user_roles")
+}
+
+// =============================================
+// WORKFLOW ENGINE
+// =============================================
+
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  stages      Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects Project[]
+
+  @@unique([tenantId, name])
+  @@map("workflow_templates")
+}
+
+// =============================================
+// PROJECT MANAGEMENT
+// =============================================
+
+model Project {
+  id               String    @id @default(cuid())
+  tenantId         String
+  projectNumber    String
+  name             String
+  description      String?
+  clientName       String
+  location         String?
+  status           String    @default("active")
+  priority         String    @default("medium")
+  startDate        DateTime?
+  dueDate          DateTime?
+  completionDate   DateTime?
+  workflowId       String?
+  currentStage     String?
+  ownerId          String
+  teamMembers      String[]  @default([])
+  followUpOwnerId  String?
+  reportingOwnerId String?
+  metadata         Json?     @default("{}")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflow  WorkflowTemplate? @relation(fields: [workflowId], references: [id])
+  owner     User              @relation("ProjectOwner", fields: [ownerId], references: [id])
+  stages    ProjectStage[]
+  followUps FollowUp[]
+  documents Document[]
+  userRoles UserRole[]
+
+  @@unique([tenantId, projectNumber])
+  @@map("projects")
+}
+
+model ProjectStage {
+  id             String    @id @default(cuid())
+  projectId      String
+  stageName      String
+  stageKey       String
+  stageOrder     Int
+  status         String    @default("pending")
+  assignedTo     String?
+  startDate      DateTime?
+  completionDate DateTime?
+  notes          String?
+  checklist      Json?     @default("[]")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stageHistory StageHistory[]
+  documents    Document[]
+
+  @@unique([projectId, stageKey])
+  @@map("project_stages")
+}
+
+model StageHistory {
+  id             String   @id @default(cuid())
+  stageId        String
+  changedById    String
+  previousStatus String?
+  newStatus      String
+  comment        String?
+  createdAt      DateTime @default(now())
+
+  stage     ProjectStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  changedBy User         @relation(fields: [changedById], references: [id])
+
+  @@map("stage_histories")
+}
+
+// =============================================
+// FOLLOW-UP MANAGEMENT
+// =============================================
+
+model FollowUp {
+  id           String    @id @default(cuid())
+  tenantId     String
+  projectId    String
+  ownerId      String
+  createdById  String
+  status       String    @default("pending")
+  lastFollowUp DateTime?
+  nextFollowUp DateTime
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner     User              @relation("FollowUpOwner", fields: [ownerId], references: [id])
+  createdBy User              @relation("FollowUpCreator", fields: [createdById], references: [id])
+  history   FollowUpHistory[]
+
+  @@map("follow_ups")
+}
+
+model FollowUpHistory {
+  id          String   @id @default(cuid())
+  followUpId  String
+  notes       String
+  createdById String
+  status      String?
+  createdAt   DateTime @default(now())
+
+  followUp  FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@map("follow_up_histories")
+}
+
+// =============================================
+// DOCUMENT MANAGEMENT
+// =============================================
+
+model Document {
+  id           String   @id @default(cuid())
+  tenantId     String
+  projectId    String
+  stageId      String?
+  fileName     String
+  originalName String
+  fileType     String
+  fileSize     BigInt
+  filePath     String
+  mimeType     String?
+  version      Int      @default(1)
+  uploadedById String
+  isActive     Boolean  @default(true)
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage      ProjectStage? @relation(fields: [stageId], references: [id])
+  uploadedBy User          @relation(fields: [uploadedById], references: [id])
+  versions   DocumentVersion[]
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id           String   @id @default(cuid())
+  documentId   String
+  version      Int
+  filePath     String
+  fileSize     BigInt
+  uploadedById String
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_versions")
+}
+
+// =============================================
+// AUDIT LOGGING
+// =============================================
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  tenantId     String?
+  userId       String?
+  userEmail    String?
+  userRole     String?
+  action       String
+  module       String
+  entityId     String?
+  entityType   String?
+  entityName   String?
+  previousData Json?
+  newData      Json?
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================
+// NOTIFICATIONS
+// =============================================
+
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}

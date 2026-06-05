@@ -1,0 +1,28 @@
+{
+  "name": "flowtiq",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Flowtiq – Multi-tenant, white-label workflow management platform",
+  "scripts": {
+    "dev": "turbo run dev --filter=@flowtiq/api --filter=@flowtiq/admin-portal",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "dev:admin": "turbo run dev --filter=@flowtiq/admin-portal",
+    "dev:api": "turbo run dev --filter=@flowtiq/api",
+    "build:admin": "turbo run build --filter=@flowtiq/admin-portal",
+    "db:setup": "turbo run db:generate db:push --filter=@flowtiq/database",
+    "db:seed": "turbo run db:seed --filter=@flowtiq/database",
+    "db:studio": "turbo run db:studio --filter=@flowtiq/database",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

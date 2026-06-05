@@ -1,0 +1,16 @@
+node_modules
+dist
+.turbo
+.env
+.env.local
+.env.production
+*.log
+.DS_Store
+coverage
+.vite
+build
+.next
+uploads/
+*.pem
+prisma/migrations
+.vercel
