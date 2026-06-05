@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: flowtiq-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @flowtiq/api build
+    startCommand: node services/api/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://flowtiq.vercel.app
+      - key: PORT
+        value: 3001
