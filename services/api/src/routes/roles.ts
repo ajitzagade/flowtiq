@@ -11,7 +11,7 @@ rolesRouter.use(authenticate);
 // GET /api/roles
 rolesRouter.get('/', async (req, res, next) => {
   try {
-    const { tenantId } = (req as AuthRequest).user;
+    const { tenantId } = (req as unknown as AuthRequest).user;
 
     const roles = await prisma.role.findMany({
       where: { tenantId: tenantId as string },
@@ -50,7 +50,7 @@ rolesRouter.get('/permissions/all', async (_req, res, next) => {
 // GET /api/roles/:id
 rolesRouter.get('/:id', async (req, res, next) => {
   try {
-    const { tenantId } = (req as AuthRequest).user;
+    const { tenantId } = (req as unknown as AuthRequest).user;
 
     const role = await prisma.role.findFirst({
       where: { id: req.params.id, tenantId: tenantId as string },

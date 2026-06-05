@@ -11,7 +11,7 @@ workflowsRouter.use(authenticate);
 // GET /api/workflows
 workflowsRouter.get('/', async (req, res, next) => {
   try {
-    const { tenantId } = (req as AuthRequest).user;
+    const { tenantId } = (req as unknown as AuthRequest).user;
 
     const workflows = await prisma.workflowTemplate.findMany({
       where: { tenantId: tenantId as string },
@@ -31,7 +31,7 @@ workflowsRouter.get('/', async (req, res, next) => {
 // GET /api/workflows/:id
 workflowsRouter.get('/:id', async (req, res, next) => {
   try {
-    const { tenantId } = (req as AuthRequest).user;
+    const { tenantId } = (req as unknown as AuthRequest).user;
 
     const workflow = await prisma.workflowTemplate.findFirst({
       where: { id: req.params.id, tenantId: tenantId as string },

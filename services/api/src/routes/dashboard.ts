@@ -160,7 +160,7 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         projectsByStatus: statusMap,
         projectsByPriority: priorityMap,
         upcomingFollowUps,
-        overdueFollowUps: overdueList,
+        overdueList,
         recentProjects,
         recentActivity,
       },

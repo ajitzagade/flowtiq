@@ -49,7 +49,7 @@ notificationsRouter.get('/', async (req, res, next) => {
 // PATCH /api/notifications/:id/read
 notificationsRouter.patch('/:id/read', async (req, res, next) => {
   try {
-    const authReq = req as AuthRequest;
+    const authReq = req as unknown as AuthRequest;
     const { userId } = authReq.user;
 
     await prisma.notification.updateMany({
