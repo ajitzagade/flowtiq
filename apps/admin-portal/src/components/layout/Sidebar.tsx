@@ -60,8 +60,13 @@ export function Sidebar() {
         style={{ borderColor: 'var(--sidebar-border)' }}>
         {!collapsed && (
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <Layers className="w-4.5 h-4.5 text-white" size={18} />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ backgroundColor: 'var(--brand-primary)' }}>
+              {(tenant?.branding as { logoUrl?: string } | undefined)?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${(tenant?.branding as { logoUrl?: string }).logoUrl}`} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <Layers className="w-4.5 h-4.5 text-white" size={18} />
+              )}
             </div>
             <div>
               <p className="text-white font-bold text-sm leading-none">
@@ -74,8 +79,13 @@ export function Sidebar() {
           </div>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
-            <Layers size={18} className="text-white" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden" style={{ backgroundColor: 'var(--brand-primary)' }}>
+            {(tenant?.branding as { logoUrl?: string } | undefined)?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${(tenant?.branding as { logoUrl?: string }).logoUrl}`} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <Layers size={18} className="text-white" />
+            )}
           </div>
         )}
         <button

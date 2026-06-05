@@ -21,6 +21,8 @@
   --sidebar-bg: #0f172a;
   --sidebar-text: #94a3b8;
   --sidebar-active: #3b82f6;
+  --brand-primary: #3b82f6;
+  --brand-primary-hover: #2563eb;
   --sidebar-hover: rgba(255, 255, 255, 0.06);
   --sidebar-border: rgba(255, 255, 255, 0.08);
 
@@ -184,8 +186,8 @@
   }
 
   .nav-item.active {
-    background-color: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
+    background-color: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    color: var(--brand-primary);
   }
 
   /* Page header */

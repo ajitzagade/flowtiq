@@ -20,7 +20,7 @@ const TABS = [
 ] as const;
 
 export default function SettingsPage() {
-  const { tenant, user } = useAuthStore();
+  const { tenant, user, setTenant } = useAuthStore();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>('branding');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +60,12 @@ export default function SettingsPage() {
         },
         body: JSON.stringify(data),
       }).then((r) => r.json()),
-    onSuccess: () => { toast.success('Branding saved'); qc.invalidateQueries({ queryKey: ['tenant'] }); refetchTenant(); },
+    onSuccess: async () => {
+      toast.success('Branding saved');
+      qc.invalidateQueries({ queryKey: ['tenant'] });
+      const updated = await refetchTenant();
+      if (updated.data) setTenant(updated.data);
+    },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -90,7 +95,8 @@ export default function SettingsPage() {
       await uploadFile(`/tenants/${currentTenant?.id}/logo`, fd);
       toast.success('Logo uploaded');
       qc.invalidateQueries({ queryKey: ['tenant'] });
-      refetchTenant();
+      const updated = await refetchTenant();
+      if (updated.data) setTenant(updated.data);
     } catch (err) {
       toast.error(getErrorMessage(err));
       setLogoPreview(null);
