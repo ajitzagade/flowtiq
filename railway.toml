@@ -1,8 +1,7 @@
 [build]
-builder = "nixpacks"
-buildCommand = "chmod +x node_modules/.bin/prisma && node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma && pnpm --filter @flowtiq/api build"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "node_modules/.bin/prisma db push --schema=packages/database/prisma/schema.prisma --accept-data-loss && node services/api/dist/index.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
