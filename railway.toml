@@ -1,8 +1,8 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm --filter @flowtiq/database exec prisma generate && pnpm --filter @flowtiq/api build"
+buildCommand = "chmod +x node_modules/.bin/prisma && node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma && pnpm --filter @flowtiq/api build"
 
 [deploy]
-startCommand = "pnpm --filter @flowtiq/database exec prisma db push --accept-data-loss && node services/api/dist/index.js"
+startCommand = "node_modules/.bin/prisma db push --schema=packages/database/prisma/schema.prisma --accept-data-loss && node services/api/dist/index.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
