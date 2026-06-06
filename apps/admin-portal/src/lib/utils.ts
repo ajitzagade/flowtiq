@@ -109,6 +109,67 @@ export function truncate(str: string, len = 50): string {
   return str.length > len ? `${str.slice(0, len)}...` : str;
 }
 
+// ── Stage / Progress Utilities ────────────────────────────────────────────────
+
+export const DEFAULT_WORKFLOW_STAGES: Array<{ key: string; name: string; order: number }> = [
+  { key: 'file_creation', name: 'File Creation', order: 1 },
+  { key: 'inward', name: 'Inward', order: 2 },
+  { key: 'scrutiny', name: 'Scrutiny', order: 3 },
+  { key: 'report_generation', name: 'Report Generation', order: 4 },
+  { key: 'approval', name: 'Approval', order: 5 },
+  { key: 'completed_stage', name: 'Completed', order: 6 },
+];
+
+/** Ordered colors for lifecycle stages (index-based, not key-based) */
+const STAGE_PALETTE = [
+  '#94a3b8', // slate   – File Creation / New
+  '#38bdf8', // sky     – Inward / Gathering
+  '#3b82f6', // blue    – Scrutiny / Analysis
+  '#8b5cf6', // violet  – Report / Design
+  '#f59e0b', // amber   – Approval / UAT
+  '#14b8a6', // teal    – Deployment
+  '#10b981', // emerald – Completed
+];
+
+export function getStageColor(stageIndex: number, totalStages: number): string {
+  if (stageIndex >= totalStages - 1) return '#10b981';
+  return STAGE_PALETTE[Math.min(stageIndex, STAGE_PALETTE.length - 2)];
+}
+
+export interface StageProgress {
+  percent: number;
+  stageIndex: number;
+  stageName: string;
+  color: string;
+}
+
+export function getProjectProgress(
+  currentStage: string | undefined,
+  status: string,
+  stages: Array<{ key: string; name: string; order: number }>
+): StageProgress {
+  if (status === 'completed') {
+    return { percent: 100, stageIndex: stages.length - 1, stageName: 'Completed', color: '#10b981' };
+  }
+  if (status === 'cancelled') {
+    return { percent: 0, stageIndex: -1, stageName: 'Cancelled', color: '#ef4444' };
+  }
+  if (!currentStage) {
+    return { percent: 0, stageIndex: -1, stageName: 'Not Started', color: '#94a3b8' };
+  }
+
+  const sorted = [...stages].sort((a, b) => a.order - b.order);
+  const idx = sorted.findIndex((s) => s.key === currentStage);
+
+  if (idx === -1) {
+    // Unknown stage key – show as partial
+    return { percent: 10, stageIndex: 0, stageName: currentStage.replace(/_/g, ' '), color: '#94a3b8' };
+  }
+
+  const percent = Math.round(((idx + 1) / sorted.length) * 100);
+  return { percent, stageIndex: idx, stageName: sorted[idx].name, color: getStageColor(idx, sorted.length) };
+}
+
 export function debounce<T extends (...args: unknown[]) => unknown>(fn: T, ms: number): (...args: Parameters<T>) => void {
   let timer: ReturnType<typeof setTimeout>;
   return function (...args: Parameters<T>) {

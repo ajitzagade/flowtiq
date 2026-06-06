@@ -9,6 +9,7 @@ import {
   TrendingUp, Users, Building2, ArrowRight,
 } from 'lucide-react';
 import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
+import { ProjectProgress } from '@/components/ProjectProgress';
 import Link from 'next/link';
 
 interface DashboardStats {
@@ -31,6 +32,7 @@ interface DashboardStats {
     clientName: string;
     status: string;
     priority: string;
+    currentStage?: string;
     dueDate?: string;
     owner?: { firstName: string; lastName: string };
   }>;
@@ -130,7 +132,7 @@ export default function DashboardPage() {
   return (
     <>
       <Header title="Dashboard" subtitle={`Welcome back, ${user?.firstName}. Here is what is happening.`} />
-      <div className="p-6 space-y-6 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-slide-in">
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -151,9 +153,9 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
           {/* Recent / Active Projects */}
-          <div className="lg:col-span-2 card">
+          <div className="xl:col-span-2 card">
             <div className="card-header">
               <div>
                 <h3 className="font-semibold text-slate-900">Active Projects</h3>
@@ -172,8 +174,8 @@ export default function DashboardPage() {
               )}
               {stats?.recentProjects?.map((project) => (
                 <Link key={project.id} href={`/projects/${project.id}`}>
-                  <div className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
+                  <div className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                    <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-mono text-slate-400">{project.projectNumber}</span>
@@ -194,6 +196,10 @@ export default function DashboardPage() {
                         </div>
                       )}
                     </div>
+                    <ProjectProgress
+                      currentStage={project.currentStage}
+                      status={project.status}
+                    />
                   </div>
                 </Link>
               ))}

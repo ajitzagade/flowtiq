@@ -77,7 +77,7 @@ function RoleModal({ role, permissions, onClose }: {
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
         </div>
         <div className="card-body space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Role Name *</label>
               <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Senior Analyst" />
@@ -178,7 +178,7 @@ export default function RolesPage() {
         />
       )}
 
-      <div className="p-6 space-y-4 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
         <div className="flex justify-end">
           <button onClick={() => setShowModal(true)} className="btn-primary">
             <Plus size={16} /> New Role

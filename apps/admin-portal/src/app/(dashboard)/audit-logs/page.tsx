@@ -51,7 +51,7 @@ export default function AuditLogsPage() {
   return (
     <>
       <Header title="Audit Logs" subtitle="Complete record of all system activities" />
-      <div className="p-6 space-y-4 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
         {/* Filters */}
         <div className="card p-4">
           <div className="flex flex-wrap gap-3">
@@ -64,7 +64,7 @@ export default function AuditLogsPage() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
-            <select className="form-select w-36" value={module} onChange={(e) => { setModule(e.target.value); setPage(1); }}>
+            <select className="form-select w-full sm:w-36" value={module} onChange={(e) => { setModule(e.target.value); setPage(1); }}>
               <option value="">All Modules</option>
               <option value="projects">Projects</option>
               <option value="stages">Stages</option>
@@ -75,7 +75,7 @@ export default function AuditLogsPage() {
               <option value="workflows">Workflows</option>
               <option value="auth">Auth</option>
             </select>
-            <select className="form-select w-40" value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }}>
+            <select className="form-select w-full sm:w-40" value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }}>
               <option value="">All Actions</option>
               <option value="CREATED">Created</option>
               <option value="UPDATED">Updated</option>
@@ -85,8 +85,8 @@ export default function AuditLogsPage() {
               <option value="STATUS_CHANGED">Status Changed</option>
               <option value="LOGGED_IN">Logged In</option>
             </select>
-            <input type="date" className="form-input w-36" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} placeholder="From" />
-            <input type="date" className="form-input w-36" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} placeholder="To" />
+            <input type="date" className="form-input w-full sm:w-36" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} placeholder="From" />
+            <input type="date" className="form-input w-full sm:w-36" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} placeholder="To" />
           </div>
         </div>
 

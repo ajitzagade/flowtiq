@@ -186,7 +186,7 @@ export default function DocumentsPage() {
       <Header title="Documents" subtitle="Manage and track all uploaded documents" />
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} initialProjectId={uploadProjectId} />}
 
-      <div className="p-6 space-y-4 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
         <div className="card p-4">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-48">

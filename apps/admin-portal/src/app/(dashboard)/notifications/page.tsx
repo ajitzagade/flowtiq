@@ -47,8 +47,8 @@ export default function NotificationsPage() {
   return (
     <>
       <Header title="Notifications" subtitle={`${unreadCount} unread`} />
-      <div className="p-6 space-y-4 animate-slide-in">
-        <div className="flex items-center justify-between">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-2">
             {['', 'false', 'true'].map((val) => (
               <button

@@ -76,7 +76,7 @@ function StageCard({ stage, projectId }: { stage: ProjectStage; projectId: strin
       {expanded && (
         <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-4">
           {/* Dates */}
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
             <div>
               <p className="text-xs text-slate-400 mb-0.5">Started</p>
               <p className="text-slate-700">{formatDate(stage.startDate)}</p>
@@ -225,7 +225,7 @@ export default function ProjectDetailPage() {
   return (
     <>
       <Header title={project.name} subtitle={`${project.projectNumber} • ${project.clientName}`} />
-      <div className="p-6 space-y-6 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-slide-in">
         {/* Back + Meta */}
         <div className="flex items-start justify-between">
           <Link href="/projects" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
@@ -239,7 +239,7 @@ export default function ProjectDetailPage() {
 
         {/* Project Info Card */}
         <div className="card p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <p className="text-xs font-medium text-slate-400 mb-1">Client</p>
               <p className="font-semibold text-slate-900">{project.clientName}</p>
@@ -285,7 +285,7 @@ export default function ProjectDetailPage() {
 
         {/* Tabs */}
         <div className="border-b border-slate-200">
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto scrollbar-none">
             {[
               { key: 'stages', label: 'Stages', icon: Clock },
               { key: 'documents', label: 'Documents', icon: FileText },
@@ -349,8 +349,10 @@ export default function ProjectDetailPage() {
                     </p>
                   </div>
                   <a
-                    href={`/api/documents/${doc.id}/download`}
+                    href={`${process.env.NEXT_PUBLIC_API_URL}/api/documents/${doc.id}/download`}
                     className="btn-secondary text-xs py-1 px-2.5"
+                    target="_blank"
+                    rel="noreferrer"
                   >
                     Download
                   </a>

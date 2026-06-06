@@ -238,7 +238,7 @@ export default function FollowUpsPage() {
       {showCreate && <CreateFollowUpModal onClose={() => setShowCreate(false)} />}
       {editFollowUp && <UpdateFollowUpModal followUp={editFollowUp} onClose={() => setEditFollowUp(null)} />}
 
-      <div className="p-6 space-y-4 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
         {/* Filters */}
         <div className="card p-4">
           <div className="flex flex-wrap gap-3">

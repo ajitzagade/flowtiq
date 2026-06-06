@@ -73,7 +73,7 @@ function UserModal({ user, roles, onClose }: {
         </div>
         <div className="card-body">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="form-label">First Name *</label>
                 <input className={cn('form-input', errors.firstName && 'border-red-400')} {...register('firstName')} />
@@ -180,7 +180,7 @@ export default function UsersPage() {
         />
       )}
 
-      <div className="p-6 space-y-4 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
         <div className="card p-4">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-48">

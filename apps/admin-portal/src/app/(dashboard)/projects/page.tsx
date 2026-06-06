@@ -10,6 +10,8 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Plus, Search, FolderKanban, Edit, Eye, Trash2, X, ChevronLeft, ChevronRight, LayoutList, Kanban } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { ProjectProgress } from '@/components/ProjectProgress';
+import { useRouter } from 'next/navigation';
 import { formatDate, getStatusBadgeClass, getPriorityBadgeClass, cn, truncate, getErrorMessage } from '@/lib/utils';
 import Link from 'next/link';
 import type { Project, User, WorkflowTemplate } from '@flowtiq/shared-types';
@@ -33,6 +35,8 @@ function KanbanCard({
   onDragEnd: () => void;
   onEdit: (p: Project) => void;
 }) {
+  const router = useRouter();
+
   return (
     <div
       draggable
@@ -42,16 +46,12 @@ function KanbanCard({
         onDragStart(project.id);
       }}
       onDragEnd={onDragEnd}
-      className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-200 transition-all select-none group"
+      onClick={() => router.push(`/projects/${project.id}`)}
+      className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-200 transition-all select-none group"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2">{project.name}</p>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <Link href={`/projects/${project.id}`}>
-            <button className="p-1 text-slate-400 hover:text-blue-600 rounded" title="View">
-              <Eye size={13} />
-            </button>
-          </Link>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(project); }}
             className="p-1 text-slate-400 hover:text-slate-700 rounded"
@@ -62,7 +62,7 @@ function KanbanCard({
         </div>
       </div>
       <p className="text-xs text-slate-500 mb-2">{project.clientName}</p>
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
         <span className="text-[10px] font-mono text-slate-300">{project.projectNumber}</span>
         <div className="flex items-center gap-1.5">
           <span className={cn('badge text-[10px] px-1.5 py-0.5', getPriorityBadgeClass(project.priority))}>
@@ -73,6 +73,7 @@ function KanbanCard({
           </span>
         </div>
       </div>
+      <ProjectProgress currentStage={project.currentStage} status={project.status} compact />
       {project.dueDate && (
         <p className="text-[10px] text-slate-400 mt-1.5">Due {formatDate(project.dueDate)}</p>
       )}
@@ -89,6 +90,7 @@ function KanbanBoard({
   const qc = useQueryClient();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [boardSearch, setBoardSearch] = useState('');
   const dragCounters = useRef<Record<string, number>>({});
 
   const { data: allProjects, isLoading: loadingProjects } = useQuery({
@@ -123,7 +125,18 @@ function KanbanBoard({
     ...rawStages.sort((a, b) => a.order - b.order),
   ];
 
-  const projects = allProjects?.items || [];
+  const allProjectItems = allProjects?.items || [];
+  const searchLower = boardSearch.toLowerCase();
+  const projects = boardSearch
+    ? allProjectItems.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchLower) ||
+          p.projectNumber.toLowerCase().includes(searchLower) ||
+          p.clientName.toLowerCase().includes(searchLower) ||
+          (p.currentStage || '').toLowerCase().includes(searchLower) ||
+          p.status.toLowerCase().includes(searchLower)
+      )
+    : allProjectItems;
 
   // Bucket projects into columns
   const buckets: Record<string, Project[]> = {};
@@ -201,6 +214,17 @@ function KanbanBoard({
   }
 
   return (
+    <div>
+      {/* Board search */}
+      <div className="mb-3 relative max-w-xs">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          className="form-input pl-8 py-2 text-sm"
+          placeholder="Search board..."
+          value={boardSearch}
+          onChange={(e) => setBoardSearch(e.target.value)}
+        />
+      </div>
     <div className="overflow-x-auto pb-4">
       <div className="flex gap-3 min-w-max">
         {stages.map((col) => {
@@ -260,6 +284,7 @@ function KanbanBoard({
           );
         })}
       </div>
+    </div>
     </div>
   );
 }
@@ -349,7 +374,7 @@ function ProjectModal({
           </button>
         </div>
         <div className="card-body">
-          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="form-label">Project Name *</label>
               <input className={cn('form-input', errors.name && 'border-red-400')} placeholder="e.g. Sunrise Residency - Building Plan" {...register('name')} />
@@ -484,7 +509,7 @@ export default function ProjectsPage() {
         />
       )}
 
-      <div className="p-6 space-y-4 animate-slide-in">
+      <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
         {/* Toolbar */}
         <div className="card p-4">
           <div className="flex flex-wrap gap-3">
@@ -500,7 +525,7 @@ export default function ProjectsPage() {
                   />
                 </div>
                 <select
-                  className="form-select w-40"
+                  className="form-select w-full sm:w-40"
                   value={status}
                   onChange={(e) => { setStatus(e.target.value); setPage(1); }}
                 >
@@ -511,7 +536,7 @@ export default function ProjectsPage() {
                   <option value="cancelled">Cancelled</option>
                 </select>
                 <select
-                  className="form-select w-40"
+                  className="form-select w-full sm:w-40"
                   value={priority}
                   onChange={(e) => { setPriority(e.target.value); setPage(1); }}
                 >
@@ -569,7 +594,7 @@ export default function ProjectsPage() {
                     <th>Client</th>
                     <th>Status</th>
                     <th>Priority</th>
-                    <th>Stage</th>
+                    <th className="min-w-[160px]">Progress</th>
                     <th>Due Date</th>
                     <th>Owner</th>
                     <th className="text-right">Actions</th>
@@ -619,12 +644,11 @@ export default function ProjectsPage() {
                           {project.priority}
                         </span>
                       </td>
-                      <td>
-                        {project.currentStage ? (
-                          <span className="text-sm text-slate-600 capitalize">{project.currentStage.replace('_', ' ')}</span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
+                      <td className="min-w-[160px]">
+                        <ProjectProgress
+                          currentStage={project.currentStage}
+                          status={project.status}
+                        />
                       </td>
                       <td>{project.dueDate ? formatDate(project.dueDate) : <span className="text-slate-300">—</span>}</td>
                       <td>

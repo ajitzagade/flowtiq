@@ -132,11 +132,31 @@ export default function SettingsPage() {
   return (
     <>
       <Header title="Settings" subtitle="Configure your organization settings" />
-      <div className="p-6 animate-slide-in">
-        <div className="flex gap-6">
-          {/* Sidebar tabs */}
-          <div className="w-48 flex-shrink-0">
-            <nav className="space-y-0.5">
+      <div className="p-4 sm:p-6 animate-slide-in">
+        {/* Mobile: horizontal scrollable tab bar; Desktop: vertical sidebar */}
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+          {/* Tab nav */}
+          <div className="md:w-48 md:flex-shrink-0">
+            {/* Mobile: horizontal scroll tabs */}
+            <div className="flex md:hidden gap-1 overflow-x-auto pb-1 scrollbar-none border-b border-slate-200">
+              {TABS.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors flex-shrink-0',
+                    activeTab === key
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  )}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Desktop: vertical list */}
+            <nav className="hidden md:block space-y-0.5">
               {TABS.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -163,7 +183,7 @@ export default function SettingsPage() {
                   <h3>Branding & Theme</h3>
                 </div>
                 <div className="card-body space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div>
                       <label className="form-label">Organization Name</label>
                       <input
@@ -225,7 +245,7 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div>
                       <label className="form-label">Primary Color</label>
                       <div className="flex items-center gap-3">
@@ -298,7 +318,7 @@ export default function SettingsPage() {
                   <h3>General Settings</h3>
                 </div>
                 <div className="card-body space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="form-label">Timezone</label>
                       <select className="form-select">
