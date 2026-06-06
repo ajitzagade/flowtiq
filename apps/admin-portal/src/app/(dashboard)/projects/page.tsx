@@ -106,18 +106,20 @@ function KanbanBoard({
   // Build stage columns from default workflow, fallback to seeded stages
   const defaultWorkflow = workflows?.find((w) => w.isDefault) || workflows?.[0];
   const rawStages: StageColumn[] = defaultWorkflow?.stages
-    ? (defaultWorkflow.stages as Array<{ key: string; name: string; order: number }>).map((s) => ({
-        key: s.key,
-        name: s.name,
-        order: s.order,
-      }))
+    ? (defaultWorkflow.stages as Array<Record<string, unknown>>)
+        .map((s) => ({
+          key: (s.stageKey || s.key) as string,
+          name: (s.stageName || s.name) as string,
+          order: s.order as number,
+        }))
+        .filter((s) => s.key && s.name)
     : [
         { key: 'file_creation', name: 'File Creation', order: 1 },
         { key: 'inward', name: 'Inward', order: 2 },
         { key: 'scrutiny', name: 'Scrutiny', order: 3 },
         { key: 'report_generation', name: 'Report Generation', order: 4 },
         { key: 'approval', name: 'Approval', order: 5 },
-        { key: 'completed', name: 'Completed', order: 6 },
+        { key: 'completed_stage', name: 'Completed', order: 6 },
       ];
 
   const stages: StageColumn[] = [

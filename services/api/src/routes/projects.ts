@@ -111,7 +111,7 @@ projectsRouter.get('/:id', requirePermission('projects:view'), async (req, res, 
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
 
-    const project = await prisma.project.findFirst({
+    let project = await prisma.project.findFirst({
       where: { id: req.params.id, tenantId: tenantId as string },
       include: {
         owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
@@ -143,7 +143,51 @@ projectsRouter.get('/:id', requirePermission('projects:view'), async (req, res, 
       return;
     }
 
-    res.json({ success: true, data: project });
+    // Auto-create ProjectStage records if project has a workflow but no stages (e.g. seeded projects)
+    if (project.stages.length === 0 && project.workflowId && project.workflow) {
+      const wfStages = project.workflow.stages as Array<Record<string, unknown>>;
+      await prisma.projectStage.createMany({
+        data: wfStages.map((s) => ({
+          projectId: project!.id,
+          stageName: (s.stageName || s.name) as string,
+          stageKey: (s.stageKey || s.key) as string,
+          stageOrder: s.order as number,
+          status: (s.stageKey || s.key) === project!.currentStage ? 'in_progress' : 'pending',
+          checklist: (s.checklist as object[]) || [],
+        })),
+      });
+      // Re-fetch with stages populated
+      project = await prisma.project.findFirst({
+        where: { id: req.params.id, tenantId: tenantId as string },
+        include: {
+          owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
+          workflow: { select: { id: true, name: true, stages: true } },
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            include: {
+              stageHistory: {
+                orderBy: { createdAt: 'desc' },
+                include: { changedBy: { select: { id: true, firstName: true, lastName: true } } },
+              },
+            },
+          },
+          followUps: {
+            where: { status: { in: ['pending', 'overdue'] } },
+            orderBy: { nextFollowUp: 'asc' },
+            include: { owner: { select: { id: true, firstName: true, lastName: true } } },
+          },
+          _count: { select: { documents: true } },
+        },
+      });
+    }
+
+    // Map stageHistory → history for frontend compatibility
+    const stagesWithHistory = project!.stages.map((s) => ({
+      ...s,
+      history: s.stageHistory,
+    }));
+
+    res.json({ success: true, data: { ...project, stages: stagesWithHistory, documentsCount: project!._count.documents } });
   } catch (err) {
     next(err);
   }
@@ -208,17 +252,15 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
 
     // Create stage instances if workflow is set
     if (data.workflowId && project.workflow) {
-      const stages = project.workflow.stages as Array<{
-        key: string; name: string; order: number; checklist?: object[];
-      }>;
+      const stages = project.workflow.stages as Array<Record<string, unknown>>;
       await prisma.projectStage.createMany({
         data: stages.map((s) => ({
           projectId: project.id,
-          stageName: s.name,
-          stageKey: s.key,
-          stageOrder: s.order,
-          status: s.order === 1 ? 'in_progress' : 'pending',
-          checklist: s.checklist || [],
+          stageName: (s.stageName || s.name) as string,
+          stageKey: (s.stageKey || s.key) as string,
+          stageOrder: s.order as number,
+          status: (s.order as number) === 1 ? 'in_progress' : 'pending',
+          checklist: (s.checklist as object[]) || [],
         })),
       });
     }
