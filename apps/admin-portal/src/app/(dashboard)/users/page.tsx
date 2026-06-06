@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -29,6 +29,11 @@ function UserModal({ user, roles, onClose }: {
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
     defaultValues: user
@@ -66,10 +71,10 @@ function UserModal({ user, roles, onClose }: {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-lg w-full">
+      <div className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
-          <h3>{user ? 'Edit User' : 'New User'}</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+          <h3 id="modal-title">{user ? 'Edit User' : 'New User'}</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="card-body">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

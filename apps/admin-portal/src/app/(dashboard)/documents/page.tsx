@@ -14,6 +14,11 @@ import type { Document, Project } from '@flowtiq/shared-types';
 
 function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; initialProjectId?: string }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const [projectId, setProjectId] = useState(initialProjectId);
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState('');
@@ -59,10 +64,10 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-md w-full">
+      <div className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
-          <h3>Upload Document</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+          <h3 id="modal-title">Upload Document</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="card-body space-y-4">
           <div>

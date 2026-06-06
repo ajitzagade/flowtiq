@@ -45,22 +45,25 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
         {/* Notifications */}
         <Link
           href="/notifications"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
         >
-          <Bell size={20} />
+          <Bell size={20} aria-hidden="true" />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center" aria-hidden="true">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </Link>
 
-        {/* Avatar */}
-        <div
-          className={`w-8 h-8 rounded-full ${avatarColor} text-white flex items-center justify-center text-xs font-semibold cursor-pointer flex-shrink-0`}
+        {/* Avatar — links to settings */}
+        <Link
+          href="/settings"
+          aria-label={`User profile: ${user?.firstName} ${user?.lastName}`}
+          className={`w-8 h-8 rounded-full ${avatarColor} text-white flex items-center justify-center text-xs font-semibold flex-shrink-0 hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 transition-all`}
         >
           {initials}
-        </div>
+        </Link>
       </div>
     </header>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -21,6 +21,11 @@ function RoleModal({ role, permissions, onClose }: {
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const [name, setName] = useState(role?.name || '');
   const [description, setDescription] = useState(role?.description || '');
   const [color, setColor] = useState(role?.color || '#3b82f6');
@@ -71,10 +76,10 @@ function RoleModal({ role, permissions, onClose }: {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-2xl w-full">
+      <div className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
-          <h3>{role ? 'Edit Role' : 'New Role'}</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+          <h3 id="modal-title">{role ? 'Edit Role' : 'New Role'}</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="card-body space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

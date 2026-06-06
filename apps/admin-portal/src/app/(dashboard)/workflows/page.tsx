@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -25,6 +25,11 @@ function generateKey(name: string) {
 
 function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | null; onClose: () => void }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const [name, setName] = useState(workflow?.name || '');
   const [description, setDescription] = useState(workflow?.description || '');
   const [isDefault, setIsDefault] = useState(workflow?.isDefault || false);
@@ -83,10 +88,10 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="modal-content max-w-2xl w-full max-h-[90vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header flex-shrink-0">
-          <h3>{workflow ? 'Edit Workflow' : 'New Workflow'}</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+          <h3 id="modal-title">{workflow ? 'Edit Workflow' : 'New Workflow'}</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="card-body overflow-y-auto flex-1 space-y-5">
           {/* Basic info */}

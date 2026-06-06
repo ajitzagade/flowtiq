@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -38,6 +38,11 @@ type UpdateForm = z.infer<typeof updateSchema>;
 
 function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const { data: projectsData } = useQuery({
     queryKey: ['projects', 'all'],
     queryFn: () => get<{ items: Project[] }>('/projects?pageSize=100&status=active'),
@@ -64,10 +69,10 @@ function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-lg w-full">
+      <div className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title-create">
         <div className="card-header">
-          <h3>New Follow-up</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+          <h3 id="modal-title-create">New Follow-up</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="card-body">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -129,6 +134,11 @@ function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
 
 function UpdateFollowUpModal({ followUp, onClose }: { followUp: FollowUp; onClose: () => void }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const { register, handleSubmit, formState: { isSubmitting } } = useForm<UpdateForm>({
     resolver: zodResolver(updateSchema),
     defaultValues: { status: followUp.status, nextFollowUp: followUp.nextFollowUp?.split('T')[0] },
@@ -147,10 +157,10 @@ function UpdateFollowUpModal({ followUp, onClose }: { followUp: FollowUp; onClos
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-md w-full">
+      <div className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title-update">
         <div className="card-header">
-          <h3>Update Follow-up</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+          <h3 id="modal-title-update">Update Follow-up</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
         </div>
         <div className="card-body">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

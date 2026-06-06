@@ -53,8 +53,10 @@ function StageCard({ stage, projectId }: { stage: ProjectStage; projectId: strin
 
   return (
     <div className={cn('card border-l-4 overflow-hidden', stageColorMap[stage.status] || 'border-l-slate-200')}>
-      <div
-        className="px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50"
+      <button
+        type="button"
+        aria-expanded={expanded}
+        className="w-full px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50 text-left"
         onClick={() => setExpanded(!expanded)}
       >
         <StageStatusIcon status={stage.status} />
@@ -69,9 +71,9 @@ function StageCard({ stage, projectId }: { stage: ProjectStage; projectId: strin
           {stage.completionDate && (
             <span className="text-xs text-slate-400">{formatDate(stage.completionDate)}</span>
           )}
-          {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+          {expanded ? <ChevronUp size={16} className="text-slate-400" aria-hidden="true" /> : <ChevronDown size={16} className="text-slate-400" aria-hidden="true" />}
         </div>
-      </div>
+      </button>
 
       {expanded && (
         <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-4">
@@ -133,7 +135,7 @@ function StageCard({ stage, projectId }: { stage: ProjectStage; projectId: strin
             <div className="bg-slate-50 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-700">Update Stage</p>
-                <button onClick={() => setShowUpdateForm(false)}><X size={16} className="text-slate-400" /></button>
+                <button onClick={() => setShowUpdateForm(false)} aria-label="Close update form"><X size={16} className="text-slate-400" aria-hidden="true" /></button>
               </div>
               <div>
                 <label className="form-label text-xs">Status</label>

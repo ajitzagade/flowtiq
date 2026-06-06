@@ -53,6 +53,7 @@ export function Sidebar() {
 
   return (
     <aside
+      aria-label="Main navigation"
       className={cn(
         'flex flex-col h-screen fixed left-0 top-0 z-50 border-r transition-all duration-300 ease-in-out',
         // Mobile: translate off-screen when closed, slide in when open
@@ -124,6 +125,7 @@ export function Sidebar() {
         {mobileOpen ? (
           <button
             onClick={() => setMobileOpen(false)}
+            aria-label="Close sidebar"
             className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded flex-shrink-0 ml-2"
           >
             <X size={16} />
@@ -131,6 +133,7 @@ export function Sidebar() {
         ) : (
           <button
             onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className="hidden md:block text-slate-500 hover:text-slate-300 transition-colors p-1 rounded flex-shrink-0"
             style={{ marginLeft: collapsed ? 0 : 8 }}
           >
@@ -142,7 +145,13 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         {navItems.map(({ key, label, href, icon: Icon }) => (
-          <Link key={key} href={href} onClick={handleNavClick}>
+          <Link
+            key={key}
+            href={href}
+            onClick={handleNavClick}
+            aria-label={!showLabels ? label : undefined}
+            aria-current={isActive(href) ? 'page' : undefined}
+          >
             <div
               className={cn(
                 'nav-item',
@@ -151,7 +160,7 @@ export function Sidebar() {
               )}
               title={!showLabels ? label : undefined}
             >
-              <Icon size={18} className="flex-shrink-0" />
+              <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
               {showLabels && <span>{label}</span>}
             </div>
           </Link>
@@ -168,13 +177,14 @@ export function Sidebar() {
         )}
         <button
           onClick={handleLogout}
+          aria-label={!showLabels ? 'Sign out' : undefined}
           className={cn(
             'nav-item w-full text-left hover:text-red-400',
             !showLabels && 'justify-center px-2',
           )}
           title={!showLabels ? 'Sign out' : undefined}
         >
-          <LogOut size={18} className="flex-shrink-0" />
+          <LogOut size={18} className="flex-shrink-0" aria-hidden="true" />
           {showLabels && <span>Sign out</span>}
         </button>
       </div>

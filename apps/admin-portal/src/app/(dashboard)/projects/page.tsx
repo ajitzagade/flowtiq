@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -324,6 +324,11 @@ function ProjectModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   const { data: users } = useQuery<{ items: User[] }>({
     queryKey: ['users', 'all'],
@@ -378,11 +383,11 @@ function ProjectModal({
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-2xl w-full">
+      <div className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
-          <h3>{project ? 'Edit Project' : 'New Project'}</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
-            <X size={18} />
+          <h3 id="modal-title">{project ? 'Edit Project' : 'New Project'}</h3>
+          <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5 rounded-lg">
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <div className="card-body">
