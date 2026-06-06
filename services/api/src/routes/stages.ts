@@ -8,7 +8,7 @@ export const stagesRouter = Router();
 stagesRouter.use(authenticate);
 
 // GET /api/stages/project/:projectId
-stagesRouter.get('/project/:projectId', requirePermission('projects:read'), async (req, res, next) => {
+stagesRouter.get('/project/:projectId', requirePermission('projects:view'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -46,7 +46,7 @@ stagesRouter.get('/project/:projectId', requirePermission('projects:read'), asyn
 });
 
 // GET /api/stages/:id
-stagesRouter.get('/:id', requirePermission('projects:read'), async (req, res, next) => {
+stagesRouter.get('/:id', requirePermission('projects:view'), async (req, res, next) => {
   try {
     const stage = await prisma.projectStage.findUnique({
       where: { id: req.params.id },
@@ -80,7 +80,7 @@ stagesRouter.get('/:id', requirePermission('projects:read'), async (req, res, ne
 });
 
 // PATCH /api/stages/:id
-stagesRouter.patch('/:id', requirePermission('stages:update'), async (req, res, next) => {
+stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;

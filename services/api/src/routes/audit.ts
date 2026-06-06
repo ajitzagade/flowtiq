@@ -4,7 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 
 export const auditRouter = Router();
-auditRouter.use(authenticate, requirePermission('audit:read'));
+auditRouter.use(authenticate, requirePermission('reports:view'));
 
 // GET /api/audit
 auditRouter.get('/', async (req, res, next) => {

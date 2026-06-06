@@ -9,7 +9,7 @@ export const followupsRouter = Router();
 followupsRouter.use(authenticate);
 
 // GET /api/follow-ups
-followupsRouter.get('/', requireAnyPermission(['followups:create', 'followups:view_all']), async (req, res, next) => {
+followupsRouter.get('/', requireAnyPermission(['follow_ups:view', 'follow_ups:create']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId, userId, permissions, isSuperAdmin } = authReq.user;
@@ -19,7 +19,7 @@ followupsRouter.get('/', requireAnyPermission(['followups:create', 'followups:vi
     } = req.query as Record<string, string>;
 
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
-    const canViewAll = isSuperAdmin || permissions.includes('followups:view_all');
+    const canViewAll = isSuperAdmin || permissions.includes('follow_ups:view');
 
     const where: Record<string, unknown> = { tenantId: tenantId as string };
 
@@ -84,7 +84,7 @@ followupsRouter.get('/', requireAnyPermission(['followups:create', 'followups:vi
 });
 
 // GET /api/follow-ups/:id
-followupsRouter.get('/:id', requireAnyPermission(['followups:create', 'followups:view_all']), async (req, res, next) => {
+followupsRouter.get('/:id', requireAnyPermission(['follow_ups:view', 'follow_ups:create']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -123,7 +123,7 @@ const createFollowUpSchema = z.object({
 });
 
 // POST /api/follow-ups
-followupsRouter.post('/', requirePermission('followups:create'), async (req, res, next) => {
+followupsRouter.post('/', requirePermission('follow_ups:create'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId, userId } = authReq.user;
@@ -173,7 +173,7 @@ followupsRouter.post('/', requirePermission('followups:create'), async (req, res
 });
 
 // PATCH /api/follow-ups/:id
-followupsRouter.patch('/:id', requirePermission('followups:update'), async (req, res, next) => {
+followupsRouter.patch('/:id', requirePermission('follow_ups:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId, userId } = authReq.user;
@@ -232,7 +232,7 @@ followupsRouter.patch('/:id', requirePermission('followups:update'), async (req,
 });
 
 // DELETE /api/follow-ups/:id
-followupsRouter.delete('/:id', requirePermission('followups:update'), async (req, res, next) => {
+followupsRouter.delete('/:id', requirePermission('follow_ups:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;

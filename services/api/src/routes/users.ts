@@ -16,7 +16,7 @@ function tenantScope(req: AuthRequest) {
 }
 
 // GET /api/users
-usersRouter.get('/', requirePermission('users:read'), async (req, res, next) => {
+usersRouter.get('/', requirePermission('users:view'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
@@ -72,7 +72,7 @@ usersRouter.get('/', requirePermission('users:read'), async (req, res, next) => 
 });
 
 // GET /api/users/:id
-usersRouter.get('/:id', requirePermission('users:read'), async (req, res, next) => {
+usersRouter.get('/:id', requirePermission('users:view'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
@@ -187,7 +187,7 @@ usersRouter.post('/', requirePermission('users:create'), async (req, res, next) 
 });
 
 // PATCH /api/users/:id
-usersRouter.patch('/:id', requirePermission('users:update'), async (req, res, next) => {
+usersRouter.patch('/:id', requirePermission('users:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
@@ -234,7 +234,7 @@ usersRouter.patch('/:id', requirePermission('users:update'), async (req, res, ne
 });
 
 // DELETE /api/users/:id
-usersRouter.delete('/:id', requirePermission('users:delete'), async (req, res, next) => {
+usersRouter.delete('/:id', requirePermission('users:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
