@@ -23,14 +23,26 @@ interface StageColumn {
   order: number;
 }
 
+// ── Default stages (fallback + matches seed workflow keys exactly) ─────────────
+const DEFAULT_KANBAN_STAGES: StageColumn[] = [
+  { key: 'file_creation',    name: 'File Creation',    order: 1 },
+  { key: 'inward',           name: 'Inward',           order: 2 },
+  { key: 'scrutiny',         name: 'Scrutiny',         order: 3 },
+  { key: 'report_generation',name: 'Report Generation',order: 4 },
+  { key: 'approval',         name: 'Approval',         order: 5 },
+  { key: 'completed_stage',  name: 'Completed',        order: 6 },
+];
+
 // ── KanbanCard ────────────────────────────────────────────────────────────────
 function KanbanCard({
   project,
+  isDragging,
   onDragStart,
   onDragEnd,
   onEdit,
 }: {
   project: Project;
+  isDragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onEdit: (p: Project) => void;
@@ -47,24 +59,24 @@ function KanbanCard({
       }}
       onDragEnd={onDragEnd}
       onClick={() => router.push(`/projects/${project.id}`)}
-      className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-200 transition-all select-none group"
+      className={cn(
+        'bg-white border rounded-xl p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group',
+        isDragging ? 'opacity-40 border-blue-300 rotate-1' : 'border-slate-200 hover:border-blue-200',
+      )}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2">{project.name}</p>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(project); }}
-            className="p-1 text-slate-400 hover:text-slate-700 rounded"
-            title="Edit"
-          >
-            <Edit size={13} />
-          </button>
-        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+          className="p-1 text-slate-300 hover:text-slate-600 rounded opacity-0 group-hover:opacity-100 flex-shrink-0"
+        >
+          <Edit size={13} />
+        </button>
       </div>
       <p className="text-xs text-slate-500 mb-2">{project.clientName}</p>
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+      <div className="flex items-center justify-between gap-1 flex-wrap mb-2">
         <span className="text-[10px] font-mono text-slate-300">{project.projectNumber}</span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <span className={cn('badge text-[10px] px-1.5 py-0.5', getPriorityBadgeClass(project.priority))}>
             {project.priority}
           </span>
@@ -82,11 +94,7 @@ function KanbanCard({
 }
 
 // ── KanbanBoard ───────────────────────────────────────────────────────────────
-function KanbanBoard({
-  onEdit,
-}: {
-  onEdit: (p: Project) => void;
-}) {
+function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   const qc = useQueryClient();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
@@ -103,49 +111,33 @@ function KanbanBoard({
     queryFn: () => get<WorkflowTemplate[]>('/workflows'),
   });
 
-  // Build stage columns from default workflow, fallback to seeded stages
-  const defaultWorkflow = workflows?.find((w) => w.isDefault) || workflows?.[0];
-  const rawStages: StageColumn[] = defaultWorkflow?.stages
-    ? (defaultWorkflow.stages as unknown as Array<Record<string, unknown>>)
-        .map((s) => ({
-          key: (s.stageKey || s.key) as string,
-          name: (s.stageName || s.name) as string,
-          order: s.order as number,
-        }))
-        .filter((s) => s.key && s.name)
-    : [
-        { key: 'file_creation', name: 'File Creation', order: 1 },
-        { key: 'inward', name: 'Inward', order: 2 },
-        { key: 'scrutiny', name: 'Scrutiny', order: 3 },
-        { key: 'report_generation', name: 'Report Generation', order: 4 },
-        { key: 'approval', name: 'Approval', order: 5 },
-        { key: 'completed_stage', name: 'Completed', order: 6 },
-      ];
+  // Build stage columns — use workflow from API (already normalized by API), fallback to defaults
+  const defaultWorkflow = workflows?.find((w) => w.isDefault) ?? workflows?.[0];
+  const workflowStages: StageColumn[] = defaultWorkflow?.stages
+    ?.filter((s) => s.key && s.name)
+    .map((s) => ({ key: s.key, name: s.name, order: s.order }))
+    .sort((a, b) => a.order - b.order) ?? DEFAULT_KANBAN_STAGES;
 
-  const stages: StageColumn[] = [
-    { key: '__no_stage__', name: 'No Stage', order: 0 },
-    ...rawStages.sort((a, b) => a.order - b.order),
-  ];
+  // All columns including "no stage" bucket
+  const allStageKeys = new Set(workflowStages.map((s) => s.key));
 
-  const allProjectItems = allProjects?.items || [];
+  // Bucket projects
+  const allProjectItems = allProjects?.items ?? [];
   const searchLower = boardSearch.toLowerCase();
-  const projects = boardSearch
-    ? allProjectItems.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchLower) ||
-          p.projectNumber.toLowerCase().includes(searchLower) ||
-          p.clientName.toLowerCase().includes(searchLower) ||
-          (p.currentStage || '').toLowerCase().includes(searchLower) ||
-          p.status.toLowerCase().includes(searchLower)
+  const filtered = boardSearch
+    ? allProjectItems.filter((p) =>
+        p.name.toLowerCase().includes(searchLower) ||
+        p.projectNumber.toLowerCase().includes(searchLower) ||
+        p.clientName.toLowerCase().includes(searchLower) ||
+        p.status.toLowerCase().includes(searchLower)
       )
     : allProjectItems;
 
-  // Bucket projects into columns
-  const buckets: Record<string, Project[]> = {};
-  for (const col of stages) buckets[col.key] = [];
-  for (const p of projects) {
-    const key = p.currentStage || '__no_stage__';
-    if (buckets[key]) {
+  const buckets: Record<string, Project[]> = { __no_stage__: [] };
+  for (const s of workflowStages) buckets[s.key] = [];
+  for (const p of filtered) {
+    const key = p.currentStage ?? '';
+    if (key && allStageKeys.has(key)) {
       buckets[key].push(p);
     } else {
       buckets['__no_stage__'].push(p);
@@ -155,7 +147,11 @@ function KanbanBoard({
   const moveMutation = useMutation({
     mutationFn: ({ id, stageKey }: { id: string; stageKey: string }) =>
       patch(`/projects/${id}`, { currentStage: stageKey === '__no_stage__' ? null : stageKey }),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
+      const stageName = vars.stageKey === '__no_stage__'
+        ? 'No Stage'
+        : (workflowStages.find((s) => s.key === vars.stageKey)?.name ?? vars.stageKey);
+      toast.success(`Moved to ${stageName}`);
       qc.invalidateQueries({ queryKey: ['projects-kanban'] });
       qc.invalidateQueries({ queryKey: ['projects'] });
     },
@@ -170,14 +166,13 @@ function KanbanBoard({
 
   const handleDragEnter = useCallback((e: React.DragEvent, stageKey: string) => {
     e.preventDefault();
-    dragCounters.current[stageKey] = (dragCounters.current[stageKey] || 0) + 1;
+    dragCounters.current[stageKey] = (dragCounters.current[stageKey] ?? 0) + 1;
     setDragOverStage(stageKey);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent, stageKey: string) => {
-    dragCounters.current[stageKey] = (dragCounters.current[stageKey] || 1) - 1;
-    if (dragCounters.current[stageKey] <= 0) {
-      dragCounters.current[stageKey] = 0;
+    dragCounters.current[stageKey] = Math.max(0, (dragCounters.current[stageKey] ?? 1) - 1);
+    if (dragCounters.current[stageKey] === 0) {
       setDragOverStage((prev) => (prev === stageKey ? null : prev));
     }
   }, []);
@@ -187,22 +182,30 @@ function KanbanBoard({
     dragCounters.current[stageKey] = 0;
     const projectId = e.dataTransfer.getData('text/plain') || draggingId;
     if (projectId) {
-      // Check the project isn't already in this column
-      const project = projects.find((p) => p.id === projectId);
-      const currentKey = project?.currentStage || '__no_stage__';
+      const project = filtered.find((p) => p.id === projectId);
+      const currentKey = project?.currentStage ?? '__no_stage__';
       if (currentKey !== stageKey) {
         moveMutation.mutate({ id: projectId, stageKey });
       }
     }
     setDraggingId(null);
     setDragOverStage(null);
-  }, [draggingId, projects, moveMutation]);
+  }, [draggingId, filtered, moveMutation]);
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null);
     setDragOverStage(null);
     dragCounters.current = {};
   }, []);
+
+  // All columns: workflow stages + "No Stage" at the end (only if there are unassigned projects)
+  const noStageProjects = buckets['__no_stage__'] ?? [];
+  const columns: Array<StageColumn & { isNoStage?: boolean }> = [
+    ...workflowStages,
+    ...(noStageProjects.length > 0 || !defaultWorkflow
+      ? [{ key: '__no_stage__', name: 'No Stage', order: 99, isNoStage: true }]
+      : []),
+  ];
 
   if (loadingProjects) {
     return (
@@ -217,7 +220,6 @@ function KanbanBoard({
 
   return (
     <div>
-      {/* Board search */}
       <div className="mb-3 relative max-w-xs">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -227,66 +229,74 @@ function KanbanBoard({
           onChange={(e) => setBoardSearch(e.target.value)}
         />
       </div>
-    <div className="overflow-x-auto pb-4">
-      <div className="flex gap-3 min-w-max">
-        {stages.map((col) => {
-          const colProjects = buckets[col.key] || [];
-          const isOver = dragOverStage === col.key && draggingId !== null;
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-3" style={{ minWidth: `${columns.length * 272}px` }}>
+          {columns.map((col) => {
+            const colProjects = buckets[col.key] ?? [];
+            const isOver = dragOverStage === col.key && draggingId !== null;
+            const isMoving = moveMutation.isPending && moveMutation.variables?.stageKey === col.key;
 
-          return (
-            <div
-              key={col.key}
-              className={cn(
-                'flex flex-col w-64 flex-shrink-0 rounded-2xl border-2 transition-colors',
-                isOver
-                  ? 'border-blue-400 bg-blue-50/60'
-                  : 'border-transparent bg-slate-100/80'
-              )}
-              onDragOver={(e) => handleDragOver(e, col.key)}
-              onDragEnter={(e) => handleDragEnter(e, col.key)}
-              onDragLeave={(e) => handleDragLeave(e, col.key)}
-              onDrop={(e) => handleDrop(e, col.key)}
-            >
-              {/* Column header */}
-              <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0">
-                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide truncate">
-                  {col.name}
-                </span>
-                <span className="text-xs font-bold text-slate-400 bg-white rounded-full w-6 h-6 flex items-center justify-center border border-slate-200 flex-shrink-0">
-                  {colProjects.length}
-                </span>
-              </div>
-
-              {/* Drop zone indicator */}
-              {isOver && (
-                <div className="mx-3 mb-2 h-1 rounded-full bg-blue-400 animate-pulse" />
-              )}
-
-              {/* Cards */}
-              <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2 min-h-[120px] max-h-[calc(100vh-280px)]">
-                {colProjects.length === 0 && (
-                  <div className={cn(
-                    'h-16 rounded-xl border-2 border-dashed flex items-center justify-center text-xs text-slate-300 transition-colors',
-                    isOver ? 'border-blue-300 text-blue-400' : 'border-slate-200'
-                  )}>
-                    Drop here
-                  </div>
+            return (
+              <div
+                key={col.key}
+                className={cn(
+                  'flex flex-col w-64 flex-shrink-0 rounded-2xl border-2 transition-all duration-150',
+                  isOver ? 'border-blue-400 bg-blue-50/70 scale-[1.01]' : 'border-transparent bg-slate-100/80',
+                  col.isNoStage && 'opacity-70',
                 )}
-                {colProjects.map((project) => (
-                  <KanbanCard
-                    key={project.id}
-                    project={project}
-                    onDragStart={setDraggingId}
-                    onDragEnd={handleDragEnd}
-                    onEdit={onEdit}
-                  />
-                ))}
+                onDragOver={(e) => handleDragOver(e, col.key)}
+                onDragEnter={(e) => handleDragEnter(e, col.key)}
+                onDragLeave={(e) => handleDragLeave(e, col.key)}
+                onDrop={(e) => handleDrop(e, col.key)}
+              >
+                {/* Column header */}
+                <div className="flex items-center justify-between px-3 py-3 flex-shrink-0">
+                  <span className={cn(
+                    'text-xs font-bold uppercase tracking-wider truncate',
+                    col.isNoStage ? 'text-slate-400' : 'text-slate-600',
+                  )}>
+                    {col.name}
+                  </span>
+                  <span className={cn(
+                    'text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border flex-shrink-0 ml-2',
+                    isMoving ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-white border-slate-200 text-slate-500',
+                  )}>
+                    {colProjects.length}
+                  </span>
+                </div>
+
+                {/* Drop indicator */}
+                <div className={cn(
+                  'mx-3 h-0.5 rounded-full transition-all duration-150 mb-1',
+                  isOver ? 'bg-blue-400' : 'bg-transparent',
+                )} />
+
+                {/* Cards */}
+                <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2 min-h-[100px] max-h-[calc(100vh-300px)]">
+                  {colProjects.length === 0 && (
+                    <div className={cn(
+                      'h-20 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-colors',
+                      isOver ? 'border-blue-300 text-blue-400 bg-blue-50' : 'border-slate-200 text-slate-300',
+                    )}>
+                      Drop here
+                    </div>
+                  )}
+                  {colProjects.map((project) => (
+                    <KanbanCard
+                      key={project.id}
+                      project={project}
+                      isDragging={draggingId === project.id}
+                      onDragStart={setDraggingId}
+                      onDragEnd={handleDragEnd}
+                      onEdit={onEdit}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </div>
     </div>
   );
 }

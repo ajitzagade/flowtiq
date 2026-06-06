@@ -9,6 +9,17 @@ export const workflowsRouter = Router();
 workflowsRouter.use(authenticate);
 
 // GET /api/workflows
+// Normalize stages so both seed format (stageKey/stageName) and API format (key/name) work
+function normalizeStages(stages: unknown): Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean }> {
+  if (!Array.isArray(stages)) return [];
+  return stages.map((s: Record<string, unknown>) => ({
+    ...s,
+    key: (s.key || s.stageKey || '') as string,
+    name: (s.name || s.stageName || '') as string,
+    order: (s.order ?? 0) as number,
+  }));
+}
+
 workflowsRouter.get('/', async (req, res, next) => {
   try {
     const { tenantId } = (req as unknown as AuthRequest).user;
@@ -21,7 +32,11 @@ workflowsRouter.get('/', async (req, res, next) => {
 
     res.json({
       success: true,
-      data: workflows.map((w) => ({ ...w, projectCount: w._count.projects })),
+      data: workflows.map((w) => ({
+        ...w,
+        stages: normalizeStages(w.stages),
+        projectCount: w._count.projects,
+      })),
     });
   } catch (err) {
     next(err);
@@ -43,7 +58,7 @@ workflowsRouter.get('/:id', async (req, res, next) => {
       return;
     }
 
-    res.json({ success: true, data: { ...workflow, projectCount: workflow._count.projects } });
+    res.json({ success: true, data: { ...workflow, stages: normalizeStages(workflow.stages), projectCount: workflow._count.projects } });
   } catch (err) {
     next(err);
   }
