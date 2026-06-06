@@ -18,13 +18,15 @@
   --color-primary-900: 30 58 138;
 
   /* Sidebar */
-  --sidebar-bg: #0f172a;
-  --sidebar-text: #94a3b8;
-  --sidebar-active: #3b82f6;
+  --sidebar-bg: #0d1b2e;
+  --sidebar-text: #8ba3be;
+  --sidebar-active: #60a5fa;
   --brand-primary: #3b82f6;
   --brand-primary-hover: #2563eb;
-  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
   --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-active-bg: rgba(59, 130, 246, 0.18);
+  --sidebar-active-border: #3b82f6;
 
   /* Font */
   --font-sans: 'Inter', system-ui, sans-serif;
@@ -182,12 +184,14 @@
 
   .nav-item:hover {
     background-color: var(--sidebar-hover);
-    color: #e2e8f0;
+    color: #cbd5e1;
   }
 
   .nav-item.active {
-    background-color: color-mix(in srgb, var(--brand-primary) 15%, transparent);
-    color: var(--brand-primary);
+    background-color: var(--sidebar-active-bg);
+    color: var(--sidebar-active);
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--sidebar-active-border);
   }
 
   /* Page header */

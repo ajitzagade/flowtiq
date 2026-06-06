@@ -61,6 +61,7 @@ function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
       await post('/follow-ups', data);
       toast.success('Follow-up created');
       qc.invalidateQueries({ queryKey: ['followups'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -149,6 +150,7 @@ function UpdateFollowUpModal({ followUp, onClose }: { followUp: FollowUp; onClos
       await patch(`/follow-ups/${followUp.id}`, data);
       toast.success('Follow-up updated');
       qc.invalidateQueries({ queryKey: ['followups'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -232,6 +234,7 @@ export default function FollowUpsPage() {
     onSuccess: () => {
       toast.success('Follow-up completed');
       qc.invalidateQueries({ queryKey: ['followups'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

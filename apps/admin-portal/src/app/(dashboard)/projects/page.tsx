@@ -8,7 +8,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Plus, Search, FolderKanban, Edit, Eye, Trash2, X, ChevronLeft, ChevronRight, LayoutList, Kanban } from 'lucide-react';
+import {
+  Plus, Search, FolderKanban, Edit, Eye, Trash2, X,
+  ChevronLeft, ChevronRight, LayoutList, Kanban, ChevronDown, GitBranch,
+} from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { ProjectProgress } from '@/components/ProjectProgress';
 import { useRouter } from 'next/navigation';
@@ -23,17 +26,16 @@ interface StageColumn {
   order: number;
 }
 
-// ── Default stages (fallback + matches seed workflow keys exactly) ─────────────
 const DEFAULT_KANBAN_STAGES: StageColumn[] = [
-  { key: 'file_creation',    name: 'File Creation',    order: 1 },
-  { key: 'inward',           name: 'Inward',           order: 2 },
-  { key: 'scrutiny',         name: 'Scrutiny',         order: 3 },
-  { key: 'report_generation',name: 'Report Generation',order: 4 },
-  { key: 'approval',         name: 'Approval',         order: 5 },
-  { key: 'completed_stage',  name: 'Completed',        order: 6 },
+  { key: 'file_creation',     name: 'File Creation',     order: 1 },
+  { key: 'inward',            name: 'Inward',            order: 2 },
+  { key: 'scrutiny',          name: 'Scrutiny',          order: 3 },
+  { key: 'report_generation', name: 'Report Generation', order: 4 },
+  { key: 'approval',          name: 'Approval',          order: 5 },
+  { key: 'completed_stage',   name: 'Completed',         order: 6 },
 ];
 
-// ── KanbanCard ────────────────────────────────────────────────────────────────
+// ── KanbanCard ─────────────────────────────────────────────────────────────────
 function KanbanCard({
   project,
   isDragging,
@@ -52,9 +54,12 @@ function KanbanCard({
   return (
     <div
       draggable
+      data-project-id={project.id}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', project.id);
+        // Carry workflowId so cross-section drops can be rejected
+        e.dataTransfer.setData('application/workflow-id', project.workflowId ?? '');
         onDragStart(project.id);
       }}
       onDragEnd={onDragEnd}
@@ -68,6 +73,7 @@ function KanbanCard({
         <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2">{project.name}</p>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+          aria-label={`Edit ${project.name}`}
           className="p-1 text-slate-300 hover:text-slate-600 rounded opacity-0 group-hover:opacity-100 flex-shrink-0"
         >
           <Edit size={13} />
@@ -93,48 +99,38 @@ function KanbanCard({
   );
 }
 
-// ── KanbanBoard ───────────────────────────────────────────────────────────────
-function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
+// ── WorkflowKanban — stage columns + drag-drop for ONE workflow's projects ─────
+function WorkflowKanban({
+  stages,
+  projects,
+  searchTerm,
+  onEdit,
+  sectionWorkflowId,
+}: {
+  stages: StageColumn[];
+  projects: Project[];
+  searchTerm: string;
+  onEdit: (p: Project) => void;
+  sectionWorkflowId: string | null;
+}) {
   const qc = useQueryClient();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
-  const [boardSearch, setBoardSearch] = useState('');
   const dragCounters = useRef<Record<string, number>>({});
 
-  const { data: allProjects, isLoading: loadingProjects } = useQuery({
-    queryKey: ['projects-kanban'],
-    queryFn: () => get<{ items: Project[] }>('/projects', { pageSize: 500 }),
-  });
-
-  const { data: workflows } = useQuery({
-    queryKey: ['workflows'],
-    queryFn: () => get<WorkflowTemplate[]>('/workflows'),
-  });
-
-  // Build stage columns — use workflow from API (already normalized by API), fallback to defaults
-  const defaultWorkflow = workflows?.find((w) => w.isDefault) ?? workflows?.[0];
-  const workflowStages: StageColumn[] = defaultWorkflow?.stages
-    ?.filter((s) => s.key && s.name)
-    .map((s) => ({ key: s.key, name: s.name, order: s.order }))
-    .sort((a, b) => a.order - b.order) ?? DEFAULT_KANBAN_STAGES;
-
-  // All columns including "no stage" bucket
-  const allStageKeys = new Set(workflowStages.map((s) => s.key));
-
-  // Bucket projects
-  const allProjectItems = allProjects?.items ?? [];
-  const searchLower = boardSearch.toLowerCase();
-  const filtered = boardSearch
-    ? allProjectItems.filter((p) =>
+  const searchLower = searchTerm.toLowerCase();
+  const filtered = searchTerm
+    ? projects.filter((p) =>
         p.name.toLowerCase().includes(searchLower) ||
         p.projectNumber.toLowerCase().includes(searchLower) ||
         p.clientName.toLowerCase().includes(searchLower) ||
         p.status.toLowerCase().includes(searchLower)
       )
-    : allProjectItems;
+    : projects;
 
+  const allStageKeys = new Set(stages.map((s) => s.key));
   const buckets: Record<string, Project[]> = { __no_stage__: [] };
-  for (const s of workflowStages) buckets[s.key] = [];
+  for (const s of stages) buckets[s.key] = [];
   for (const p of filtered) {
     const key = p.currentStage ?? '';
     if (key && allStageKeys.has(key)) {
@@ -150,18 +146,19 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     onSuccess: (_, vars) => {
       const stageName = vars.stageKey === '__no_stage__'
         ? 'No Stage'
-        : (workflowStages.find((s) => s.key === vars.stageKey)?.name ?? vars.stageKey);
+        : (stages.find((s) => s.key === vars.stageKey)?.name ?? vars.stageKey);
       toast.success(`Moved to ${stageName}`);
-      qc.invalidateQueries({ queryKey: ['projects-kanban'] });
+      // ['projects', 'kanban'] is prefix-matched by any invalidation of ['projects']
+      qc.invalidateQueries({ queryKey: ['projects', 'kanban'] });
       qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  const handleDragOver = useCallback((e: React.DragEvent, stageKey: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverStage(stageKey);
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent, stageKey: string) => {
@@ -180,6 +177,16 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   const handleDrop = useCallback((e: React.DragEvent, stageKey: string) => {
     e.preventDefault();
     dragCounters.current[stageKey] = 0;
+
+    // Reject drops from a different workflow section
+    const draggedWorkflowId = e.dataTransfer.getData('application/workflow-id');
+    const expected = sectionWorkflowId ?? '';
+    if (draggedWorkflowId !== expected) {
+      setDraggingId(null);
+      setDragOverStage(null);
+      return;
+    }
+
     const projectId = e.dataTransfer.getData('text/plain') || draggingId;
     if (projectId) {
       const project = filtered.find((p) => p.id === projectId);
@@ -190,7 +197,7 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     }
     setDraggingId(null);
     setDragOverStage(null);
-  }, [draggingId, filtered, moveMutation]);
+  }, [draggingId, filtered, moveMutation, sectionWorkflowId]);
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null);
@@ -198,18 +205,175 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     dragCounters.current = {};
   }, []);
 
-  // All columns: workflow stages + "No Stage" at the end (only if there are unassigned projects)
   const noStageProjects = buckets['__no_stage__'] ?? [];
   const columns: Array<StageColumn & { isNoStage?: boolean }> = [
-    ...workflowStages,
-    ...(noStageProjects.length > 0 || !defaultWorkflow
-      ? [{ key: '__no_stage__', name: 'No Stage', order: 99, isNoStage: true }]
-      : []),
+    ...stages,
+    ...(noStageProjects.length > 0 ? [{ key: '__no_stage__', name: 'No Stage', order: 99, isNoStage: true }] : []),
   ];
 
-  if (loadingProjects) {
+  if (filtered.length === 0 && searchTerm) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <p className="text-sm text-slate-400 py-4 text-center">No matching projects</p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className="flex gap-3" style={{ minWidth: `${columns.length * 264}px` }}>
+        {columns.map((col) => {
+          const colProjects = buckets[col.key] ?? [];
+          const isOver = dragOverStage === col.key && draggingId !== null;
+          const isMoving = moveMutation.isPending && moveMutation.variables?.stageKey === col.key;
+
+          return (
+            <div
+              key={col.key}
+              data-stage-key={col.key}
+              className={cn(
+                'flex flex-col w-60 flex-shrink-0 rounded-xl border-2 transition-all duration-150',
+                isOver ? 'border-blue-400 bg-blue-50/70 scale-[1.01]' : 'border-transparent bg-slate-100/80',
+                col.isNoStage && 'opacity-70',
+              )}
+              onDragOver={handleDragOver}
+              onDragEnter={(e) => handleDragEnter(e, col.key)}
+              onDragLeave={(e) => handleDragLeave(e, col.key)}
+              onDrop={(e) => handleDrop(e, col.key)}
+            >
+              <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0">
+                <span className={cn(
+                  'text-[11px] font-bold uppercase tracking-wider truncate',
+                  col.isNoStage ? 'text-slate-400' : 'text-slate-600',
+                )}>
+                  {col.name}
+                </span>
+                <span className={cn(
+                  'text-[11px] font-bold rounded-full w-5 h-5 flex items-center justify-center border flex-shrink-0 ml-1.5',
+                  isMoving ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-white border-slate-200 text-slate-500',
+                )}>
+                  {colProjects.length}
+                </span>
+              </div>
+
+              <div className={cn(
+                'mx-3 h-0.5 rounded-full transition-all duration-150 mb-1',
+                isOver ? 'bg-blue-400' : 'bg-transparent',
+              )} />
+
+              <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2 min-h-[80px] max-h-[360px]">
+                {colProjects.length === 0 && (
+                  <div className={cn(
+                    'h-16 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-colors',
+                    isOver ? 'border-blue-300 text-blue-400 bg-blue-50' : 'border-slate-200 text-slate-300',
+                  )}>
+                    Drop here
+                  </div>
+                )}
+                {colProjects.map((project) => (
+                  <KanbanCard
+                    key={project.id}
+                    project={project}
+                    isDragging={draggingId === project.id}
+                    onDragStart={setDraggingId}
+                    onDragEnd={handleDragEnd}
+                    onEdit={onEdit}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── WorkflowSection — accordion wrapper ────────────────────────────────────────
+function WorkflowSection({
+  workflow,
+  projects,
+  searchTerm,
+  onEdit,
+  defaultExpanded,
+}: {
+  workflow: WorkflowTemplate | null;
+  projects: Project[];
+  searchTerm: string;
+  onEdit: (p: Project) => void;
+  defaultExpanded: boolean;
+}) {
+  const [manualExpanded, setManualExpanded] = useState(defaultExpanded);
+  // Auto-expand when searching so results are visible
+  const expanded = searchTerm.length > 0 ? true : manualExpanded;
+
+  const stages: StageColumn[] = workflow?.stages
+    ?.filter((s) => s.key && s.name)
+    .map((s) => ({ key: s.key, name: s.name, order: s.order }))
+    .sort((a, b) => a.order - b.order) ?? DEFAULT_KANBAN_STAGES;
+
+  return (
+    <div className="card overflow-hidden">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setManualExpanded(!manualExpanded)}
+        className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <GitBranch size={14} className="text-blue-500" />
+          </div>
+          <span className="font-semibold text-slate-800 text-sm">
+            {workflow?.name ?? 'No Workflow'}
+          </span>
+          {workflow?.isDefault && (
+            <span className="badge badge-blue text-[10px] py-0">Default</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2.5 py-1">
+            {projects.length} project{projects.length !== 1 ? 's' : ''}
+          </span>
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={cn('text-slate-400 transition-transform duration-200 flex-shrink-0', expanded ? 'rotate-0' : '-rotate-90')}
+          />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-slate-100 p-4">
+          <WorkflowKanban
+            stages={stages}
+            projects={projects}
+            searchTerm={searchTerm}
+            onEdit={onEdit}
+            sectionWorkflowId={workflow?.id ?? null}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── KanbanBoard — groups projects by workflow, renders accordion sections ──────
+function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
+  const [boardSearch, setBoardSearch] = useState('');
+
+  // Note: key is ['projects', 'kanban'] — prefix-matched by invalidateQueries(['projects'])
+  const { data: allProjectsData, isLoading } = useQuery({
+    queryKey: ['projects', 'kanban'],
+    queryFn: () => get<{ items: Project[] }>('/projects', { pageSize: 500 }),
+  });
+
+  const { data: allWorkflows } = useQuery({
+    queryKey: ['workflows'],
+    queryFn: () => get<WorkflowTemplate[]>('/workflows'),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-40">
         <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -218,9 +382,29 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     );
   }
 
+  const projects = allProjectsData?.items ?? [];
+  const workflows = allWorkflows ?? [];
+
+  // Group projects by workflowId (null = no workflow assigned)
+  const byWorkflow = new Map<string | null, Project[]>();
+  for (const p of projects) {
+    const key = p.workflowId ?? null;
+    if (!byWorkflow.has(key)) byWorkflow.set(key, []);
+    byWorkflow.get(key)!.push(p);
+  }
+
+  // Order: default workflow first, then rest alphabetically
+  const orderedWorkflows: WorkflowTemplate[] = [
+    ...workflows.filter((w) => w.isDefault),
+    ...workflows.filter((w) => !w.isDefault).sort((a, b) => a.name.localeCompare(b.name)),
+  ];
+
+  const noWorkflowProjects = byWorkflow.get(null) ?? [];
+
   return (
-    <div>
-      <div className="mb-3 relative max-w-xs">
+    <div className="space-y-3">
+      {/* Board search */}
+      <div className="relative max-w-xs">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           className="form-input pl-8 py-2 text-sm"
@@ -229,78 +413,45 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
           onChange={(e) => setBoardSearch(e.target.value)}
         />
       </div>
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-3" style={{ minWidth: `${columns.length * 272}px` }}>
-          {columns.map((col) => {
-            const colProjects = buckets[col.key] ?? [];
-            const isOver = dragOverStage === col.key && draggingId !== null;
-            const isMoving = moveMutation.isPending && moveMutation.variables?.stageKey === col.key;
 
-            return (
-              <div
-                key={col.key}
-                className={cn(
-                  'flex flex-col w-64 flex-shrink-0 rounded-2xl border-2 transition-all duration-150',
-                  isOver ? 'border-blue-400 bg-blue-50/70 scale-[1.01]' : 'border-transparent bg-slate-100/80',
-                  col.isNoStage && 'opacity-70',
-                )}
-                onDragOver={(e) => handleDragOver(e, col.key)}
-                onDragEnter={(e) => handleDragEnter(e, col.key)}
-                onDragLeave={(e) => handleDragLeave(e, col.key)}
-                onDrop={(e) => handleDrop(e, col.key)}
-              >
-                {/* Column header */}
-                <div className="flex items-center justify-between px-3 py-3 flex-shrink-0">
-                  <span className={cn(
-                    'text-xs font-bold uppercase tracking-wider truncate',
-                    col.isNoStage ? 'text-slate-400' : 'text-slate-600',
-                  )}>
-                    {col.name}
-                  </span>
-                  <span className={cn(
-                    'text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border flex-shrink-0 ml-2',
-                    isMoving ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-white border-slate-200 text-slate-500',
-                  )}>
-                    {colProjects.length}
-                  </span>
-                </div>
+      {/* One accordion section per workflow */}
+      {orderedWorkflows.map((workflow, idx) => (
+        <WorkflowSection
+          key={workflow.id}
+          workflow={workflow}
+          projects={byWorkflow.get(workflow.id) ?? []}
+          searchTerm={boardSearch}
+          onEdit={onEdit}
+          defaultExpanded={idx === 0}
+        />
+      ))}
 
-                {/* Drop indicator */}
-                <div className={cn(
-                  'mx-3 h-0.5 rounded-full transition-all duration-150 mb-1',
-                  isOver ? 'bg-blue-400' : 'bg-transparent',
-                )} />
+      {/* Projects with no workflow assigned */}
+      {noWorkflowProjects.length > 0 && (
+        <WorkflowSection
+          key="__no_workflow__"
+          workflow={null}
+          projects={noWorkflowProjects}
+          searchTerm={boardSearch}
+          onEdit={onEdit}
+          defaultExpanded={orderedWorkflows.length === 0}
+        />
+      )}
 
-                {/* Cards */}
-                <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2 min-h-[100px] max-h-[calc(100vh-300px)]">
-                  {colProjects.length === 0 && (
-                    <div className={cn(
-                      'h-20 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-colors',
-                      isOver ? 'border-blue-300 text-blue-400 bg-blue-50' : 'border-slate-200 text-slate-300',
-                    )}>
-                      Drop here
-                    </div>
-                  )}
-                  {colProjects.map((project) => (
-                    <KanbanCard
-                      key={project.id}
-                      project={project}
-                      isDragging={draggingId === project.id}
-                      onDragStart={setDraggingId}
-                      onDragEnd={handleDragEnd}
-                      onEdit={onEdit}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+      {projects.length === 0 && (
+        <div className="card">
+          <div className="empty-state">
+            <FolderKanban size={48} className="text-slate-200 mb-3" />
+            <p className="font-medium text-slate-500">No projects yet</p>
+            <p className="text-slate-400 text-sm mt-1">Create your first project to get started</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
+// ── ProjectModal ───────────────────────────────────────────────────────────────
 const projectSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   description: z.string().optional(),
@@ -371,7 +522,10 @@ function ProjectModal({
         await post('/projects', data);
         toast.success('Project created');
       }
+      // Invalidate ['projects'] — prefix-matches both ['projects', page, ...] and ['projects', 'kanban']
       qc.invalidateQueries({ queryKey: ['projects'] });
+      // Refresh dashboard stats
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -483,6 +637,7 @@ function ProjectModal({
   );
 }
 
+// ── ProjectsPage ───────────────────────────────────────────────────────────────
 export default function ProjectsPage() {
   const qc = useQueryClient();
   const { user } = useAuthStore();
@@ -490,16 +645,27 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
+  const [workflowFilter, setWorkflowFilter] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [view, setView] = useState<'list' | 'kanban'>('kanban');
 
+  const { data: workflows } = useQuery<WorkflowTemplate[]>({
+    queryKey: ['workflows'],
+    queryFn: () => get<WorkflowTemplate[]>('/workflows'),
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['projects', page, search, status, priority],
+    queryKey: ['projects', page, search, status, priority, workflowFilter],
     queryFn: () =>
       get<{ items: Project[]; total: number; totalPages: number }>('/projects', {
-        page, pageSize: 15, search: search || undefined, status: status || undefined, priority: priority || undefined,
+        page,
+        pageSize: 15,
+        search: search || undefined,
+        status: status || undefined,
+        priority: priority || undefined,
+        workflowId: workflowFilter || undefined,
       }),
     placeholderData: (prev) => prev,
   });
@@ -509,6 +675,7 @@ export default function ProjectsPage() {
     onSuccess: () => {
       toast.success('Project cancelled');
       qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -543,6 +710,16 @@ export default function ProjectsPage() {
                 </div>
                 <select
                   className="form-select w-full sm:w-40"
+                  value={workflowFilter}
+                  onChange={(e) => { setWorkflowFilter(e.target.value); setPage(1); }}
+                >
+                  <option value="">All Workflows</option>
+                  {(workflows ?? []).map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+                <select
+                  className="form-select w-full sm:w-36"
                   value={status}
                   onChange={(e) => { setStatus(e.target.value); setPage(1); }}
                 >
@@ -553,7 +730,7 @@ export default function ProjectsPage() {
                   <option value="cancelled">Cancelled</option>
                 </select>
                 <select
-                  className="form-select w-full sm:w-40"
+                  className="form-select w-full sm:w-36"
                   value={priority}
                   onChange={(e) => { setPriority(e.target.value); setPage(1); }}
                 >
@@ -573,7 +750,7 @@ export default function ProjectsPage() {
                 onClick={() => setView('list')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                  view === 'list' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                  view === 'list' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700',
                 )}
               >
                 <LayoutList size={15} /> List
@@ -582,7 +759,7 @@ export default function ProjectsPage() {
                 onClick={() => setView('kanban')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                  view === 'kanban' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                  view === 'kanban' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700',
                 )}
               >
                 <Kanban size={15} /> Board
@@ -609,6 +786,7 @@ export default function ProjectsPage() {
                   <tr>
                     <th>Project</th>
                     <th>Client</th>
+                    <th>Workflow</th>
                     <th>Status</th>
                     <th>Priority</th>
                     <th className="min-w-[160px]">Progress</th>
@@ -620,7 +798,7 @@ export default function ProjectsPage() {
                 <tbody>
                   {isLoading && (
                     <tr>
-                      <td colSpan={8} className="text-center py-10 text-slate-400">
+                      <td colSpan={9} className="text-center py-10 text-slate-400">
                         <svg className="animate-spin w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -630,7 +808,7 @@ export default function ProjectsPage() {
                   )}
                   {!isLoading && projects.length === 0 && (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={9}>
                         <div className="empty-state">
                           <FolderKanban size={48} className="text-slate-200 mb-3" />
                           <p className="font-medium text-slate-500">No projects found</p>
@@ -646,11 +824,20 @@ export default function ProjectsPage() {
                     <tr key={project.id}>
                       <td>
                         <div>
-                          <p className="font-medium text-slate-900">{truncate(project.name, 45)}</p>
+                          <p className="font-medium text-slate-900">{truncate(project.name, 40)}</p>
                           <p className="text-xs font-mono text-slate-400">{project.projectNumber}</p>
                         </div>
                       </td>
                       <td className="text-slate-600">{project.clientName}</td>
+                      <td>
+                        {(project.workflow as { name: string } | undefined)?.name ? (
+                          <span className="badge badge-blue text-[10px]">
+                            {(project.workflow as { name: string }).name}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
                       <td>
                         <span className={getStatusBadgeClass(project.status)}>
                           {project.status.replace('_', ' ')}
@@ -676,13 +863,18 @@ export default function ProjectsPage() {
                       <td>
                         <div className="flex items-center justify-end gap-1">
                           <Link href={`/projects/${project.id}`}>
-                            <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View">
+                            <button
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              aria-label={`View ${project.name}`}
+                              title="View"
+                            >
                               <Eye size={16} />
                             </button>
                           </Link>
                           <button
                             onClick={() => setEditProject(project)}
                             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                            aria-label={`Edit ${project.name}`}
                             title="Edit"
                           >
                             <Edit size={16} />
@@ -695,6 +887,7 @@ export default function ProjectsPage() {
                                 }
                               }}
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              aria-label={`Delete ${project.name}`}
                               title="Cancel"
                             >
                               <Trash2 size={16} />
@@ -708,7 +901,6 @@ export default function ProjectsPage() {
               </table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-500">
