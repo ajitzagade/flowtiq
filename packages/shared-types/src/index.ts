@@ -142,39 +142,31 @@ export type PermissionAction =
 
 export const PERMISSION_CODES = {
   // Projects
-  PROJECTS_CREATE: 'projects:create',
-  PROJECTS_READ: 'projects:read',
-  PROJECTS_UPDATE: 'projects:update',
-  PROJECTS_DELETE: 'projects:delete',
+  PROJECTS_VIEW: 'projects:view',
   PROJECTS_VIEW_ALL: 'projects:view_all',
-  // Stages
-  STAGES_UPDATE: 'stages:update',
-  STAGES_APPROVE: 'stages:approve',
+  PROJECTS_CREATE: 'projects:create',
+  PROJECTS_EDIT: 'projects:edit',
+  PROJECTS_DELETE: 'projects:delete',
   // Documents
   DOCUMENTS_UPLOAD: 'documents:upload',
   DOCUMENTS_DOWNLOAD: 'documents:download',
   DOCUMENTS_DELETE: 'documents:delete',
   // Follow-ups
-  FOLLOWUPS_CREATE: 'followups:create',
-  FOLLOWUPS_UPDATE: 'followups:update',
-  FOLLOWUPS_VIEW_ALL: 'followups:view_all',
+  FOLLOW_UPS_VIEW: 'follow_ups:view',
+  FOLLOW_UPS_CREATE: 'follow_ups:create',
+  FOLLOW_UPS_EDIT: 'follow_ups:edit',
   // Users
+  USERS_VIEW: 'users:view',
   USERS_CREATE: 'users:create',
-  USERS_READ: 'users:read',
-  USERS_UPDATE: 'users:update',
-  USERS_DELETE: 'users:delete',
-  USERS_MANAGE: 'users:manage',
+  USERS_EDIT: 'users:edit',
   // Roles
+  ROLES_VIEW: 'roles:view',
   ROLES_MANAGE: 'roles:manage',
   // Workflows
+  WORKFLOWS_VIEW: 'workflows:view',
   WORKFLOWS_MANAGE: 'workflows:manage',
-  // Audit
-  AUDIT_VIEW: 'audit:read',
-  // Settings
-  SETTINGS_MANAGE: 'settings:manage',
-  // Reports
-  REPORTS_VIEW: 'reports:read',
-  REPORTS_EXPORT: 'reports:export',
+  // Reports & Audit
+  REPORTS_VIEW: 'reports:view',
 } as const;
 
 export type PermissionCode = typeof PERMISSION_CODES[keyof typeof PERMISSION_CODES];

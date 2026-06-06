@@ -73,82 +73,71 @@ export function canAccessProject(
   return false;
 }
 
+
 // =============================================
 // ROLE-BASED DEFAULT PERMISSIONS
 // =============================================
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, PermissionCode[]> = {
   'Tenant Admin': [
-    'projects:create',
-    'projects:read',
-    'projects:update',
-    'projects:delete',
+    'projects:view',
     'projects:view_all',
-    'stages:update',
-    'stages:approve',
+    'projects:create',
+    'projects:edit',
+    'projects:delete',
     'documents:upload',
     'documents:download',
     'documents:delete',
-    'followups:create',
-    'followups:update',
-    'followups:view_all',
+    'follow_ups:view',
+    'follow_ups:create',
+    'follow_ups:edit',
+    'users:view',
     'users:create',
-    'users:read',
-    'users:update',
-    'users:delete',
-    'users:manage',
+    'users:edit',
+    'roles:view',
     'roles:manage',
+    'workflows:view',
     'workflows:manage',
-    'audit:read',
-    'settings:manage',
-    'reports:read',
-    'reports:export',
+    'reports:view',
   ],
   'Project Manager': [
-    'projects:create',
-    'projects:read',
-    'projects:update',
+    'projects:view',
     'projects:view_all',
-    'stages:update',
-    'stages:approve',
+    'projects:create',
+    'projects:edit',
     'documents:upload',
     'documents:download',
-    'followups:create',
-    'followups:update',
-    'followups:view_all',
-    'users:read',
-    'reports:read',
-    'reports:export',
+    'follow_ups:view',
+    'follow_ups:create',
+    'follow_ups:edit',
+    'users:view',
+    'reports:view',
   ],
   'File Executive': [
-    'projects:read',
-    'projects:update',
-    'stages:update',
+    'projects:view',
+    'projects:create',
+    'projects:edit',
     'documents:upload',
     'documents:download',
-    'followups:create',
-    'followups:update',
+    'follow_ups:view',
+    'follow_ups:create',
   ],
   'Follow-up Executive': [
-    'projects:read',
-    'projects:view_all',
-    'followups:create',
-    'followups:update',
-    'followups:view_all',
-    'documents:download',
+    'projects:view',
+    'follow_ups:view',
+    'follow_ups:create',
+    'follow_ups:edit',
   ],
   'Reporting Executive': [
-    'projects:read',
+    'projects:view',
     'projects:view_all',
     'documents:download',
-    'reports:read',
-    'reports:export',
-    'audit:read',
+    'reports:view',
   ],
   'Viewer': [
-    'projects:read',
+    'projects:view',
     'documents:download',
-    'reports:read',
+    'reports:view',
   ],
 };
 
@@ -161,11 +150,11 @@ export function getNavigationItems(permissions: string[], isSuperAdmin: boolean)
 
   items.push({ key: 'dashboard', label: 'Dashboard', href: '/dashboard' });
 
-  if (isSuperAdmin || permissions.includes('projects:read')) {
+  if (isSuperAdmin || permissions.includes('projects:view') || permissions.includes('projects:view_all')) {
     items.push({ key: 'projects', label: 'Projects', href: '/projects' });
   }
 
-  if (isSuperAdmin || permissions.includes('followups:view_all') || permissions.includes('followups:create')) {
+  if (isSuperAdmin || permissions.includes('follow_ups:view') || permissions.includes('follow_ups:create')) {
     items.push({ key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups' });
   }
 
@@ -173,7 +162,7 @@ export function getNavigationItems(permissions: string[], isSuperAdmin: boolean)
     items.push({ key: 'documents', label: 'Documents', href: '/documents' });
   }
 
-  if (isSuperAdmin || permissions.includes('users:read')) {
+  if (isSuperAdmin || permissions.includes('users:view')) {
     items.push({ key: 'users', label: 'Users', href: '/users' });
   }
 
@@ -185,12 +174,8 @@ export function getNavigationItems(permissions: string[], isSuperAdmin: boolean)
     items.push({ key: 'workflows', label: 'Workflows', href: '/workflows' });
   }
 
-  if (isSuperAdmin || permissions.includes('audit:read')) {
+  if (isSuperAdmin || permissions.includes('reports:view')) {
     items.push({ key: 'audit-logs', label: 'Audit Logs', href: '/audit-logs' });
-  }
-
-  if (isSuperAdmin || permissions.includes('settings:manage')) {
-    items.push({ key: 'settings', label: 'Settings', href: '/settings' });
   }
 
   if (isSuperAdmin) {
