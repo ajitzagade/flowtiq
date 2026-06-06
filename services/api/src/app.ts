@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import path from 'path';
 import { errorHandler } from './middleware/error';
 import { authRouter } from './routes/auth';
 import { tenantsRouter } from './routes/tenants';
@@ -16,6 +15,7 @@ import { workflowsRouter } from './routes/workflows';
 import { auditRouter } from './routes/audit';
 import { notificationsRouter } from './routes/notifications';
 import { dashboardRouter } from './routes/dashboard';
+import { reportsRouter } from './routes/reports';
 
 export const app = express();
 
@@ -41,9 +41,6 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Static files for uploads
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'flowtiq-api' });
@@ -62,6 +59,7 @@ app.use('/api/workflows', workflowsRouter);
 app.use('/api/audit', auditRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/reports', reportsRouter);
 
 // 404 handler
 app.use((_req, res) => {

@@ -6,7 +6,3 @@ buildCommand = "npm install -g pnpm && pnpm install --no-frozen-lockfile && pnpm
 startCommand = "node services/api/dist/index.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-[environments.production]
-  [environments.production.deploy]
-  startCommand = "node services/api/dist/index.js"

@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import path from 'path';
-import fs from 'fs';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { requireAnyPermission, requirePermission } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
-import { upload, getUploadPath, moveFile, deleteFile } from '../lib/storage';
+import { upload, uploadToCloudinary, deleteFromCloudinary } from '../lib/storage';
 
 export const documentsRouter = Router();
 documentsRouter.use(authenticate);
@@ -30,7 +28,6 @@ documentsRouter.get('/', requirePermission('documents:download'), async (req, re
     if (stageId) where.stageId = stageId;
     if (search) {
       where.OR = [
-        { fileName: { contains: search, mode: 'insensitive' } },
         { originalName: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -92,28 +89,31 @@ documentsRouter.post(
       });
 
       if (!project) {
-        deleteFile(req.file.path);
         res.status(404).json({ success: false, error: 'Project not found' });
         return;
       }
 
-      // Move file to proper location
-      const destDir = getUploadPath(tenantId as string, projectId, stageId);
-      const destPath = path.join(destDir, req.file.filename);
-      moveFile(req.file.path, destPath);
+      // Upload buffer to Cloudinary
+      const folder = stageId
+        ? `flowtiq/${tenantId}/${projectId}/${stageId}`
+        : `flowtiq/${tenantId}/${projectId}`;
 
-      const relativePath = `${tenantId}/${projectId}/${stageId || ''}/${req.file.filename}`.replace('//', '/');
+      const { url, publicId } = await uploadToCloudinary(
+        req.file.buffer,
+        folder,
+        req.file.originalname,
+      );
 
       const document = await prisma.document.create({
         data: {
           tenantId: tenantId as string,
           projectId,
           stageId: stageId || null,
-          fileName: req.file.filename,
+          fileName: publicId,                          // Cloudinary public_id (for deletion)
           originalName: req.file.originalname,
-          fileType: path.extname(req.file.originalname).slice(1).toUpperCase(),
+          fileType: req.file.originalname.split('.').pop()?.toUpperCase() || 'FILE',
           fileSize: BigInt(req.file.size),
-          filePath: relativePath,
+          filePath: url,                               // Cloudinary secure_url (for download)
           mimeType: req.file.mimetype,
           uploadedById: userId,
           tags: tags ? JSON.parse(tags) : [],
@@ -146,13 +146,13 @@ documentsRouter.post(
         data: { ...document, fileSize: Number(document.fileSize) },
       });
     } catch (err) {
-      if (req.file) deleteFile(req.file.path);
       next(err);
     }
-  }
+  },
 );
 
 // GET /api/documents/:id/download
+// Redirects to the Cloudinary secure URL — browser handles the download
 documentsRouter.get('/:id/download', requirePermission('documents:download'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
@@ -167,14 +167,6 @@ documentsRouter.get('/:id/download', requirePermission('documents:download'), as
       return;
     }
 
-    const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
-    const absolutePath = path.join(uploadDir, document.filePath);
-
-    if (!fs.existsSync(absolutePath)) {
-      res.status(404).json({ success: false, error: 'File not found on storage' });
-      return;
-    }
-
     await createAuditLog({
       req: authReq,
       action: 'DOWNLOADED',
@@ -184,7 +176,8 @@ documentsRouter.get('/:id/download', requirePermission('documents:download'), as
       entityName: document.originalName,
     });
 
-    res.download(absolutePath, document.originalName);
+    // filePath is now the Cloudinary secure_url
+    res.redirect(document.filePath);
   } catch (err) {
     next(err);
   }
@@ -210,24 +203,28 @@ documentsRouter.post(
       });
 
       if (!document) {
-        deleteFile(req.file.path);
         res.status(404).json({ success: false, error: 'Document not found' });
         return;
       }
 
       const newVersion = document.version + 1;
-      const destDir = getUploadPath(tenantId as string, document.projectId, document.stageId || undefined);
-      const destPath = path.join(destDir, req.file.filename);
-      moveFile(req.file.path, destPath);
 
-      const relativePath = `${tenantId}/${document.projectId}/${document.stageId || ''}/${req.file.filename}`.replace('//', '/');
+      const folder = document.stageId
+        ? `flowtiq/${tenantId}/${document.projectId}/${document.stageId}`
+        : `flowtiq/${tenantId}/${document.projectId}`;
 
-      // Save version history
+      const { url, publicId } = await uploadToCloudinary(
+        req.file.buffer,
+        folder,
+        req.file.originalname,
+      );
+
+      // Save version history (keeps old Cloudinary URL accessible for version downloads)
       await prisma.documentVersion.create({
         data: {
           documentId: document.id,
           version: document.version,
-          filePath: document.filePath,
+          filePath: document.filePath,   // old Cloudinary URL
           fileSize: document.fileSize,
           uploadedById: userId,
           notes: req.body.notes,
@@ -237,10 +234,10 @@ documentsRouter.post(
       const updated = await prisma.document.update({
         where: { id: req.params.id },
         data: {
-          fileName: req.file.filename,
+          fileName: publicId,
           originalName: req.file.originalname,
           fileSize: BigInt(req.file.size),
-          filePath: relativePath,
+          filePath: url,
           mimeType: req.file.mimetype,
           version: newVersion,
           uploadedById: userId,
@@ -257,19 +254,19 @@ documentsRouter.post(
         entityId: document.id,
         entityType: 'document',
         entityName: document.originalName,
-        previousData: { version: document.version, fileName: document.fileName },
+        previousData: { version: document.version, fileName: document.originalName },
         newData: { version: newVersion, fileName: req.file.originalname },
       });
 
       res.json({ success: true, data: { ...updated, fileSize: Number(updated.fileSize) } });
     } catch (err) {
-      if (req.file) deleteFile(req.file.path);
       next(err);
     }
-  }
+  },
 );
 
 // DELETE /api/documents/:id
+// Soft-deletes in DB and removes from Cloudinary
 documentsRouter.delete('/:id', requirePermission('documents:delete'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
@@ -288,6 +285,9 @@ documentsRouter.delete('/:id', requirePermission('documents:delete'), async (req
       where: { id: req.params.id },
       data: { isActive: false },
     });
+
+    // Delete from Cloudinary (fileName holds the public_id)
+    await deleteFromCloudinary(document.fileName);
 
     await createAuditLog({
       req: authReq,

@@ -1,71 +1,27 @@
-import fs from 'fs';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { Readable } from 'stream';
+import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import multer from 'multer';
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '52428800', 10); // 50MB default
-
-export function ensureDir(dirPath: string): void {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-}
-
-export function getUploadPath(tenantId: string, projectId: string, stageId?: string): string {
-  const dir = stageId
-    ? path.join(UPLOAD_DIR, tenantId, projectId, stageId)
-    : path.join(UPLOAD_DIR, tenantId, projectId);
-  ensureDir(dir);
-  return dir;
-}
-
-export function deleteFile(filePath: string): void {
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch (error) {
-    console.error('Failed to delete file:', error);
-  }
-}
-
-export function getFileStats(filePath: string): { size: number; exists: boolean } {
-  try {
-    const stats = fs.statSync(filePath);
-    return { size: stats.size, exists: true };
-  } catch {
-    return { size: 0, exists: false };
-  }
-}
-
-export function generateFileName(originalName: string): string {
-  const ext = path.extname(originalName);
-  const baseName = path.basename(originalName, ext)
-    .replace(/[^a-zA-Z0-9-_]/g, '_')
-    .substring(0, 50);
-  return `${baseName}_${uuidv4().split('-')[0]}${ext}`;
-}
-
-// Multer configuration
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    ensureDir(UPLOAD_DIR);
-    cb(null, UPLOAD_DIR); // Will be moved to proper location after upload
-  },
-  filename: (_req, file, cb) => {
-    cb(null, generateFileName(file.originalname));
-  },
+// Configure Cloudinary from env vars
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
+  secure: true,
 });
 
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '52428800', 10); // 50 MB
+
+const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js'];
+
+// Use memory storage — buffer is uploaded to Cloudinary in the route handler
 export const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
-    // Block dangerous file types
-    const dangerousTypes = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (dangerousTypes.includes(ext)) {
+    if (DANGEROUS_EXTENSIONS.includes(ext)) {
       cb(new Error(`File type ${ext} is not allowed`));
     } else {
       cb(null, true);
@@ -73,15 +29,57 @@ export const upload = multer({
   },
 });
 
-export function moveFile(from: string, to: string): void {
-  ensureDir(path.dirname(to));
-  fs.renameSync(from, to);
+export interface CloudinaryUploadResult {
+  url: string;       // secure_url — stored in document.filePath
+  publicId: string;  // public_id  — stored in document.fileName (used for deletion)
 }
 
-export function getRelativePath(absolutePath: string): string {
-  return absolutePath.replace(UPLOAD_DIR, '').replace(/^\//, '');
+/**
+ * Upload a buffer to Cloudinary.
+ * @param buffer  File buffer from multer memoryStorage
+ * @param folder  Cloudinary folder path, e.g. "flowtiq/tenantId/projectId"
+ * @param originalName  Original filename — used as display hint for the public_id
+ */
+export function uploadToCloudinary(
+  buffer: Buffer,
+  folder: string,
+  originalName: string,
+): Promise<CloudinaryUploadResult> {
+  return new Promise((resolve, reject) => {
+    // Sanitize originalName to a safe Cloudinary-friendly base name
+    const baseName = path.basename(originalName, path.extname(originalName))
+      .replace(/[^a-zA-Z0-9-_]/g, '_')
+      .substring(0, 60);
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'raw', // treats all files as binary (PDFs, docs, images, etc.)
+        use_filename: false,
+        public_id: `${baseName}_${Date.now()}`,
+        overwrite: false,
+      },
+      (error, result: UploadApiResponse | undefined) => {
+        if (error || !result) {
+          return reject(error || new Error('Cloudinary upload failed'));
+        }
+        resolve({ url: result.secure_url, publicId: result.public_id });
+      },
+    );
+
+    Readable.from(buffer).pipe(uploadStream);
+  });
 }
 
-export function getAbsolutePath(relativePath: string): string {
-  return path.join(UPLOAD_DIR, relativePath);
+/**
+ * Delete a file from Cloudinary by its public_id.
+ * Called when a document is hard-deleted or a version is replaced.
+ */
+export async function deleteFromCloudinary(publicId: string): Promise<void> {
+  try {
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+  } catch (err) {
+    // Non-fatal — log and continue
+    console.error('Cloudinary delete error:', err);
+  }
 }

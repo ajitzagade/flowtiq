@@ -282,7 +282,7 @@ export default function DocumentsPage() {
                   <td>
                     <div className="flex items-center justify-end gap-1">
                       <a
-                        href={`${process.env.NEXT_PUBLIC_API_URL}/api/documents/${doc.id}/download`}
+                        href={doc.filePath}
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Download"
                         target="_blank"

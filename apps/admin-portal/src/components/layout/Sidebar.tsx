@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FolderKanban, Clock, FileText, Users, Shield,
   GitBranch, ClipboardList, Bell, Settings, Building2, Layers, LogOut,
-  ChevronLeft, ChevronRight, X,
+  ChevronLeft, ChevronRight, X, BarChart2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -14,6 +14,7 @@ import { useSidebarStore } from '@/store/sidebar';
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban },
+  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2 },
   { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock },
   { key: 'documents', label: 'Documents', href: '/documents', icon: FileText },
   { key: 'users', label: 'Users', href: '/users', icon: Users },

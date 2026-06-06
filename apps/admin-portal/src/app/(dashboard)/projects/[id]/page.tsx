@@ -339,7 +339,7 @@ export default function ProjectDetailPage() {
                   <p className="text-slate-400 text-sm">No documents uploaded yet</p>
                 </div>
               )}
-              {(docsData?.items as Array<{ id: string; originalName: string; fileType: string; fileSize: number; version: number; createdAt: string; uploadedBy?: { firstName: string; lastName: string } }>)?.map((doc) => (
+              {(docsData?.items as Array<{ id: string; originalName: string; fileType: string; fileSize: number; filePath: string; version: number; createdAt: string; uploadedBy?: { firstName: string; lastName: string } }>)?.map((doc) => (
                 <div key={doc.id} className="px-6 py-3 flex items-center gap-4">
                   <FileText size={18} className="text-slate-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -349,7 +349,7 @@ export default function ProjectDetailPage() {
                     </p>
                   </div>
                   <a
-                    href={`${process.env.NEXT_PUBLIC_API_URL}/api/documents/${doc.id}/download`}
+                    href={doc.filePath}
                     className="btn-secondary text-xs py-1 px-2.5"
                     target="_blank"
                     rel="noreferrer"
