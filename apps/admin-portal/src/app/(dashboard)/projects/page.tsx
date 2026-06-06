@@ -106,7 +106,7 @@ function KanbanBoard({
   // Build stage columns from default workflow, fallback to seeded stages
   const defaultWorkflow = workflows?.find((w) => w.isDefault) || workflows?.[0];
   const rawStages: StageColumn[] = defaultWorkflow?.stages
-    ? (defaultWorkflow.stages as Array<Record<string, unknown>>)
+    ? (defaultWorkflow.stages as unknown as Array<Record<string, unknown>>)
         .map((s) => ({
           key: (s.stageKey || s.key) as string,
           name: (s.stageName || s.name) as string,
