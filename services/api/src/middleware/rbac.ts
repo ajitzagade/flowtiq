@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import type { AuthRequest } from './auth';
-import type { PermissionCode } from '@flowtiq/shared-types';
 
-export function requirePermission(permissionCode: PermissionCode) {
+export function requirePermission(permissionCode: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const user = (req as AuthRequest).user;
     if (!user) {
@@ -24,7 +23,7 @@ export function requirePermission(permissionCode: PermissionCode) {
   };
 }
 
-export function requireAnyPermission(permissionCodes: PermissionCode[]) {
+export function requireAnyPermission(permissionCodes: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const user = (req as AuthRequest).user;
     if (!user) {
