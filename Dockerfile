@@ -27,5 +27,9 @@ RUN cd packages/database && npx prisma generate
 # Build API TypeScript
 RUN pnpm --filter @flowtiq/api build
 
+# Copy and set startup script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # At runtime: push schema then start server
-CMD cd packages/database && npx prisma db push --accept-data-loss && cd /app && node services/api/dist/index.js
+CMD ["/app/start.sh"]
