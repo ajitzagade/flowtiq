@@ -1,15 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import path from 'path';
 import prisma from '../lib/prisma';
 import { authenticate, requireSuperAdmin } from '../middleware/auth';
 import { createAuditLog } from '../lib/audit';
-import { upload, ensureDir } from '../lib/storage';
+import { upload, uploadToCloudinary } from '../lib/storage';
 import type { AuthRequest } from '../middleware/auth';
 
 export const tenantsRouter = Router();
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 // BigInt fields (maxStorageBytes, usedStorageBytes) can't be JSON.stringify'd natively
 function serializeTenant(t: Record<string, unknown>) {
@@ -41,23 +38,12 @@ tenantsRouter.post('/:id/logo', imageUpload.single('logo'), async (req, res, nex
       return;
     }
 
-    // Move file to logos directory
-    const fs = await import('fs');
-    const logoDir = path.join(UPLOAD_DIR, 'logos', req.params.id);
-    ensureDir(logoDir);
-
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const destPath = path.join(logoDir, `logo${ext}`);
-
-    // Remove old logo files if any
-    const exts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
-    for (const e of exts) {
-      const old = path.join(logoDir, `logo${e}`);
-      if (fs.default.existsSync(old)) fs.default.unlinkSync(old);
-    }
-
-    fs.default.renameSync(req.file.path, destPath);
-    const logoUrl = `/uploads/logos/${req.params.id}/logo${ext}`;
+    // Upload logo to Cloudinary
+    const { url: logoUrl } = await uploadToCloudinary(
+      req.file.buffer,
+      `flowtiq/logos/${req.params.id}`,
+      req.file.originalname,
+    );
 
     // Update branding.logoUrl
     const tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
