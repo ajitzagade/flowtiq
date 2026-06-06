@@ -152,29 +152,40 @@ function WorkflowPipelineSection({ pipeline }: {
               {workflow.stages.map((stage) => {
                 const max = Math.max(...workflow.stages.map((s) => s.count), 1);
                 const pct = Math.round((stage.count / max) * 100);
+                const stageColor = stage.color || '#94a3b8';
                 return (
-                  <div key={stage.key} className="flex items-center gap-3 px-4 py-2.5">
+                  <div
+                    key={stage.key}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-2.5 transition-colors',
+                      stage.count > 0 && 'bg-slate-50/60',
+                    )}
+                  >
                     <div
                       className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: stage.color || '#94a3b8' }}
+                      style={{ backgroundColor: stageColor }}
                     />
                     <span className="text-sm text-slate-600 flex-1 min-w-0 truncate">{stage.name}</span>
                     {/* Bar */}
-                    <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden flex-shrink-0">
+                    <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden flex-shrink-0">
                       <div
                         className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${pct}%`,
-                          backgroundColor: stage.color || '#94a3b8',
-                        }}
+                        style={{ width: `${pct}%`, backgroundColor: stageColor }}
                       />
                     </div>
-                    <span className={cn(
-                      'text-sm font-semibold w-6 text-right flex-shrink-0',
-                      stage.count > 0 ? 'text-slate-800' : 'text-slate-300',
-                    )}>
-                      {stage.count}
-                    </span>
+                    {/* Count badge */}
+                    {stage.count > 0 ? (
+                      <span
+                        className="flex-shrink-0 min-w-[24px] h-6 px-2 rounded-full text-xs font-bold text-white flex items-center justify-center shadow-sm"
+                        style={{ backgroundColor: stageColor }}
+                      >
+                        {stage.count}
+                      </span>
+                    ) : (
+                      <span className="flex-shrink-0 min-w-[24px] h-6 px-2 rounded-full text-xs font-medium text-slate-300 bg-slate-100 flex items-center justify-center">
+                        0
+                      </span>
+                    )}
                   </div>
                 );
               })}
