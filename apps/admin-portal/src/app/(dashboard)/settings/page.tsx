@@ -112,7 +112,7 @@ export default function SettingsPage() {
           ...currentTenant,
           branding: { ...(currentTenant.branding as object), logoUrl: result.logoUrl },
         };
-        setTenant(updatedTenant as typeof currentTenant);
+        setTenant(updatedTenant as unknown as typeof currentTenant);
         qc.setQueryData(['tenant', currentTenant.id], updatedTenant);
       }
     } catch (err) {
