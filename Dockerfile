@@ -1,8 +1,9 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-# Install pnpm
+# Install OpenSSL (required by Prisma engine) and pnpm
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@8
 
 # Copy workspace manifests first (for layer caching)
