@@ -24,15 +24,13 @@ interface StageColumn {
   key: string;
   name: string;
   order: number;
+  color: string;
+  isNoStage?: boolean;
 }
 
-const DEFAULT_KANBAN_STAGES: StageColumn[] = [
-  { key: 'file_creation',     name: 'File Creation',     order: 1 },
-  { key: 'inward',            name: 'Inward',            order: 2 },
-  { key: 'scrutiny',          name: 'Scrutiny',          order: 3 },
-  { key: 'report_generation', name: 'Report Generation', order: 4 },
-  { key: 'approval',          name: 'Approval',          order: 5 },
-  { key: 'completed_stage',   name: 'Completed',         order: 6 },
+const PALETTE = [
+  '#6366f1', '#0ea5e9', '#8b5cf6', '#f59e0b',
+  '#10b981', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#94a3b8',
 ];
 
 // ── KanbanCard ─────────────────────────────────────────────────────────────────
@@ -58,42 +56,41 @@ function KanbanCard({
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', project.id);
-        // Carry workflowId so cross-section drops can be rejected
         e.dataTransfer.setData('application/workflow-id', project.workflowId ?? '');
         onDragStart(project.id);
       }}
       onDragEnd={onDragEnd}
       onClick={() => router.push(`/projects/${project.id}`)}
       className={cn(
-        'bg-white border rounded-xl p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none group',
-        isDragging ? 'opacity-40 border-blue-300 rotate-1' : 'border-slate-200 hover:border-blue-200',
+        'bg-white border rounded-xl p-3 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
+        isDragging
+          ? 'opacity-40 rotate-1 shadow-lg border-blue-300'
+          : 'border-slate-200 hover:border-blue-200 hover:shadow-md shadow-sm',
       )}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-sm font-semibold text-slate-800 leading-tight line-clamp-2">{project.name}</p>
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <p className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 flex-1">{project.name}</p>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(project); }}
           aria-label={`Edit ${project.name}`}
-          className="p-1 text-slate-300 hover:text-slate-600 rounded opacity-0 group-hover:opacity-100 flex-shrink-0"
+          className="p-1 text-slate-300 hover:text-slate-600 rounded opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
         >
           <Edit size={13} />
         </button>
       </div>
-      <p className="text-xs text-slate-500 mb-2">{project.clientName}</p>
-      <div className="flex items-center justify-between gap-1 flex-wrap mb-2">
-        <span className="text-[10px] font-mono text-slate-300">{project.projectNumber}</span>
-        <div className="flex items-center gap-1">
-          <span className={cn('badge text-[10px] px-1.5 py-0.5', getPriorityBadgeClass(project.priority))}>
-            {project.priority}
-          </span>
-          <span className={cn('badge text-[10px] px-1.5 py-0.5', getStatusBadgeClass(project.status))}>
-            {project.status.replace('_', ' ')}
-          </span>
-        </div>
+      <p className="text-xs text-slate-400 mb-2.5 truncate">{project.clientName}</p>
+      <div className="flex items-center gap-1 flex-wrap mb-2.5">
+        <span className="text-[10px] font-mono text-slate-300 flex-1 truncate">{project.projectNumber}</span>
+        <span className={cn('badge text-[10px] px-1.5 py-0', getPriorityBadgeClass(project.priority))}>
+          {project.priority}
+        </span>
+        <span className={cn('badge text-[10px] px-1.5 py-0', getStatusBadgeClass(project.status))}>
+          {project.status.replace('_', ' ')}
+        </span>
       </div>
       <ProjectProgress currentStage={project.currentStage} status={project.status} compact />
       {project.dueDate && (
-        <p className="text-[10px] text-slate-400 mt-1.5">Due {formatDate(project.dueDate)}</p>
+        <p className="text-[10px] text-slate-400 mt-2">Due {formatDate(project.dueDate)}</p>
       )}
     </div>
   );
@@ -123,8 +120,7 @@ function WorkflowKanban({
     ? projects.filter((p) =>
         p.name.toLowerCase().includes(searchLower) ||
         p.projectNumber.toLowerCase().includes(searchLower) ||
-        p.clientName.toLowerCase().includes(searchLower) ||
-        p.status.toLowerCase().includes(searchLower)
+        p.clientName.toLowerCase().includes(searchLower)
       )
     : projects;
 
@@ -148,7 +144,6 @@ function WorkflowKanban({
         ? 'No Stage'
         : (stages.find((s) => s.key === vars.stageKey)?.name ?? vars.stageKey);
       toast.success(`Moved to ${stageName}`);
-      // ['projects', 'kanban'] is prefix-matched by any invalidation of ['projects']
       qc.invalidateQueries({ queryKey: ['projects', 'kanban'] });
       qc.invalidateQueries({ queryKey: ['projects'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -178,7 +173,6 @@ function WorkflowKanban({
     e.preventDefault();
     dragCounters.current[stageKey] = 0;
 
-    // Reject drops from a different workflow section
     const draggedWorkflowId = e.dataTransfer.getData('application/workflow-id');
     const expected = sectionWorkflowId ?? '';
     if (draggedWorkflowId !== expected) {
@@ -206,20 +200,24 @@ function WorkflowKanban({
   }, []);
 
   const noStageProjects = buckets['__no_stage__'] ?? [];
-  const columns: Array<StageColumn & { isNoStage?: boolean }> = [
+  const columns: StageColumn[] = [
     ...stages,
-    ...(noStageProjects.length > 0 ? [{ key: '__no_stage__', name: 'No Stage', order: 99, isNoStage: true }] : []),
+    ...(noStageProjects.length > 0
+      ? [{ key: '__no_stage__', name: 'No Stage', order: 999, color: '#94a3b8', isNoStage: true }]
+      : []),
   ];
 
   if (filtered.length === 0 && searchTerm) {
-    return (
-      <p className="text-sm text-slate-400 py-4 text-center">No matching projects</p>
-    );
+    return <p className="text-sm text-slate-400 py-4 text-center">No matching projects</p>;
+  }
+
+  if (columns.length === 0) {
+    return <p className="text-sm text-slate-400 py-4 text-center">No stages configured for this workflow</p>;
   }
 
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className="flex gap-3" style={{ minWidth: `${columns.length * 264}px` }}>
+    <div className="overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="flex gap-3 items-start" style={{ minWidth: `${columns.length * 272}px` }}>
         {columns.map((col) => {
           const colProjects = buckets[col.key] ?? [];
           const isOver = dragOverStage === col.key && draggingId !== null;
@@ -230,42 +228,51 @@ function WorkflowKanban({
               key={col.key}
               data-stage-key={col.key}
               className={cn(
-                'flex flex-col w-60 flex-shrink-0 rounded-xl border-2 transition-all duration-150',
-                isOver ? 'border-blue-400 bg-blue-50/70 scale-[1.01]' : 'border-transparent bg-slate-100/80',
-                col.isNoStage && 'opacity-70',
+                'flex flex-col w-64 flex-shrink-0 rounded-xl border bg-white transition-all duration-150 overflow-hidden',
+                isOver ? 'border-blue-300 shadow-lg' : 'border-slate-200 shadow-sm',
+                col.isNoStage && 'opacity-75',
               )}
+              style={{ borderTopColor: col.color, borderTopWidth: 3 }}
               onDragOver={handleDragOver}
               onDragEnter={(e) => handleDragEnter(e, col.key)}
               onDragLeave={(e) => handleDragLeave(e, col.key)}
               onDrop={(e) => handleDrop(e, col.key)}
             >
+              {/* Column header */}
               <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: col.color }}
+                  />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate">
+                    {col.name}
+                  </span>
+                </div>
                 <span className={cn(
-                  'text-[11px] font-bold uppercase tracking-wider truncate',
-                  col.isNoStage ? 'text-slate-400' : 'text-slate-600',
-                )}>
-                  {col.name}
-                </span>
-                <span className={cn(
-                  'text-[11px] font-bold rounded-full w-5 h-5 flex items-center justify-center border flex-shrink-0 ml-1.5',
-                  isMoving ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-white border-slate-200 text-slate-500',
+                  'text-[11px] font-semibold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 flex-shrink-0 ml-2',
+                  isMoving ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500',
                 )}>
                   {colProjects.length}
                 </span>
               </div>
 
+              {/* Drop highlight bar */}
               <div className={cn(
-                'mx-3 h-0.5 rounded-full transition-all duration-150 mb-1',
+                'mx-3 h-0.5 rounded-full transition-all duration-150 -mt-1 mb-1',
                 isOver ? 'bg-blue-400' : 'bg-transparent',
               )} />
 
-              <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2 min-h-[80px] max-h-[360px]">
+              {/* Cards */}
+              <div className="overflow-y-auto px-3 pb-3 space-y-2 min-h-[120px] max-h-[440px]">
                 {colProjects.length === 0 && (
                   <div className={cn(
-                    'h-16 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-colors',
-                    isOver ? 'border-blue-300 text-blue-400 bg-blue-50' : 'border-slate-200 text-slate-300',
+                    'h-20 rounded-xl border-2 border-dashed flex items-center justify-center text-xs transition-colors',
+                    isOver
+                      ? 'border-blue-300 text-blue-400 bg-blue-50'
+                      : 'border-slate-100 text-slate-300',
                   )}>
-                    Drop here
+                    {isOver ? 'Drop here' : 'No projects'}
                   </div>
                 )}
                 {colProjects.map((project) => (
@@ -302,13 +309,19 @@ function WorkflowSection({
   defaultExpanded: boolean;
 }) {
   const [manualExpanded, setManualExpanded] = useState(defaultExpanded);
-  // Auto-expand when searching so results are visible
   const expanded = searchTerm.length > 0 ? true : manualExpanded;
 
+  // Build stages from workflow template stages (with their colors)
   const stages: StageColumn[] = workflow?.stages
-    ?.filter((s) => s.key && s.name)
-    .map((s) => ({ key: s.key, name: s.name, order: s.order }))
-    .sort((a, b) => a.order - b.order) ?? DEFAULT_KANBAN_STAGES;
+    ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean }>)
+        .sort((a, b) => a.order - b.order)
+        .map((s, idx) => ({
+          key: s.key,
+          name: s.name,
+          order: s.order,
+          color: s.color || PALETTE[idx % PALETTE.length],
+        }))
+    : []; // null workflow → no stages → all land in __no_stage__
 
   return (
     <div className="card overflow-hidden">
@@ -323,7 +336,7 @@ function WorkflowSection({
             <GitBranch size={14} className="text-blue-500" />
           </div>
           <span className="font-semibold text-slate-800 text-sm">
-            {workflow?.name ?? 'No Workflow'}
+            {workflow?.name ?? 'No Workflow Assigned'}
           </span>
           {workflow?.isDefault && (
             <span className="badge badge-blue text-[10px] py-0">Default</span>
@@ -356,11 +369,10 @@ function WorkflowSection({
   );
 }
 
-// ── KanbanBoard — groups projects by workflow, renders accordion sections ──────
+// ── KanbanBoard — groups projects by workflowId, renders accordion sections ────
 function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   const [boardSearch, setBoardSearch] = useState('');
 
-  // Note: key is ['projects', 'kanban'] — prefix-matched by invalidateQueries(['projects'])
   const { data: allProjectsData, isLoading } = useQuery({
     queryKey: ['projects', 'kanban'],
     queryFn: () => get<{ items: Project[] }>('/projects', { pageSize: 500 }),
@@ -385,7 +397,7 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   const projects = allProjectsData?.items ?? [];
   const workflows = allWorkflows ?? [];
 
-  // Group projects by workflowId (null = no workflow assigned)
+  // Group projects by their workflowId (null = no workflow assigned)
   const byWorkflow = new Map<string | null, Project[]>();
   for (const p of projects) {
     const key = p.workflowId ?? null;
@@ -393,7 +405,7 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     byWorkflow.get(key)!.push(p);
   }
 
-  // Order: default workflow first, then rest alphabetically
+  // Default workflow first, then others alphabetically
   const orderedWorkflows: WorkflowTemplate[] = [
     ...workflows.filter((w) => w.isDefault),
     ...workflows.filter((w) => !w.isDefault).sort((a, b) => a.name.localeCompare(b.name)),
@@ -414,17 +426,20 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
         />
       </div>
 
-      {/* One accordion section per workflow */}
-      {orderedWorkflows.map((workflow, idx) => (
-        <WorkflowSection
-          key={workflow.id}
-          workflow={workflow}
-          projects={byWorkflow.get(workflow.id) ?? []}
-          searchTerm={boardSearch}
-          onEdit={onEdit}
-          defaultExpanded={idx === 0}
-        />
-      ))}
+      {/* One accordion section per workflow — each with its OWN stage columns */}
+      {orderedWorkflows.map((workflow, idx) => {
+        const workflowProjects = byWorkflow.get(workflow.id) ?? [];
+        return (
+          <WorkflowSection
+            key={workflow.id}
+            workflow={workflow}
+            projects={workflowProjects}
+            searchTerm={boardSearch}
+            onEdit={onEdit}
+            defaultExpanded={idx === 0}
+          />
+        );
+      })}
 
       {/* Projects with no workflow assigned */}
       {noWorkflowProjects.length > 0 && (
@@ -522,9 +537,7 @@ function ProjectModal({
         await post('/projects', data);
         toast.success('Project created');
       }
-      // Invalidate ['projects'] — prefix-matches both ['projects', page, ...] and ['projects', 'kanban']
       qc.invalidateQueries({ queryKey: ['projects'] });
-      // Refresh dashboard stats
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       onClose();
     } catch (err) {

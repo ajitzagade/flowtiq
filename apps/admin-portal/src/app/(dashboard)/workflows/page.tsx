@@ -43,6 +43,8 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
           { key: 'stage_1', name: 'Stage 1', order: 1, color: '#94a3b8', requiresApproval: false },
         ]
   );
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const addStage = () => {
     const order = stages.length + 1;
@@ -62,6 +64,33 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
       }
       return next;
     });
+  };
+
+  const handleStageDragStart = (e: React.DragEvent, idx: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx));
+    setDragIdx(idx);
+  };
+
+  const handleStageDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (idx !== dragOverIdx) setDragOverIdx(idx);
+  };
+
+  const handleStageDrop = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    const sourceIdx = Number(e.dataTransfer.getData('text/plain'));
+    if (!isNaN(sourceIdx) && sourceIdx !== targetIdx) {
+      setStages((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(sourceIdx, 1);
+        next.splice(targetIdx, 0, moved);
+        return next.map((s, i) => ({ ...s, order: i + 1 }));
+      });
+    }
+    setDragIdx(null);
+    setDragOverIdx(null);
   };
 
   const handleSave = async () => {
@@ -124,8 +153,22 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
             </div>
             <div className="space-y-2">
               {stages.map((stage, idx) => (
-                <div key={idx} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
-                  <GripVertical size={14} className="text-slate-300 flex-shrink-0" />
+                <div
+                  key={idx}
+                  draggable
+                  onDragStart={(e) => handleStageDragStart(e, idx)}
+                  onDragOver={(e) => handleStageDragOver(e, idx)}
+                  onDrop={(e) => handleStageDrop(e, idx)}
+                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                  className={cn(
+                    'flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border transition-all',
+                    dragOverIdx === idx && dragIdx !== idx
+                      ? 'border-blue-400 bg-blue-50 shadow-md'
+                      : 'border-slate-100',
+                    dragIdx === idx ? 'opacity-40' : '',
+                  )}
+                >
+                  <GripVertical size={14} className="text-slate-400 flex-shrink-0 cursor-grab active:cursor-grabbing" />
                   <div
                     className="w-5 h-5 rounded-full flex-shrink-0 cursor-pointer border-2 border-white shadow"
                     style={{ backgroundColor: stage.color }}
