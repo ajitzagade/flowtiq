@@ -1,12 +1,12 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm --filter @flowtiq/database exec prisma generate && pnpm --filter @flowtiq/database exec prisma db push --accept-data-loss && pnpm --filter @flowtiq/api build"
+buildCommand = "pnpm --filter @flowtiq/database exec prisma generate && pnpm --filter @flowtiq/api build"
 
 [deploy]
-startCommand = "node services/api/dist/index.js"
+startCommand = "pnpm --filter @flowtiq/database exec prisma db push --accept-data-loss && node services/api/dist/index.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [environments.production]
   [environments.production.deploy]
-  startCommand = "node services/api/dist/index.js"
+  startCommand = "pnpm --filter @flowtiq/database exec prisma db push --accept-data-loss && node services/api/dist/index.js"
