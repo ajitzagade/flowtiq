@@ -50,6 +50,16 @@ export default function SettingsPage() {
     }
   }, [tenantData]);
 
+  // Apply color changes to CSS variables in real-time as the user adjusts them
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--brand-primary', primaryColor);
+    root.style.setProperty('--brand-primary-hover', primaryColor);
+    root.style.setProperty('--sidebar-active', primaryColor);
+    root.style.setProperty('--sidebar-active-bg', `${primaryColor}28`);
+    root.style.setProperty('--sidebar-active-border', primaryColor);
+  }, [primaryColor]);
+
   const saveMutation = useMutation({
     mutationFn: (data: object) =>
       fetch(`${API_URL}/api/tenants/${currentTenant?.id}/branding`, {
@@ -60,11 +70,13 @@ export default function SettingsPage() {
         },
         body: JSON.stringify(data),
       }).then((r) => r.json()),
-    onSuccess: async () => {
+    onSuccess: (response) => {
       toast.success('Branding saved');
-      qc.invalidateQueries({ queryKey: ['tenant'] });
-      const updated = await refetchTenant();
-      if (updated.data) setTenant(updated.data);
+      // Use the PATCH response directly — GET /tenants/:id was previously super-admin only
+      if (response?.data) {
+        setTenant(response.data);
+        qc.setQueryData(['tenant', currentTenant?.id], response.data);
+      }
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -92,11 +104,17 @@ export default function SettingsPage() {
     try {
       const fd = new FormData();
       fd.append('logo', file);
-      await uploadFile(`/tenants/${currentTenant?.id}/logo`, fd);
+      const result = await uploadFile<{ logoUrl: string }>(`/tenants/${currentTenant?.id}/logo`, fd);
       toast.success('Logo uploaded');
-      qc.invalidateQueries({ queryKey: ['tenant'] });
-      const updated = await refetchTenant();
-      if (updated.data) setTenant(updated.data);
+      // Merge the new logoUrl into the tenant store without a refetch
+      if (result?.logoUrl && currentTenant) {
+        const updatedTenant = {
+          ...currentTenant,
+          branding: { ...(currentTenant.branding as object), logoUrl: result.logoUrl },
+        };
+        setTenant(updatedTenant as typeof currentTenant);
+        qc.setQueryData(['tenant', currentTenant.id], updatedTenant);
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
       setLogoPreview(null);
@@ -108,24 +126,27 @@ export default function SettingsPage() {
 
   const handleRemoveLogo = async () => {
     try {
-      await fetch(`${API_URL}/api/tenants/${currentTenant?.id}/branding`, {
+      const res = await fetch(`${API_URL}/api/tenants/${currentTenant?.id}/branding`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${useAuthStore.getState().accessToken}`,
         },
         body: JSON.stringify({ branding: { logoUrl: null } }),
-      });
+      }).then((r) => r.json());
       setLogoPreview(null);
       toast.success('Logo removed');
-      qc.invalidateQueries({ queryKey: ['tenant'] });
-      refetchTenant();
+      if (res?.data && currentTenant) {
+        setTenant(res.data);
+        qc.setQueryData(['tenant', currentTenant.id], res.data);
+      }
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
   };
 
-  const currentLogoUrl = logoPreview || (branding?.logoUrl ? `${API_URL}${branding.logoUrl}` : null);
+  // logoUrl is a full Cloudinary URL — do NOT prepend API_URL
+  const currentLogoUrl = logoPreview || branding?.logoUrl || null;
 
   const isSuperAdmin = user?.isSuperAdmin;
 

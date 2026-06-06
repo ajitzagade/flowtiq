@@ -100,9 +100,46 @@ tenantsRouter.patch('/:id/branding', async (req, res, next) => {
   }
 });
 
+// GET /api/tenants/:id — super admin OR own-tenant admin
+tenantsRouter.get('/:id', async (req, res, next) => {
+  try {
+    const authReq = req as unknown as AuthRequest;
+    const user = authReq.user!;
+
+    if (!user.isSuperAdmin && user.tenantId !== req.params.id) {
+      res.status(403).json({ success: false, error: 'Forbidden' });
+      return;
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.params.id },
+      include: {
+        _count: { select: { users: true, projects: true, documents: true } },
+      },
+    });
+
+    if (!tenant) {
+      res.status(404).json({ success: false, error: 'Tenant not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: serializeTenant({
+        ...tenant,
+        userCount: tenant._count.users,
+        projectCount: tenant._count.projects,
+        documentCount: tenant._count.documents,
+      } as Record<string, unknown>),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 tenantsRouter.use(requireSuperAdmin);
 
-// GET /api/tenants
+// GET /api/tenants — super admin only (list all tenants)
 tenantsRouter.get('/', async (req, res, next) => {
   try {
     const { page = '1', pageSize = '20', search } = req.query as Record<string, string>;
@@ -149,34 +186,6 @@ tenantsRouter.get('/', async (req, res, next) => {
   }
 });
 
-// GET /api/tenants/:id
-tenantsRouter.get('/:id', async (req, res, next) => {
-  try {
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: req.params.id },
-      include: {
-        _count: { select: { users: true, projects: true, documents: true } },
-      },
-    });
-
-    if (!tenant) {
-      res.status(404).json({ success: false, error: 'Tenant not found' });
-      return;
-    }
-
-    res.json({
-      success: true,
-      data: serializeTenant({
-        ...tenant,
-        userCount: tenant._count.users,
-        projectCount: tenant._count.projects,
-        documentCount: tenant._count.documents,
-      } as Record<string, unknown>),
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
 const createTenantSchema = z.object({
   name: z.string().min(2).max(100),

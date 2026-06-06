@@ -84,7 +84,7 @@ export function Sidebar() {
               {(tenant?.branding as { logoUrl?: string } | undefined)?.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${(tenant?.branding as { logoUrl?: string }).logoUrl}`}
+                  src={(tenant?.branding as { logoUrl?: string }).logoUrl}
                   alt="Logo"
                   className="w-full h-full object-contain"
                 />
@@ -111,7 +111,7 @@ export function Sidebar() {
             {(tenant?.branding as { logoUrl?: string } | undefined)?.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${(tenant?.branding as { logoUrl?: string }).logoUrl}`}
+                src={(tenant?.branding as { logoUrl?: string }).logoUrl}
                 alt="Logo"
                 className="w-full h-full object-contain"
               />

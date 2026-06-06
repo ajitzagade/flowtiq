@@ -33,6 +33,8 @@ export function BrandingApplicator() {
     root.style.setProperty('--brand-primary', primary);
     root.style.setProperty('--brand-primary-hover', adjustHex(primary, -20));
     root.style.setProperty('--sidebar-active', primary);
+    root.style.setProperty('--sidebar-active-bg', `${primary}28`);
+    root.style.setProperty('--sidebar-active-border', primary);
 
     const rgb = hexToRgb(primary);
     if (rgb) {
