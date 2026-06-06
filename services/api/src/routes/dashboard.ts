@@ -111,14 +111,51 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       },
     });
 
-    // Recent projects
-    const recentProjects = await prisma.project.findMany({
+    const PRIORITY_ORDER: Record<string, number> = { urgent: 1, high: 2, medium: 3, low: 4 };
+
+    // Active projects sorted by priority (urgent first), then by updated date
+    const recentProjectsRaw = await prisma.project.findMany({
       where: { ...projectWhere, status: 'active' },
       orderBy: { updatedAt: 'desc' },
-      take: 5,
+      take: 20,
       include: {
         owner: { select: { id: true, firstName: true, lastName: true } },
       },
+    });
+    const recentProjects = [...recentProjectsRaw]
+      .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 5) - (PRIORITY_ORDER[b.priority] ?? 5))
+      .slice(0, 8);
+
+    // Workflow pipeline: count active projects per stage per workflow
+    const [workflows, projectsByStage] = await Promise.all([
+      prisma.workflowTemplate.findMany({
+        where: { tenantId: tenantId as string },
+        orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+      }),
+      prisma.project.groupBy({
+        by: ['workflowId', 'currentStage'],
+        where: { ...projectWhere, status: 'active' },
+        _count: { id: true },
+      }),
+    ]);
+
+    const workflowPipeline = workflows.map((w) => {
+      const stages = (w.stages as Array<{ key: string; name: string; order: number; color?: string }>)
+        .slice()
+        .sort((a, b) => a.order - b.order);
+
+      const stagesWithCounts = stages.map((stage) => ({
+        key: stage.key,
+        name: stage.name,
+        order: stage.order,
+        color: stage.color,
+        count: projectsByStage.find((p) => p.workflowId === w.id && p.currentStage === stage.key)?._count.id ?? 0,
+      }));
+
+      const totalProjects = stagesWithCounts.reduce((s, st) => s + st.count, 0) +
+        (projectsByStage.find((p) => p.workflowId === w.id && p.currentStage === null)?._count.id ?? 0);
+
+      return { id: w.id, name: w.name, isDefault: w.isDefault, totalProjects, stages: stagesWithCounts };
     });
 
     // Overdue follow-ups
@@ -163,6 +200,7 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         overdueList,
         recentProjects,
         recentActivity,
+        workflowPipeline,
       },
     });
   } catch (err) {

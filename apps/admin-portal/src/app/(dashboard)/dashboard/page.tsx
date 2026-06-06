@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { useAuthStore } from '@/store/auth';
 import {
   FolderKanban, Clock, FileText, CheckCircle2, AlertTriangle,
-  TrendingUp, Users, Building2, ArrowRight,
+  TrendingUp, Users, Building2, ArrowRight, GitBranch,
 } from 'lucide-react';
 import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
 import { ProjectProgress } from '@/components/ProjectProgress';
@@ -61,6 +61,25 @@ interface DashboardStats {
     projectCount: number;
     createdAt: string;
   }>;
+  workflowPipeline?: Array<{
+    id: string;
+    name: string;
+    isDefault: boolean;
+    totalProjects: number;
+    stages: Array<{
+      key: string;
+      name: string;
+      order: number;
+      color?: string;
+      count: number;
+    }>;
+  }>;
+  overdueList?: Array<{
+    id: string;
+    nextFollowUp: string;
+    project: { id: string; name: string; projectNumber: string; clientName: string };
+    owner: { firstName: string; lastName: string };
+  }>;
 }
 
 function StatCard({
@@ -84,6 +103,90 @@ function StatCard({
   );
 
   return href ? <Link href={href}>{content}</Link> : content;
+}
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: 'bg-red-500',
+  high: 'bg-orange-400',
+  medium: 'bg-amber-400',
+  low: 'bg-slate-400',
+};
+
+function WorkflowPipelineSection({ pipeline }: {
+  pipeline: NonNullable<DashboardStats['workflowPipeline']>;
+}) {
+  if (!pipeline || pipeline.length === 0) return null;
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div className="flex items-center gap-2">
+          <GitBranch size={18} className="text-slate-500" />
+          <h3 className="font-semibold text-slate-900">Workflow Pipeline</h3>
+          <span className="text-xs text-slate-400">— active projects per stage</span>
+        </div>
+        <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+          View all <ArrowRight size={14} />
+        </Link>
+      </div>
+      <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {pipeline.map((workflow) => (
+          <div key={workflow.id} className="border border-slate-200 rounded-xl overflow-hidden">
+            {/* Workflow header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-medium text-slate-800 truncate">{workflow.name}</span>
+                {workflow.isDefault && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 flex-shrink-0">
+                    Default
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-semibold text-slate-700 flex-shrink-0 ml-2">
+                {workflow.totalProjects} project{workflow.totalProjects !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Stages */}
+            <div className="divide-y divide-slate-100">
+              {workflow.stages.map((stage) => {
+                const max = Math.max(...workflow.stages.map((s) => s.count), 1);
+                const pct = Math.round((stage.count / max) * 100);
+                return (
+                  <div key={stage.key} className="flex items-center gap-3 px-4 py-2.5">
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: stage.color || '#94a3b8' }}
+                    />
+                    <span className="text-sm text-slate-600 flex-1 min-w-0 truncate">{stage.name}</span>
+                    {/* Bar */}
+                    <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden flex-shrink-0">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: stage.color || '#94a3b8',
+                        }}
+                      />
+                    </div>
+                    <span className={cn(
+                      'text-sm font-semibold w-6 text-right flex-shrink-0',
+                      stage.count > 0 ? 'text-slate-800' : 'text-slate-300',
+                    )}>
+                      {stage.count}
+                    </span>
+                  </div>
+                );
+              })}
+              {workflow.stages.length === 0 && (
+                <div className="px-4 py-3 text-sm text-slate-400 text-center">No stages configured</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function getActionLabel(action: string): string {
@@ -159,7 +262,7 @@ export default function DashboardPage() {
             <div className="card-header">
               <div>
                 <h3 className="font-semibold text-slate-900">Active Projects</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Recently updated projects</p>
+                <p className="text-xs text-slate-500 mt-0.5">Sorted by priority — urgent first</p>
               </div>
               <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                 View all <ArrowRight size={14} />
@@ -178,6 +281,10 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className={cn('w-2 h-2 rounded-full flex-shrink-0', PRIORITY_COLORS[project.priority] || 'bg-slate-300')}
+                            title={`${project.priority} priority`}
+                          />
                           <span className="text-xs font-mono text-slate-400">{project.projectNumber}</span>
                           <span className={getStatusBadgeClass(project.status)}>
                             {project.status.replace('_', ' ')}
@@ -254,6 +361,11 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Workflow Pipeline */}
+        {!isSuperAdmin && stats?.workflowPipeline && stats.workflowPipeline.length > 0 && (
+          <WorkflowPipelineSection pipeline={stats.workflowPipeline} />
+        )}
 
         {/* Summary row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
