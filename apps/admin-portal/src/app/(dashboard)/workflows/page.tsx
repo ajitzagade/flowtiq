@@ -14,7 +14,9 @@ interface StageInput {
   name: string;
   order: number;
   color: string;
+  isRequired: boolean;
   requiresApproval: boolean;
+  description: string;
 }
 
 const STAGE_COLORS = ['#94a3b8', '#38bdf8', '#3b82f6', '#8b5cf6', '#f59e0b', '#14b8a6', '#10b981', '#ef4444'];
@@ -36,11 +38,11 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
   const [saving, setSaving] = useState(false);
   const [stages, setStages] = useState<StageInput[]>(
     workflow?.stages
-      ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean }>)
+      ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string }>)
           .sort((a, b) => a.order - b.order)
-          .map((s) => ({ key: s.key, name: s.name, order: s.order, color: s.color || '#6366f1', requiresApproval: s.requiresApproval || false }))
+          .map((s) => ({ key: s.key, name: s.name, order: s.order, color: s.color || '#6366f1', isRequired: s.isRequired !== false, requiresApproval: s.requiresApproval || false, description: s.description || '' }))
       : [
-          { key: 'stage_1', name: 'Stage 1', order: 1, color: '#94a3b8', requiresApproval: false },
+          { key: 'stage_1', name: 'Stage 1', order: 1, color: '#94a3b8', isRequired: true, requiresApproval: false, description: '' },
         ]
   );
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -48,14 +50,14 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
 
   const addStage = () => {
     const order = stages.length + 1;
-    setStages((prev) => [...prev, { key: `stage_${order}`, name: `Stage ${order}`, order, color: STAGE_COLORS[(order - 1) % STAGE_COLORS.length], requiresApproval: false }]);
+    setStages((prev) => [...prev, { key: `stage_${order}`, name: `Stage ${order}`, order, color: STAGE_COLORS[(order - 1) % STAGE_COLORS.length], isRequired: true, requiresApproval: false, description: '' }]);
   };
 
   const removeStage = (idx: number) => {
     setStages((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, order: i + 1 })));
   };
 
-  const updateStage = (idx: number, field: keyof StageInput, value: string | number | boolean) => {
+  const updateStage = (idx: number, field: keyof StageInput, value: string | number | boolean | undefined) => {
     setStages((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
@@ -161,49 +163,66 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
                   onDrop={(e) => handleStageDrop(e, idx)}
                   onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
                   className={cn(
-                    'flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5 border transition-all',
+                    'bg-slate-50 rounded-xl px-3 py-2.5 border transition-all',
                     dragOverIdx === idx && dragIdx !== idx
                       ? 'border-blue-400 bg-blue-50 shadow-md'
                       : 'border-slate-100',
                     dragIdx === idx ? 'opacity-40' : '',
                   )}
                 >
-                  <GripVertical size={14} className="text-slate-400 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                  <div
-                    className="w-5 h-5 rounded-full flex-shrink-0 cursor-pointer border-2 border-white shadow"
-                    style={{ backgroundColor: stage.color }}
-                    title="Click to change color"
-                  >
+                  <div className="flex items-center gap-2">
+                    <GripVertical size={14} className="text-slate-400 flex-shrink-0 cursor-grab active:cursor-grabbing" />
+                    <div
+                      className="w-5 h-5 rounded-full flex-shrink-0 cursor-pointer border-2 border-white shadow"
+                      style={{ backgroundColor: stage.color }}
+                      title="Click to change color"
+                    >
+                      <input
+                        type="color"
+                        className="opacity-0 w-full h-full cursor-pointer"
+                        value={stage.color}
+                        onChange={(e) => updateStage(idx, 'color', e.target.value)}
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-slate-400 w-5 flex-shrink-0">{idx + 1}</span>
                     <input
-                      type="color"
-                      className="opacity-0 w-full h-full cursor-pointer"
-                      value={stage.color}
-                      onChange={(e) => updateStage(idx, 'color', e.target.value)}
+                      className="form-input py-1 text-sm flex-1 min-w-0"
+                      value={stage.name}
+                      onChange={(e) => updateStage(idx, 'name', e.target.value)}
+                      placeholder="Stage name"
                     />
+                    <label className="flex items-center gap-1.5 text-xs flex-shrink-0 whitespace-nowrap cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={stage.isRequired}
+                        onChange={(e) => updateStage(idx, 'isRequired', e.target.checked)}
+                      />
+                      <span className={stage.isRequired ? 'text-red-600 font-medium' : 'text-slate-400'}>Required</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-500 flex-shrink-0 whitespace-nowrap cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={stage.requiresApproval}
+                        onChange={(e) => updateStage(idx, 'requiresApproval', e.target.checked)}
+                      />
+                      Approval
+                    </label>
+                    <button
+                      onClick={() => removeStage(idx)}
+                      disabled={stages.length === 1}
+                      className="p-1 text-slate-300 hover:text-red-500 disabled:opacity-30 transition-colors flex-shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
-                  <span className="text-xs font-bold text-slate-400 w-5 flex-shrink-0">{idx + 1}</span>
                   <input
-                    className="form-input py-1 text-sm flex-1 min-w-0"
-                    value={stage.name}
-                    onChange={(e) => updateStage(idx, 'name', e.target.value)}
-                    placeholder="Stage name"
+                    className="form-input py-1 text-xs mt-2 w-full text-slate-500"
+                    value={stage.description}
+                    onChange={(e) => updateStage(idx, 'description', e.target.value)}
+                    placeholder="Stage description (optional)"
                   />
-                  <label className="flex items-center gap-1.5 text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      className="rounded"
-                      checked={stage.requiresApproval}
-                      onChange={(e) => updateStage(idx, 'requiresApproval', e.target.checked)}
-                    />
-                    Approval
-                  </label>
-                  <button
-                    onClick={() => removeStage(idx)}
-                    disabled={stages.length === 1}
-                    className="p-1 text-slate-300 hover:text-red-500 disabled:opacity-30 transition-colors flex-shrink-0"
-                  >
-                    <X size={14} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -308,7 +327,7 @@ export default function WorkflowsPage() {
 
               {/* Stage flow visualization */}
               <div className="space-y-1">
-                {(workflow.stages as Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean }>).map((stage, idx) => (
+                {(workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string }>).map((stage, idx) => (
                   <div key={stage.key} className="flex items-center gap-2">
                     <div
                       className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
@@ -316,11 +335,17 @@ export default function WorkflowsPage() {
                     >
                       {stage.order}
                     </div>
-                    <div className="flex-1 bg-slate-50 rounded px-3 py-1.5 flex items-center justify-between">
-                      <span className="text-sm text-slate-700">{stage.name}</span>
-                      {stage.requiresApproval && (
-                        <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Requires Approval</span>
-                      )}
+                    <div className="flex-1 bg-slate-50 rounded px-3 py-1.5 flex items-center justify-between gap-2">
+                      <span className="text-sm text-slate-700 truncate">{stage.name}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {stage.isRequired !== false
+                          ? <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Required</span>
+                          : <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>
+                        }
+                        {stage.requiresApproval && (
+                          <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Approval</span>
+                        )}
+                      </div>
                     </div>
                     {idx < workflow.stages.length - 1 && (
                       <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />

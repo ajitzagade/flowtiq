@@ -150,9 +150,9 @@ reportsRouter.get('/summary', async (req, res, next) => {
       ];
     }
 
-    // Stage / status filters applied to period queries
+    // Status filter applied to period queries
+    // Note: stageFilter is used for stageDistribution only (via ProjectStage records), not for project counts
     const periodExtra: Record<string, unknown> = {};
-    if (stageFilter !== 'all') periodExtra.currentStage = stageFilter;
     if (statusFilter !== 'all') periodExtra.status = statusFilter;
 
     const periodWhere = { ...baseWhere, ...periodExtra };
@@ -196,18 +196,29 @@ reportsRouter.get('/summary', async (req, res, next) => {
       }),
     ]);
 
-    // ── Stage distribution ────────────────────────────────────────────────────
+    // ── Stage distribution (from ProjectStage records) ────────────────────────
 
-    const stageGroups = await prisma.project.groupBy({
-      by: ['currentStage'],
-      where: periodWhere,
+    // Get project IDs in scope for stage distribution
+    const scopedProjectIds = (
+      await prisma.project.findMany({
+        where: periodWhere,
+        select: { id: true },
+      })
+    ).map((p) => p.id);
+
+    const stageGroups = await prisma.projectStage.groupBy({
+      by: ['stageKey', 'stageName'],
+      where: {
+        projectId: { in: scopedProjectIds },
+        ...(stageFilter !== 'all' && { stageKey: stageFilter }),
+      },
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },
     });
 
     const stageDistribution = stageGroups.map((g) => ({
-      stage: g.currentStage || 'none',
-      name: g.currentStage ? stageName(g.currentStage) : 'No Stage',
+      stage: g.stageKey,
+      name: g.stageName || stageName(g.stageKey),
       count: g._count.id,
     }));
 
@@ -319,20 +330,25 @@ reportsRouter.get('/stages', async (req, res, next) => {
     const authReq = req as unknown as AuthRequest;
     const { tenantId, isSuperAdmin } = authReq.user;
 
-    const stageGroups = await prisma.project.groupBy({
-      by: ['currentStage'],
+    // Get project IDs in scope
+    const scopedProjects = await prisma.project.findMany({
       where: isSuperAdmin ? {} : { tenantId: tenantId as string },
+      select: { id: true },
+    });
+    const projectIds = scopedProjects.map((p) => p.id);
+
+    const stageGroups = await prisma.projectStage.groupBy({
+      by: ['stageKey', 'stageName'],
+      where: { projectId: { in: projectIds } },
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },
     });
 
-    const stages = stageGroups
-      .filter((g) => g.currentStage)
-      .map((g) => ({
-        key: g.currentStage as string,
-        name: stageName(g.currentStage as string),
-        count: g._count.id,
-      }));
+    const stages = stageGroups.map((g) => ({
+      key: g.stageKey,
+      name: g.stageName || stageName(g.stageKey),
+      count: g._count.id,
+    }));
 
     res.json({ success: true, data: stages });
   } catch (err) {

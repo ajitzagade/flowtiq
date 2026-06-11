@@ -17,6 +17,16 @@ async function generateProjectNumber(tenantId: string): Promise<string> {
   return `${prefix}-${year}-${num}`;
 }
 
+function computeProgress(stages: Array<{ status: string }>) {
+  if (!stages.length) return { progressPct: 0, completedStages: 0, totalStages: 0 };
+  const completed = stages.filter((s) => s.status === 'completed').length;
+  return {
+    progressPct: Math.round((completed / stages.length) * 100),
+    completedStages: completed,
+    totalStages: stages.length,
+  };
+}
+
 // GET /api/projects
 projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_all']), async (req, res, next) => {
   try {
@@ -30,7 +40,7 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     const canViewAll = isSuperAdmin || permissions.includes('projects:view_all');
 
-    const where: Record<string, unknown> = { tenantId: tenantId as string };
+    const where: Record<string, unknown> = isSuperAdmin ? {} : { tenantId: tenantId as string };
 
     if (!canViewAll) {
       where.OR = [
@@ -70,13 +80,12 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
         include: {
           owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
           workflow: { select: { id: true, name: true } },
-          _count: { select: { documents: true, followUps: true } },
+          _count: { select: { documents: true, followUps: true, projectWorkflows: true } },
         },
       }),
       prisma.project.count({ where }),
     ]);
 
-    // Get pending follow-ups count per project
     const projectIds = projects.map((p) => p.id);
     const pendingFollowUps = await prisma.followUp.groupBy({
       by: ['projectId'],
@@ -92,6 +101,7 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
           ...p,
           documentsCount: p._count.documents,
           followUpsCount: p._count.followUps,
+          workflowsCount: p._count.projectWorkflows,
           pendingFollowUps: followUpMap.get(p.id) || 0,
         })),
         total,
@@ -117,12 +127,42 @@ projectsRouter.get('/:id', requirePermission('projects:view'), async (req, res, 
         owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
         workflow: { select: { id: true, name: true, stages: true } },
         stages: {
+          where: { projectWorkflowId: null }, // legacy stages only
           orderBy: { stageOrder: 'asc' },
           include: {
             stageHistory: {
               orderBy: { createdAt: 'desc' },
               include: {
                 changedBy: { select: { id: true, firstName: true, lastName: true } },
+              },
+            },
+            documents: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true, fileName: true, originalName: true, fileType: true, mimeType: true, filePath: true, version: true, createdAt: true },
+            },
+            subTasks: { orderBy: { order: 'asc' } },
+          },
+        },
+        projectWorkflows: {
+          orderBy: { order: 'asc' },
+          include: {
+            workflowTemplate: { select: { id: true, name: true, stages: true } },
+            stages: {
+              orderBy: { stageOrder: 'asc' },
+              include: {
+                stageHistory: {
+                  orderBy: { createdAt: 'desc' },
+                  include: {
+                    changedBy: { select: { id: true, firstName: true, lastName: true } },
+                  },
+                },
+                documents: {
+                  where: { isActive: true },
+                  orderBy: { createdAt: 'desc' },
+                  select: { id: true, fileName: true, originalName: true, fileType: true, mimeType: true, filePath: true, version: true, createdAt: true },
+                },
+                subTasks: { orderBy: { order: 'asc' } },
               },
             },
           },
@@ -143,51 +183,96 @@ projectsRouter.get('/:id', requirePermission('projects:view'), async (req, res, 
       return;
     }
 
-    // Auto-create ProjectStage records if project has a workflow but no stages (e.g. seeded projects)
-    if (project.stages.length === 0 && project.workflowId && project.workflow) {
+    // ── Backward compat: auto-create legacy ProjectStage records if missing ──
+    const hasLegacyStages = project.stages.length > 0;
+    if (!hasLegacyStages && project.workflowId && project.workflow && project.projectWorkflows.length === 0) {
       const wfStages = project.workflow.stages as Array<Record<string, unknown>>;
-      await prisma.projectStage.createMany({
-        data: wfStages.map((s) => ({
-          projectId: project!.id,
-          stageName: (s.stageName || s.name) as string,
-          stageKey: (s.stageKey || s.key) as string,
-          stageOrder: s.order as number,
-          status: (s.stageKey || s.key) === project!.currentStage ? 'in_progress' : 'pending',
-          checklist: (s.checklist as object[]) || [],
-        })),
-      });
-      // Re-fetch with stages populated
-      project = await prisma.project.findFirst({
-        where: { id: req.params.id, tenantId: tenantId as string },
-        include: {
-          owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
-          workflow: { select: { id: true, name: true, stages: true } },
-          stages: {
-            orderBy: { stageOrder: 'asc' },
-            include: {
-              stageHistory: {
-                orderBy: { createdAt: 'desc' },
-                include: { changedBy: { select: { id: true, firstName: true, lastName: true } } },
+      if (wfStages.length > 0) {
+        await prisma.projectStage.createMany({
+          data: wfStages.map((s) => ({
+            projectId: project!.id,
+            stageName: (s.stageName || s.name) as string,
+            stageKey: (s.stageKey || s.key) as string,
+            stageOrder: s.order as number,
+            isRequired: (s.isRequired ?? true) as boolean,
+            status: (s.stageKey || s.key) === project!.currentStage ? 'in_progress' : 'pending',
+            checklist: (s.checklist as object[]) || [],
+          })),
+        });
+        // Re-fetch
+        project = await prisma.project.findFirst({
+          where: { id: req.params.id, tenantId: tenantId as string },
+          include: {
+            owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
+            workflow: { select: { id: true, name: true, stages: true } },
+            stages: {
+              where: { projectWorkflowId: null },
+              orderBy: { stageOrder: 'asc' },
+              include: {
+                stageHistory: {
+                  orderBy: { createdAt: 'desc' },
+                  include: { changedBy: { select: { id: true, firstName: true, lastName: true } } },
+                },
+                documents: {
+                  where: { isActive: true },
+                  orderBy: { createdAt: 'desc' },
+                  select: { id: true, fileName: true, originalName: true, fileType: true, mimeType: true, filePath: true, version: true, createdAt: true },
+                },
+                subTasks: { orderBy: { order: 'asc' } },
               },
             },
+            projectWorkflows: {
+              orderBy: { order: 'asc' },
+              include: {
+                workflowTemplate: { select: { id: true, name: true, stages: true } },
+                stages: {
+                  orderBy: { stageOrder: 'asc' },
+                  include: {
+                    stageHistory: {
+                      orderBy: { createdAt: 'desc' },
+                      include: { changedBy: { select: { id: true, firstName: true, lastName: true } } },
+                    },
+                    documents: {
+                      where: { isActive: true },
+                      orderBy: { createdAt: 'desc' },
+                      select: { id: true, fileName: true, originalName: true, fileType: true, mimeType: true, filePath: true, version: true, createdAt: true },
+                    },
+                    subTasks: { orderBy: { order: 'asc' } },
+                  },
+                },
+              },
+            },
+            followUps: {
+              where: { status: { in: ['pending', 'overdue'] } },
+              orderBy: { nextFollowUp: 'asc' },
+              include: { owner: { select: { id: true, firstName: true, lastName: true } } },
+            },
+            _count: { select: { documents: true } },
           },
-          followUps: {
-            where: { status: { in: ['pending', 'overdue'] } },
-            orderBy: { nextFollowUp: 'asc' },
-            include: { owner: { select: { id: true, firstName: true, lastName: true } } },
-          },
-          _count: { select: { documents: true } },
-        },
-      });
+        });
+      }
     }
 
-    // Map stageHistory → history for frontend compatibility
     const stagesWithHistory = project!.stages.map((s) => ({
       ...s,
       history: s.stageHistory,
     }));
 
-    res.json({ success: true, data: { ...project, stages: stagesWithHistory, documentsCount: project!._count.documents } });
+    const projectWorkflowsWithProgress = project!.projectWorkflows.map((pw) => ({
+      ...pw,
+      ...computeProgress(pw.stages),
+      stages: pw.stages.map((s) => ({ ...s, history: s.stageHistory })),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        ...project,
+        stages: stagesWithHistory,
+        projectWorkflows: projectWorkflowsWithProgress,
+        documentsCount: project!._count.documents,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -203,6 +288,7 @@ const createProjectSchema = z.object({
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
   workflowId: z.string().optional(),
+  workflowIds: z.array(z.string()).optional(),
   ownerId: z.string(),
   teamMembers: z.array(z.string()).default([]),
   followUpOwnerId: z.string().optional(),
@@ -250,19 +336,62 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
       },
     });
 
-    // Create stage instances if workflow is set
-    if (data.workflowId && project.workflow) {
+    // Build the list of workflow IDs to attach
+    const wfIds = data.workflowIds?.length
+      ? data.workflowIds
+      : data.workflowId
+        ? [data.workflowId]
+        : [];
+
+    if (wfIds.length > 0) {
+      for (let idx = 0; idx < wfIds.length; idx++) {
+        const tmpl = await prisma.workflowTemplate.findFirst({
+          where: { id: wfIds[idx], tenantId: tenantId as string },
+        });
+        if (!tmpl) continue;
+
+        const pw = await prisma.projectWorkflow.create({
+          data: {
+            projectId: project.id,
+            workflowTemplateId: tmpl.id,
+            name: tmpl.name,
+            order: idx + 1,
+            status: 'not_started',
+          },
+        });
+
+        const templateStages = tmpl.stages as Array<Record<string, unknown>>;
+        if (templateStages.length > 0) {
+          await prisma.projectStage.createMany({
+            data: templateStages.map((s) => ({
+              projectId: project.id,
+              projectWorkflowId: pw.id,
+              stageName: (s.name || s.stageName) as string,
+              stageKey: (s.key || s.stageKey) as string,
+              stageOrder: s.order as number,
+              isRequired: (s.isRequired ?? true) as boolean,
+              status: 'pending',
+              checklist: (s.checklist as object[]) || [],
+            })),
+          });
+        }
+      }
+    } else if (project.workflow) {
+      // Legacy: create stages directly on project (no ProjectWorkflow)
       const stages = project.workflow.stages as Array<Record<string, unknown>>;
-      await prisma.projectStage.createMany({
-        data: stages.map((s) => ({
-          projectId: project.id,
-          stageName: (s.stageName || s.name) as string,
-          stageKey: (s.stageKey || s.key) as string,
-          stageOrder: s.order as number,
-          status: (s.order as number) === 1 ? 'in_progress' : 'pending',
-          checklist: (s.checklist as object[]) || [],
-        })),
-      });
+      if (stages.length > 0) {
+        await prisma.projectStage.createMany({
+          data: stages.map((s) => ({
+            projectId: project.id,
+            stageName: (s.stageName || s.name) as string,
+            stageKey: (s.stageKey || s.key) as string,
+            stageOrder: s.order as number,
+            isRequired: (s.isRequired ?? true) as boolean,
+            status: (s.order as number) === 1 ? 'in_progress' : 'pending',
+            checklist: (s.checklist as object[]) || [],
+          })),
+        });
+      }
     }
 
     await createAuditLog({
@@ -296,7 +425,8 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
       return;
     }
 
-    const { startDate, dueDate, completionDate, ...rest } = req.body;
+    // Strip workflowIds — not a Project column; handled separately below
+    const { startDate, dueDate, completionDate, workflowIds: newWorkflowIds, ...rest } = req.body;
 
     const updated = await prisma.project.update({
       where: { id: req.params.id },
@@ -310,6 +440,47 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
         owner: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
+
+    // Sync workflows if workflowIds was provided in the payload
+    if (Array.isArray(newWorkflowIds)) {
+      const existingPws = await prisma.projectWorkflow.findMany({
+        where: { projectId: req.params.id },
+        select: { id: true, workflowTemplateId: true },
+      });
+      const existingTemplateIds = new Set(existingPws.map((pw) => pw.workflowTemplateId));
+      const desiredIds = new Set(newWorkflowIds as string[]);
+
+      // Attach newly selected workflows
+      const maxOrder = existingPws.length;
+      let orderIdx = maxOrder;
+      for (const tmplId of desiredIds) {
+        if (!existingTemplateIds.has(tmplId)) {
+          const tmpl = await prisma.workflowTemplate.findFirst({
+            where: { id: tmplId, tenantId: tenantId as string },
+          });
+          if (!tmpl) continue;
+          orderIdx++;
+          const pw = await prisma.projectWorkflow.create({
+            data: { projectId: req.params.id, workflowTemplateId: tmpl.id, name: tmpl.name, order: orderIdx, status: 'not_started' },
+          });
+          const templateStages = tmpl.stages as Array<Record<string, unknown>>;
+          if (templateStages.length > 0) {
+            await prisma.projectStage.createMany({
+              data: templateStages.map((s) => ({
+                projectId: req.params.id,
+                projectWorkflowId: pw.id,
+                stageName: (s.name || s.stageName) as string,
+                stageKey: (s.key || s.stageKey) as string,
+                stageOrder: s.order as number,
+                isRequired: (s.isRequired ?? true) as boolean,
+                status: 'pending',
+                checklist: [],
+              })),
+            });
+          }
+        }
+      }
+    }
 
     await createAuditLog({
       req: authReq,

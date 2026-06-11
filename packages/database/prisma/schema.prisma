@@ -156,12 +156,14 @@ model WorkflowTemplate {
   description String?
   isDefault   Boolean  @default(false)
   isActive    Boolean  @default(true)
+  // stages JSON: [{ key, name, order, description, color, isRequired, requiresApproval, canSkip, checklist, subStages }]
   stages      Json     @default("[]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  projects Project[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects         Project[]
+  projectWorkflows ProjectWorkflow[]
 
   @@unique([tenantId, name])
   @@map("workflow_templates")
@@ -184,6 +186,7 @@ model Project {
   startDate        DateTime?
   dueDate          DateTime?
   completionDate   DateTime?
+  // Legacy single-workflow link — kept for backward compat
   workflowId       String?
   currentStage     String?
   ownerId          String
@@ -194,47 +197,105 @@ model Project {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  workflow  WorkflowTemplate? @relation(fields: [workflowId], references: [id])
-  owner     User              @relation("ProjectOwner", fields: [ownerId], references: [id])
-  stages    ProjectStage[]
-  followUps FollowUp[]
-  documents Document[]
-  userRoles UserRole[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflow         WorkflowTemplate? @relation(fields: [workflowId], references: [id])
+  owner            User              @relation("ProjectOwner", fields: [ownerId], references: [id])
+  stages           ProjectStage[]
+  followUps        FollowUp[]
+  documents        Document[]
+  userRoles        UserRole[]
+  projectWorkflows ProjectWorkflow[]
 
   @@unique([tenantId, projectNumber])
   @@map("projects")
 }
 
+// =============================================
+// PROJECT WORKFLOWS (Project → Many Workflows)
+// =============================================
+
+model ProjectWorkflow {
+  id                 String    @id @default(cuid())
+  projectId          String
+  workflowTemplateId String
+  name               String
+  // not_started | in_progress | completed | blocked
+  status             String    @default("not_started")
+  order              Int       @default(1)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workflowTemplate WorkflowTemplate @relation(fields: [workflowTemplateId], references: [id])
+  stages           ProjectStage[]
+  documents        Document[]
+
+  @@map("project_workflows")
+}
+
 model ProjectStage {
-  id             String    @id @default(cuid())
-  projectId      String
-  stageName      String
-  stageKey       String
-  stageOrder     Int
-  status         String    @default("pending")
-  assignedTo     String?
-  startDate      DateTime?
-  completionDate DateTime?
-  notes          String?
-  checklist      Json?     @default("[]")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  projectId         String
+  projectWorkflowId String?
+  stageName         String
+  stageKey          String
+  stageOrder        Int
+  isRequired        Boolean   @default(true)
+  status            String    @default("pending")
+  // assignedTo: user id (legacy string, no FK)
+  assignedTo        String?
+  // assignedById: user id (no FK) — who made the assignment
+  assignedById      String?
+  assignedAt        DateTime?
+  startDate         DateTime?
+  completionDate    DateTime?
+  notes             String?
+  checklist         Json?     @default("[]")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  stageHistory StageHistory[]
-  documents    Document[]
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectWorkflow ProjectWorkflow? @relation(fields: [projectWorkflowId], references: [id])
+  stageHistory    StageHistory[]
+  documents       Document[]
+  subTasks        StageSubTask[]
 
-  @@unique([projectId, stageKey])
+  @@index([projectId])
+  @@index([projectWorkflowId])
   @@map("project_stages")
+}
+
+model StageSubTask {
+  id          String    @id @default(cuid())
+  stageId     String
+  name        String
+  description String?
+  status      String    @default("pending")
+  order       Int
+  isRequired  Boolean   @default(false)
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  stage ProjectStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@map("stage_sub_tasks")
 }
 
 model StageHistory {
   id             String   @id @default(cuid())
   stageId        String
   changedById    String
+  // status | assignment | notes | checklist | document | sub_task
+  changeType     String   @default("status")
+  fieldChanged   String?
   previousStatus String?
   newStatus      String
+  previousValue  String?
+  newValue       String?
   comment        String?
   createdAt      DateTime @default(now())
 
@@ -288,28 +349,30 @@ model FollowUpHistory {
 // =============================================
 
 model Document {
-  id           String   @id @default(cuid())
-  tenantId     String
-  projectId    String
-  stageId      String?
-  fileName     String
-  originalName String
-  fileType     String
-  fileSize     BigInt
-  filePath     String
-  mimeType     String?
-  version      Int      @default(1)
-  uploadedById String
-  isActive     Boolean  @default(true)
-  tags         String[] @default([])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String
+  projectId         String
+  projectWorkflowId String?
+  stageId           String?
+  fileName          String
+  originalName      String
+  fileType          String
+  fileSize          BigInt
+  filePath          String
+  mimeType          String?
+  version           Int      @default(1)
+  uploadedById      String
+  isActive          Boolean  @default(true)
+  tags              String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  tenant     Tenant        @relation(fields: [tenantId], references: [id])
-  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  stage      ProjectStage? @relation(fields: [stageId], references: [id])
-  uploadedBy User          @relation(fields: [uploadedById], references: [id])
-  versions   DocumentVersion[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectWorkflow ProjectWorkflow? @relation(fields: [projectWorkflowId], references: [id], onDelete: SetNull)
+  stage           ProjectStage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  uploadedBy      User             @relation(fields: [uploadedById], references: [id])
+  versions        DocumentVersion[]
 
   @@map("documents")
 }

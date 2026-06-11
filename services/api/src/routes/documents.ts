@@ -26,6 +26,8 @@ documentsRouter.get('/', requirePermission('documents:download'), async (req, re
     };
     if (projectId) where.projectId = projectId;
     if (stageId) where.stageId = stageId;
+    const { projectWorkflowId: qWorkflowId } = req.query as Record<string, string>;
+    if (qWorkflowId) where.projectWorkflowId = qWorkflowId;
     if (search) {
       where.OR = [
         { originalName: { contains: search, mode: 'insensitive' } },
@@ -42,6 +44,7 @@ documentsRouter.get('/', requirePermission('documents:download'), async (req, re
           uploadedBy: { select: { id: true, firstName: true, lastName: true } },
           project: { select: { id: true, name: true, projectNumber: true } },
           stage: { select: { id: true, stageName: true } },
+          projectWorkflow: { select: { id: true, name: true } },
         },
       }),
       prisma.document.count({ where }),
@@ -77,7 +80,7 @@ documentsRouter.post(
         return;
       }
 
-      const { projectId, stageId, tags } = req.body;
+      const { projectId, stageId, projectWorkflowId, tags } = req.body;
 
       if (!projectId) {
         res.status(400).json({ success: false, error: 'projectId is required' });
@@ -96,7 +99,9 @@ documentsRouter.post(
       // Upload buffer to Cloudinary
       const folder = stageId
         ? `flowtiq/${tenantId}/${projectId}/${stageId}`
-        : `flowtiq/${tenantId}/${projectId}`;
+        : projectWorkflowId
+          ? `flowtiq/${tenantId}/${projectId}/wf_${projectWorkflowId}`
+          : `flowtiq/${tenantId}/${projectId}`;
 
       const { url, publicId } = await uploadToCloudinary(
         req.file.buffer,
@@ -108,6 +113,7 @@ documentsRouter.post(
         data: {
           tenantId: tenantId as string,
           projectId,
+          projectWorkflowId: projectWorkflowId || null,
           stageId: stageId || null,
           fileName: publicId,                          // Cloudinary public_id (for deletion)
           originalName: req.file.originalname,
@@ -122,6 +128,7 @@ documentsRouter.post(
           uploadedBy: { select: { id: true, firstName: true, lastName: true } },
           project: { select: { id: true, name: true, projectNumber: true } },
           stage: { select: { id: true, stageName: true } },
+          projectWorkflow: { select: { id: true, name: true } },
         },
       });
 
@@ -211,7 +218,9 @@ documentsRouter.post(
 
       const folder = document.stageId
         ? `flowtiq/${tenantId}/${document.projectId}/${document.stageId}`
-        : `flowtiq/${tenantId}/${document.projectId}`;
+        : document.projectWorkflowId
+          ? `flowtiq/${tenantId}/${document.projectId}/wf_${document.projectWorkflowId}`
+          : `flowtiq/${tenantId}/${document.projectId}`;
 
       const { url, publicId } = await uploadToCloudinary(
         req.file.buffer,
