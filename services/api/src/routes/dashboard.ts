@@ -126,35 +126,91 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 5) - (PRIORITY_ORDER[b.priority] ?? 5))
       .slice(0, 8);
 
-    // Workflow pipeline: count active projects per stage per workflow
-    const [workflows, projectsByStage] = await Promise.all([
-      prisma.workflowTemplate.findMany({
-        where: { tenantId: tenantId as string },
-        orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-      }),
-      prisma.project.groupBy({
-        by: ['workflowId', 'currentStage'],
-        where: { ...projectWhere, status: 'active' },
-        _count: { id: true },
-      }),
-    ]);
+    // Workflow pipeline: use ProjectWorkflow + ProjectStage for accurate counts
+    const workflowTemplates = await prisma.workflowTemplate.findMany({
+      where: { tenantId: tenantId as string },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+    });
 
-    const workflowPipeline = workflows.map((w) => {
-      const stages = (w.stages as Array<{ key: string; name: string; order: number; color?: string }>)
+    // Get active project IDs (scoped by canViewAll)
+    const activeProjectIds = (
+      await prisma.project.findMany({
+        where: { ...projectWhere, status: 'active' },
+        select: { id: true },
+      })
+    ).map((p) => p.id);
+
+    // Fetch ProjectWorkflow IDs for active projects (needed for groupBy — Prisma groupBy can't filter by relation)
+    const activeProjectWorkflows = await prisma.projectWorkflow.findMany({
+      where: {
+        projectId: { in: activeProjectIds },
+        workflowTemplateId: { in: workflowTemplates.map((w) => w.id) },
+      },
+      select: { id: true, workflowTemplateId: true },
+    });
+    const activeProjectWorkflowIds = activeProjectWorkflows.map((pw) => pw.id);
+
+    // Count stages per workflow template using ProjectWorkflow
+    const projectWorkflowStages = await prisma.projectStage.groupBy({
+      by: ['stageKey', 'stageName', 'status', 'projectWorkflowId'],
+      where: {
+        projectWorkflowId: { in: activeProjectWorkflowIds },
+      },
+      _count: { id: true },
+    });
+
+    // Also include legacy project stages (projectWorkflowId = null)
+    const legacyProjectsByStage = await prisma.project.groupBy({
+      by: ['workflowId', 'currentStage'],
+      where: { ...projectWhere, status: 'active' },
+      _count: { id: true },
+    });
+
+    // Build a map: workflowTemplateId → Set of projectWorkflowIds
+    const templateToWorkflowIds = new Map<string, Set<string>>();
+    for (const pw of activeProjectWorkflows) {
+      if (!templateToWorkflowIds.has(pw.workflowTemplateId)) {
+        templateToWorkflowIds.set(pw.workflowTemplateId, new Set());
+      }
+      templateToWorkflowIds.get(pw.workflowTemplateId)!.add(pw.id);
+    }
+
+    const workflowPipeline = workflowTemplates.map((w) => {
+      const templateStages = (w.stages as Array<{ key?: string; stageKey?: string; name?: string; stageName?: string; order: number; color?: string }>)
         .slice()
         .sort((a, b) => a.order - b.order);
 
-      const stagesWithCounts = stages.map((stage) => ({
-        key: stage.key,
-        name: stage.name,
-        order: stage.order,
-        color: stage.color,
-        count: projectsByStage.find((p) => p.workflowId === w.id && p.currentStage === stage.key)?._count.id ?? 0,
-      }));
+      const pwIds = templateToWorkflowIds.get(w.id) ?? new Set<string>();
 
-      const totalProjects = stagesWithCounts.reduce((s, st) => s + st.count, 0) +
-        (projectsByStage.find((p) => p.workflowId === w.id && p.currentStage === null)?._count.id ?? 0);
+      const stagesWithCounts = templateStages.map((stage) => {
+        const key = stage.key || stage.stageKey || '';
+        const name = stage.name || stage.stageName || '';
 
+        // Count from new ProjectWorkflow system (in_progress stages for this template)
+        const newCount = projectWorkflowStages
+          .filter(
+            (ps) =>
+              ps.stageKey === key &&
+              ps.status === 'in_progress' &&
+              ps.projectWorkflowId !== null &&
+              pwIds.has(ps.projectWorkflowId!),
+          )
+          .reduce((s, ps) => s + ps._count.id, 0);
+
+        // Count from legacy system
+        const legacyCount = legacyProjectsByStage
+          .find((p) => p.workflowId === w.id && p.currentStage === key)?._count.id ?? 0;
+
+        return {
+          key,
+          name,
+          order: stage.order,
+          color: stage.color,
+          count: newCount + legacyCount,
+        };
+      });
+
+      const totalProjects = stagesWithCounts.reduce((s, st) => s + st.count, 0);
       return { id: w.id, name: w.name, isDefault: w.isDefault, totalProjects, stages: stagesWithCounts };
     });
 

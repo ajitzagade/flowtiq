@@ -209,6 +209,7 @@ export interface StageConfig {
   description?: string;
   color?: string;
   icon?: string;
+  isRequired: boolean;
   requiresApproval: boolean;
   approverRoleIds?: string[];
   requiredDocuments?: string[];
@@ -283,9 +284,36 @@ export interface Project {
   owner?: User;
   workflow?: WorkflowTemplate;
   stages?: ProjectStage[];
+  projectWorkflows?: ProjectWorkflow[];
   documentsCount?: number;
   followUpsCount?: number;
   pendingFollowUps?: number;
+}
+
+// =============================================
+// PROJECT WORKFLOW INSTANCE
+// =============================================
+
+export type ProjectWorkflowStatus = 'not_started' | 'in_progress' | 'completed' | 'blocked';
+
+export interface ProjectWorkflow {
+  id: string;
+  projectId: string;
+  workflowTemplateId: string;
+  name: string;
+  status: ProjectWorkflowStatus;
+  order: number;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  // computed
+  progressPct?: number;
+  completedStages?: number;
+  totalStages?: number;
+  // populated
+  workflowTemplate?: WorkflowTemplate;
+  stages?: ProjectStage[];
 }
 
 export interface CreateProjectInput {
@@ -328,11 +356,15 @@ export interface UpdateProjectInput {
 export interface ProjectStage {
   id: string;
   projectId: string;
+  projectWorkflowId?: string;
   stageName: string;
   stageKey: string;
   stageOrder: number;
+  isRequired: boolean;
   status: StageStatus;
   assignedTo?: string;
+  assignedById?: string;
+  assignedAt?: string;
   startDate?: string;
   completionDate?: string;
   notes?: string;
@@ -343,14 +375,33 @@ export interface ProjectStage {
   assignedUser?: User;
   history?: StageHistory[];
   documents?: Document[];
+  subTasks?: StageSubTask[];
+}
+
+export interface StageSubTask {
+  id: string;
+  stageId: string;
+  name: string;
+  description?: string;
+  status: StageStatus;
+  order: number;
+  isRequired: boolean;
+  notes?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StageHistory {
   id: string;
   stageId: string;
   changedById: string;
+  changeType: string;
+  fieldChanged?: string;
   previousStatus?: StageStatus;
   newStatus: StageStatus;
+  previousValue?: string;
+  newValue?: string;
   comment?: string;
   createdAt: string;
   changedBy?: User;
@@ -424,6 +475,7 @@ export interface Document {
   id: string;
   tenantId: string;
   projectId: string;
+  projectWorkflowId?: string;
   stageId?: string;
   fileName: string;
   originalName: string;

@@ -38,6 +38,7 @@ jest.mock('../lib/prisma', () => {
     },
     projectStage: {
       findMany: jest.fn(),
+      groupBy: jest.fn(),
     },
     stageHistory: {
       findMany: jest.fn(),
@@ -63,7 +64,7 @@ function getMock() {
     followUp: { groupBy: jest.Mock; findMany: jest.Mock };
     workflowTemplate: { findMany: jest.Mock; findFirst: jest.Mock };
     auditLog: { findMany: jest.Mock; count: jest.Mock };
-    projectStage: { findMany: jest.Mock };
+    projectStage: { findMany: jest.Mock; groupBy: jest.Mock };
     stageHistory: { findMany: jest.Mock };
   };
 }
@@ -97,6 +98,7 @@ beforeEach(() => {
   m.auditLog.findMany.mockResolvedValue([]);
   m.auditLog.count.mockResolvedValue(0);
   m.projectStage.findMany.mockResolvedValue([]);
+  m.projectStage.groupBy.mockResolvedValue([]);
   m.stageHistory.findMany.mockResolvedValue([]);
 });
 

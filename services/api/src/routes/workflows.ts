@@ -27,7 +27,7 @@ workflowsRouter.get('/', async (req, res, next) => {
     const workflows = await prisma.workflowTemplate.findMany({
       where: { tenantId: tenantId as string },
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
-      include: { _count: { select: { projects: true } } },
+      include: { _count: { select: { projects: true, projectWorkflows: true } } },
     });
 
     res.json({
@@ -35,7 +35,7 @@ workflowsRouter.get('/', async (req, res, next) => {
       data: workflows.map((w) => ({
         ...w,
         stages: normalizeStages(w.stages),
-        projectCount: w._count.projects,
+        projectCount: w._count.projects + w._count.projectWorkflows,
       })),
     });
   } catch (err) {
@@ -50,7 +50,7 @@ workflowsRouter.get('/:id', async (req, res, next) => {
 
     const workflow = await prisma.workflowTemplate.findFirst({
       where: { id: req.params.id, tenantId: tenantId as string },
-      include: { _count: { select: { projects: true } } },
+      include: { _count: { select: { projects: true, projectWorkflows: true } } },
     });
 
     if (!workflow) {
@@ -70,6 +70,7 @@ const stageConfigSchema = z.object({
   order: z.number().int().min(1),
   description: z.string().optional(),
   color: z.string().optional(),
+  isRequired: z.boolean().default(true),
   requiresApproval: z.boolean().default(false),
   canSkip: z.boolean().default(false),
   checklist: z.array(z.object({
@@ -182,7 +183,7 @@ workflowsRouter.delete('/:id', requirePermission('workflows:manage'), async (req
 
     const workflow = await prisma.workflowTemplate.findFirst({
       where: { id: req.params.id, tenantId: tenantId as string },
-      include: { _count: { select: { projects: true } } },
+      include: { _count: { select: { projects: true, projectWorkflows: true } } },
     });
 
     if (!workflow) {
@@ -190,10 +191,10 @@ workflowsRouter.delete('/:id', requirePermission('workflows:manage'), async (req
       return;
     }
 
-    if (workflow._count.projects > 0) {
+    if ((workflow._count.projects + workflow._count.projectWorkflows) > 0) {
       res.status(400).json({
         success: false,
-        error: `Cannot delete workflow with ${workflow._count.projects} active projects`,
+        error: `Cannot delete workflow that is used by ${workflow._count.projects + workflow._count.projectWorkflows} project(s)`,
       });
       return;
     }

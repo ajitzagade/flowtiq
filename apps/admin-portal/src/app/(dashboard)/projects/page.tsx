@@ -475,7 +475,6 @@ const projectSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
-  workflowId: z.string().optional(),
   ownerId: z.string().min(1, 'Owner is required'),
   followUpOwnerId: z.string().optional(),
 });
@@ -490,6 +489,8 @@ function ProjectModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const [selectedWorkflowIds, setSelectedWorkflowIds] = useState<string[]>([]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -506,6 +507,19 @@ function ProjectModal({
     queryFn: () => get<WorkflowTemplate[]>('/workflows'),
   });
 
+  // Pre-select workflows when editing — only run when the project changes, not on every workflows refetch
+  useEffect(() => {
+    if (!project) return;
+    const existingIds = (project.projectWorkflows as Array<{ workflowTemplateId: string }> | undefined)
+      ?.map((pw) => pw.workflowTemplateId) ?? [];
+    if (existingIds.length > 0) {
+      setSelectedWorkflowIds(existingIds);
+    } else if (project.workflowId) {
+      setSelectedWorkflowIds([project.workflowId]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
+
   const {
     register,
     handleSubmit,
@@ -521,20 +535,26 @@ function ProjectModal({
           priority: project.priority,
           startDate: project.startDate?.split('T')[0],
           dueDate: project.dueDate?.split('T')[0],
-          workflowId: project.workflowId || '',
           ownerId: project.ownerId,
           followUpOwnerId: project.followUpOwnerId || '',
         }
       : { priority: 'medium' },
   });
 
+  const toggleWorkflow = (id: string) => {
+    setSelectedWorkflowIds((prev) =>
+      prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id],
+    );
+  };
+
   const onSubmit = async (data: ProjectForm) => {
     try {
+      const payload = { ...data, workflowIds: selectedWorkflowIds };
       if (project) {
-        await patch(`/projects/${project.id}`, data);
+        await patch(`/projects/${project.id}`, payload);
         toast.success('Project updated');
       } else {
-        await post('/projects', data);
+        await post('/projects', payload);
         toast.success('Project created');
       }
       qc.invalidateQueries({ queryKey: ['projects'] });
@@ -597,16 +617,6 @@ function ProjectModal({
             </div>
 
             <div>
-              <label className="form-label">Workflow</label>
-              <select className="form-select" {...register('workflowId')}>
-                <option value="">No workflow</option>
-                {workflowList.map((w) => (
-                  <option key={w.id} value={w.id}>{w.name}{w.isDefault ? ' (Default)' : ''}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label className="form-label">Start Date</label>
               <input type="date" className="form-input" {...register('startDate')} />
             </div>
@@ -614,6 +624,48 @@ function ProjectModal({
             <div>
               <label className="form-label">Due Date</label>
               <input type="date" className="form-input" {...register('dueDate')} />
+            </div>
+
+            <div className="col-span-2">
+              <label className="form-label">Workflows</label>
+              {workflowList.length === 0 ? (
+                <p className="text-sm text-slate-400">No workflows available</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                  {workflowList.map((w) => {
+                    const checked = selectedWorkflowIds.includes(w.id);
+                    return (
+                      <label
+                        key={w.id}
+                        className={cn(
+                          'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors select-none',
+                          checked
+                            ? 'border-blue-300 bg-blue-50 text-blue-800'
+                            : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleWorkflow(w.id)}
+                          className="accent-blue-600 w-4 h-4 flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{w.name}</p>
+                          {w.isDefault && (
+                            <p className="text-[10px] text-blue-500 font-medium">Default</p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedWorkflowIds.length > 0 && (
+                <p className="text-xs text-slate-500 mt-1.5">
+                  {selectedWorkflowIds.length} workflow{selectedWorkflowIds.length !== 1 ? 's' : ''} selected
+                </p>
+              )}
             </div>
 
             <div>
@@ -843,13 +895,25 @@ export default function ProjectsPage() {
                       </td>
                       <td className="text-slate-600">{project.clientName}</td>
                       <td>
-                        {(project.workflow as { name: string } | undefined)?.name ? (
-                          <span className="badge badge-blue text-[10px]">
-                            {(project.workflow as { name: string }).name}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
+                        {(() => {
+                          const pws = project.projectWorkflows as Array<{ name: string; status: string }> | undefined;
+                          if (pws && pws.length > 0) {
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {pws.slice(0, 2).map((pw, i) => (
+                                  <span key={i} className="badge badge-blue text-[10px]">{pw.name}</span>
+                                ))}
+                                {pws.length > 2 && (
+                                  <span className="badge text-[10px] bg-slate-100 text-slate-500">+{pws.length - 2}</span>
+                                )}
+                              </div>
+                            );
+                          }
+                          const wfName = (project.workflow as { name: string } | undefined)?.name;
+                          return wfName
+                            ? <span className="badge badge-blue text-[10px]">{wfName}</span>
+                            : <span className="text-slate-300 text-xs">—</span>;
+                        })()}
                       </td>
                       <td>
                         <span className={getStatusBadgeClass(project.status)}>

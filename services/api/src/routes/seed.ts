@@ -6,7 +6,6 @@ export const seedRouter = Router();
 const prisma = new PrismaClient();
 
 // POST /api/seed — protected one-time seed endpoint
-// curl -X POST https://your-api.railway.app/api/seed -H "x-seed-secret: <SEED_SECRET>"
 seedRouter.post('/', async (req, res) => {
   const secret = process.env.SEED_SECRET;
   if (!secret || req.headers['x-seed-secret'] !== secret) {
@@ -15,7 +14,6 @@ seedRouter.post('/', async (req, res) => {
   }
 
   try {
-    // Already seeded?
     const existing = await prisma.tenant.findFirst({ where: { slug: 'vastudeep' } });
     if (existing) {
       res.json({ success: true, message: 'Already seeded', tenantId: existing.id });
@@ -119,7 +117,6 @@ seedRouter.post('/', async (req, res) => {
       },
     });
 
-    // Assign roles
     await Promise.all([
       prisma.userRole.create({ data: { userId: admin.id, roleId: adminRole.id } }),
       prisma.userRole.create({ data: { userId: pm.id, roleId: pmRole.id } }),
@@ -127,20 +124,66 @@ seedRouter.post('/', async (req, res) => {
       prisma.userRole.create({ data: { userId: followupExec.id, roleId: followupRole.id } }),
     ]);
 
-    // ── Workflow (stages stored as JSON) ──────────────────────────────────────
-    const workflow = await prisma.workflowTemplate.create({
+    // ── Workflow Templates ─────────────────────────────────────────────────────
+    // Legacy workflow (kept for backward compat)
+    const legacyWorkflow = await prisma.workflowTemplate.create({
       data: {
         tenantId: tenant.id,
         name: 'Standard File Workflow',
         description: 'Default 6-stage property file workflow',
         isDefault: true,
         stages: [
-          { stageName: 'File Creation',    stageKey: 'file_creation',    order: 1, color: '#6366f1', requiresApproval: false },
-          { stageName: 'Inward',           stageKey: 'inward',           order: 2, color: '#3b82f6', requiresApproval: false },
-          { stageName: 'Scrutiny',         stageKey: 'scrutiny',         order: 3, color: '#0ea5e9', requiresApproval: true },
-          { stageName: 'Report Generation',stageKey: 'report_generation',order: 4, color: '#10b981', requiresApproval: false },
-          { stageName: 'Approval',         stageKey: 'approval',         order: 5, color: '#f59e0b', requiresApproval: true },
-          { stageName: 'Completed',        stageKey: 'completed_stage',  order: 6, color: '#22c55e', requiresApproval: false },
+          { stageName: 'File Creation',    stageKey: 'file_creation',    key: 'file_creation',    name: 'File Creation',     order: 1, color: '#6366f1', isRequired: true,  requiresApproval: false },
+          { stageName: 'Inward',           stageKey: 'inward',           key: 'inward',           name: 'Inward',            order: 2, color: '#3b82f6', isRequired: true,  requiresApproval: false },
+          { stageName: 'Scrutiny',         stageKey: 'scrutiny',         key: 'scrutiny',         name: 'Scrutiny',          order: 3, color: '#0ea5e9', isRequired: true,  requiresApproval: true },
+          { stageName: 'Report Generation',stageKey: 'report_generation',key: 'report_generation',name: 'Report Generation', order: 4, color: '#10b981', isRequired: true,  requiresApproval: false },
+          { stageName: 'Approval',         stageKey: 'approval',         key: 'approval',         name: 'Approval',          order: 5, color: '#f59e0b', isRequired: true,  requiresApproval: true },
+          { stageName: 'Completed',        stageKey: 'completed_stage',  key: 'completed_stage',  name: 'Completed',         order: 6, color: '#22c55e', isRequired: true,  requiresApproval: false },
+        ],
+      },
+    });
+
+    // 3 Mandatory pre-sanction workflows
+    const zoningWorkflow = await prisma.workflowTemplate.create({
+      data: {
+        tenantId: tenant.id,
+        name: 'Zoning',
+        description: 'Zoning clearance workflow — mandatory before sanction',
+        isDefault: false,
+        stages: [
+          { key: 'zoning_application',  name: 'Application Submission', order: 1, color: '#6366f1', isRequired: true,  requiresApproval: false, description: 'Submit zoning application to municipal authority' },
+          { key: 'zoning_site_visit',   name: 'Site Inspection',        order: 2, color: '#3b82f6', isRequired: true,  requiresApproval: false, description: 'Scheduled site visit by authority inspector' },
+          { key: 'zoning_objections',   name: 'Objection Period',       order: 3, color: '#0ea5e9', isRequired: true,  requiresApproval: false, description: 'Public objection window (21 days)' },
+          { key: 'zoning_approval',     name: 'Zoning Approval',        order: 4, color: '#10b981', isRequired: true,  requiresApproval: true,  description: 'Final zoning clearance certificate' },
+        ],
+      },
+    });
+
+    const gardeningNocWorkflow = await prisma.workflowTemplate.create({
+      data: {
+        tenantId: tenant.id,
+        name: 'Gardening NOC',
+        description: 'Gardening / Horticulture NOC — mandatory before sanction',
+        isDefault: false,
+        stages: [
+          { key: 'garden_noc_apply',    name: 'NOC Application',        order: 1, color: '#16a34a', isRequired: true,  requiresApproval: false, description: 'Apply for NOC from Horticulture Department' },
+          { key: 'garden_noc_survey',   name: 'Tree Survey',            order: 2, color: '#15803d', isRequired: true,  requiresApproval: false, description: 'Physical survey of trees on site' },
+          { key: 'garden_noc_approval', name: 'NOC Granted',            order: 3, color: '#14532d', isRequired: true,  requiresApproval: true,  description: 'Horticulture NOC certificate issued' },
+        ],
+      },
+    });
+
+    const laqWorkflow = await prisma.workflowTemplate.create({
+      data: {
+        tenantId: tenant.id,
+        name: 'LAQ',
+        description: 'Land Acquisition Query clearance — mandatory before sanction',
+        isDefault: false,
+        stages: [
+          { key: 'laq_application',     name: 'LAQ Application',        order: 1, color: '#b45309', isRequired: true,  requiresApproval: false, description: 'Submit LAQ form to revenue department' },
+          { key: 'laq_verification',    name: 'Revenue Verification',   order: 2, color: '#92400e', isRequired: true,  requiresApproval: false, description: 'Revenue officer verifies land records' },
+          { key: 'laq_encumbrance',     name: 'Encumbrance Check',      order: 3, color: '#78350f', isRequired: false, requiresApproval: false, description: 'Check for existing encumbrances (optional)' },
+          { key: 'laq_clearance',       name: 'LAQ Clearance',          order: 4, color: '#7c3aed', isRequired: true,  requiresApproval: true,  description: 'Final LAQ clearance certificate' },
         ],
       },
     });
@@ -150,14 +193,14 @@ seedRouter.post('/', async (req, res) => {
     const daysFromNow = (n: number) => new Date(Date.now() + n * 86400000);
 
     const projectsData = [
-      { name: 'Sharma Residence - Survey No. 142',    client: 'Arvind Sharma',    num: 'VD-2024-001', stage: 'approval',         status: 'active',    owner: pm,    days: 45, due: 15 },
-      { name: 'Mehta Commercial Complex - Plot 78',   client: 'Suresh Mehta',     num: 'VD-2024-002', stage: 'report_generation', status: 'active',    owner: exec1, days: 30, due: 30 },
-      { name: 'Patel Bungalow - CTS No. 2341',        client: 'Kiran Patel',      num: 'VD-2024-003', stage: 'completed_stage',   status: 'completed', owner: pm,    days: 90, due: -5 },
-      { name: 'Redevelopment - Old Town Block C',     client: 'City Corp Ltd',    num: 'VD-2024-004', stage: 'scrutiny',          status: 'active',    owner: exec1, days: 20, due: 45 },
-      { name: 'Industrial Land Survey - Zone 4',      client: 'Bharat Industries', num: 'VD-2024-005', stage: 'inward',           status: 'active',    owner: pm,    days: 10, due: 60 },
-      { name: 'Gokhale Estate Valuation',             client: 'Prakash Gokhale',  num: 'VD-2024-006', stage: 'file_creation',     status: 'active',    owner: exec1, days: 5,  due: 90 },
-      { name: 'City Centre Mall - Floor Plan Review', client: 'Mall Corp Pvt Ltd', num: 'VD-2024-007', stage: 'approval',         status: 'on_hold',   owner: pm,    days: 60, due: -10 },
-      { name: 'Riverside Township - Phase 2',         client: 'Township Builders', num: 'VD-2024-008', stage: 'scrutiny',         status: 'active',    owner: exec1, days: 25, due: 20 },
+      { name: 'Sharma Residence - Survey No. 142',     client: 'Arvind Sharma',    num: 'VD-2024-001', stage: 'approval',         status: 'active',    owner: pm,    days: 45, due: 15,  priority: 'high' },
+      { name: 'Mehta Commercial Complex - Plot 78',    client: 'Suresh Mehta',     num: 'VD-2024-002', stage: 'report_generation', status: 'active',    owner: exec1, days: 30, due: 30,  priority: 'medium' },
+      { name: 'Patel Bungalow - CTS No. 2341',         client: 'Kiran Patel',      num: 'VD-2024-003', stage: 'completed_stage',   status: 'completed', owner: pm,    days: 90, due: -5,  priority: 'low' },
+      { name: 'Redevelopment - Old Town Block C',      client: 'City Corp Ltd',    num: 'VD-2024-004', stage: 'scrutiny',          status: 'active',    owner: exec1, days: 20, due: 45,  priority: 'urgent' },
+      { name: 'Industrial Land Survey - Zone 4',       client: 'Bharat Industries', num: 'VD-2024-005', stage: 'inward',           status: 'active',    owner: pm,    days: 10, due: 60,  priority: 'medium' },
+      { name: 'Gokhale Estate Valuation',              client: 'Prakash Gokhale',  num: 'VD-2024-006', stage: 'file_creation',     status: 'active',    owner: exec1, days: 5,  due: 90,  priority: 'low' },
+      { name: 'City Centre Mall - Floor Plan Review',  client: 'Mall Corp Pvt Ltd', num: 'VD-2024-007', stage: 'approval',         status: 'on_hold',   owner: pm,    days: 60, due: -10, priority: 'high' },
+      { name: 'Riverside Township - Phase 2',          client: 'Township Builders', num: 'VD-2024-008', stage: 'scrutiny',         status: 'active',    owner: exec1, days: 25, due: 20,  priority: 'high' },
     ];
 
     const projects = await Promise.all(
@@ -165,12 +208,13 @@ seedRouter.post('/', async (req, res) => {
         prisma.project.create({
           data: {
             tenantId: tenant.id,
-            workflowId: workflow.id,
+            workflowId: legacyWorkflow.id,
             name: p.name,
             projectNumber: p.num,
             clientName: p.client,
             description: `Property valuation file for ${p.client}`,
             status: p.status,
+            priority: p.priority,
             currentStage: p.stage,
             ownerId: p.owner.id,
             followUpOwnerId: followupExec.id,
@@ -181,39 +225,119 @@ seedRouter.post('/', async (req, res) => {
       )
     );
 
+    // ── Attach 3 mandatory workflows to all projects ───────────────────────────
+    const mandatoryWorkflows = [
+      { tmpl: zoningWorkflow, order: 1 },
+      { tmpl: gardeningNocWorkflow, order: 2 },
+      { tmpl: laqWorkflow, order: 3 },
+    ];
+
+    // Progress states for seeding realistic data (project index → workflow index → stage statuses)
+    const seedProgress: Record<number, Record<number, string[]>> = {
+      0: { // Sharma - Approval stage (mostly done)
+        0: ['completed', 'completed', 'completed', 'completed'],  // Zoning done
+        1: ['completed', 'completed', 'completed'],               // Gardening done
+        2: ['completed', 'completed', 'pending', 'in_progress'],  // LAQ in progress
+      },
+      1: { // Mehta - Report Generation (zoning done, others in progress)
+        0: ['completed', 'completed', 'completed', 'completed'],
+        1: ['completed', 'in_progress', 'pending'],
+        2: ['completed', 'pending', 'pending', 'pending'],
+      },
+      2: { // Patel - Completed
+        0: ['completed', 'completed', 'completed', 'completed'],
+        1: ['completed', 'completed', 'completed'],
+        2: ['completed', 'completed', 'completed', 'completed'],
+      },
+      3: { // Redevelopment - Scrutiny (all in early stages)
+        0: ['completed', 'in_progress', 'pending', 'pending'],
+        1: ['in_progress', 'pending', 'pending'],
+        2: ['pending', 'pending', 'pending', 'pending'],
+      },
+      4: { // Industrial - Inward (just started)
+        0: ['in_progress', 'pending', 'pending', 'pending'],
+        1: ['pending', 'pending', 'pending'],
+        2: ['pending', 'pending', 'pending', 'pending'],
+      },
+      5: { // Gokhale - File Creation (brand new)
+        0: ['pending', 'pending', 'pending', 'pending'],
+        1: ['pending', 'pending', 'pending'],
+        2: ['pending', 'pending', 'pending', 'pending'],
+      },
+      6: { // Mall - On Hold
+        0: ['completed', 'completed', 'in_progress', 'pending'],
+        1: ['completed', 'on_hold', 'pending'],
+        2: ['completed', 'pending', 'pending', 'pending'],
+      },
+      7: { // Riverside - Scrutiny
+        0: ['completed', 'completed', 'in_progress', 'pending'],
+        1: ['completed', 'completed', 'pending'],
+        2: ['in_progress', 'pending', 'pending', 'pending'],
+      },
+    };
+
+    for (let pi = 0; pi < projects.length; pi++) {
+      const project = projects[pi];
+      for (let wi = 0; wi < mandatoryWorkflows.length; wi++) {
+        const { tmpl, order } = mandatoryWorkflows[wi];
+        const stageStatuses = seedProgress[pi]?.[wi] || [];
+        const templateStages = tmpl.stages as Array<Record<string, unknown>>;
+
+        // Determine workflow status from stage statuses
+        const allCompleted = stageStatuses.every((s) => s === 'completed');
+        const anyInProgress = stageStatuses.some((s) => s === 'in_progress' || s === 'completed');
+        const wfStatus = allCompleted ? 'completed' : anyInProgress ? 'in_progress' : 'not_started';
+
+        const pw = await prisma.projectWorkflow.create({
+          data: {
+            projectId: project.id,
+            workflowTemplateId: tmpl.id,
+            name: tmpl.name,
+            order,
+            status: wfStatus,
+            ...(anyInProgress && { startedAt: daysAgo(Math.max(5, projectsData[pi].days - 5)) }),
+            ...(allCompleted && { completedAt: daysAgo(2) }),
+          },
+        });
+
+        await prisma.projectStage.createMany({
+          data: templateStages.map((s, si) => ({
+            projectId: project.id,
+            projectWorkflowId: pw.id,
+            stageName: (s.name || s.stageName) as string,
+            stageKey: (s.key || s.stageKey) as string,
+            stageOrder: s.order as number,
+            isRequired: (s.isRequired ?? true) as boolean,
+            status: stageStatuses[si] || 'pending',
+            checklist: [],
+            ...(stageStatuses[si] === 'completed' && { completionDate: daysAgo(3), startDate: daysAgo(7) }),
+            ...(stageStatuses[si] === 'in_progress' && { startDate: daysAgo(2) }),
+          })),
+        });
+      }
+    }
+
     // ── Follow-ups ─────────────────────────────────────────────────────────────
     await Promise.all([
       prisma.followUp.create({
         data: {
-          tenantId: tenant.id,
-          projectId: projects[0].id,
-          ownerId: followupExec.id,
-          createdById: pm.id,
-          notes: 'Chase approval from municipal office for NOC',
-          nextFollowUp: daysFromNow(3),
-          status: 'pending',
+          tenantId: tenant.id, projectId: projects[0].id, ownerId: followupExec.id,
+          createdById: pm.id, notes: 'Chase approval from municipal office for NOC',
+          nextFollowUp: daysFromNow(3), status: 'pending',
         },
       }),
       prisma.followUp.create({
         data: {
-          tenantId: tenant.id,
-          projectId: projects[1].id,
-          ownerId: exec1.id,
-          createdById: pm.id,
-          notes: 'Site visit required for updated photographs',
-          nextFollowUp: daysFromNow(7),
-          status: 'pending',
+          tenantId: tenant.id, projectId: projects[1].id, ownerId: exec1.id,
+          createdById: pm.id, notes: 'Site visit required for updated photographs',
+          nextFollowUp: daysFromNow(7), status: 'pending',
         },
       }),
       prisma.followUp.create({
         data: {
-          tenantId: tenant.id,
-          projectId: projects[3].id,
-          ownerId: followupExec.id,
-          createdById: admin.id,
-          notes: 'All documents to be submitted for scrutiny review',
-          nextFollowUp: daysFromNow(2),
-          status: 'pending',
+          tenantId: tenant.id, projectId: projects[3].id, ownerId: followupExec.id,
+          createdById: admin.id, notes: 'All documents to be submitted for scrutiny review',
+          nextFollowUp: daysFromNow(2), status: 'pending',
         },
       }),
     ]);
@@ -222,24 +346,18 @@ seedRouter.post('/', async (req, res) => {
     await Promise.all([
       prisma.notification.create({
         data: {
-          tenantId: tenant.id,
-          userId: pm.id,
-          type: 'overdue',
+          tenantId: tenant.id, userId: pm.id, type: 'overdue',
           title: 'Project Overdue',
           message: `${projects[6].name} is past its due date`,
-          isRead: false,
-          data: { projectId: projects[6].id },
+          isRead: false, data: { projectId: projects[6].id },
         },
       }),
       prisma.notification.create({
         data: {
-          tenantId: tenant.id,
-          userId: admin.id,
-          type: 'status_changed',
+          tenantId: tenant.id, userId: admin.id, type: 'status_changed',
           title: 'Project Completed',
           message: `${projects[2].name} has been marked as completed`,
-          isRead: false,
-          data: { projectId: projects[2].id },
+          isRead: false, data: { projectId: projects[2].id },
         },
       }),
     ]);
@@ -252,6 +370,7 @@ seedRouter.post('/', async (req, res) => {
         users: ['superadmin@flowtiq.com', 'admin@vastudeep.com', 'pm@vastudeep.com', 'exec1@vastudeep.com', 'followup@vastudeep.com'],
         password: DEFAULT_PASSWORD,
         projects: projects.length,
+        mandatoryWorkflows: ['Zoning', 'Gardening NOC', 'LAQ'],
       },
     });
   } catch (err) {

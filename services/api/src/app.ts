@@ -17,6 +17,7 @@ import { notificationsRouter } from './routes/notifications';
 import { dashboardRouter } from './routes/dashboard';
 import { reportsRouter } from './routes/reports';
 import { seedRouter } from './routes/seed';
+import { projectWorkflowsRouter } from './routes/project-workflows';
 
 export const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/audit', auditRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/project-workflows', projectWorkflowsRouter);
 app.use('/api/seed', seedRouter);
 
 // 404 handler
