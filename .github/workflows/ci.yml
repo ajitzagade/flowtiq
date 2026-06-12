@@ -30,7 +30,7 @@ jobs:
         run: cd packages/database && npx prisma generate
 
       - name: Run API smoke tests
-        run: pnpm --filter @flowtiq/api test --ci --passWithNoTests
+        run: pnpm --filter @flowtiq/api test -- --ci --passWithNoTests
         env:
           NODE_ENV: test
           JWT_SECRET: ci-test-secret
