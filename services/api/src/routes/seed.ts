@@ -432,12 +432,21 @@ seedRouter.post('/projects', async (req, res) => {
     const allWorkflows = await prisma.workflowTemplate.findMany({
       where: { tenantId: tenant.id, isActive: true },
     });
-    const wf = (name: string) => allWorkflows.find((w) => w.name === name);
 
-    const zoningWf          = wf('Zoning');
-    const laqWf             = wf('LAQ');
-    const sanctionWf        = wf('Sanction');
-    const revisedSanctionWf = wf('Revised Sanction');
+    // Case-insensitive keyword match — tolerates "Sanction Process", "REVISED SANCTION PROCESS", etc.
+    const wfByKeyword = (keyword: string, excludeKeyword?: string) => {
+      const kw = keyword.toLowerCase();
+      const ex = excludeKeyword?.toLowerCase();
+      return allWorkflows.find((w) => {
+        const n = w.name.toLowerCase();
+        return n.includes(kw) && (!ex || !n.includes(ex));
+      });
+    };
+
+    const zoningWf          = wfByKeyword('zoning');
+    const laqWf             = wfByKeyword('laq');
+    const sanctionWf        = wfByKeyword('sanction', 'revised');
+    const revisedSanctionWf = wfByKeyword('revised');
 
     const missing = [
       !zoningWf   && 'Zoning',
