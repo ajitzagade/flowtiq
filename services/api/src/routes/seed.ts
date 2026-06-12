@@ -501,7 +501,7 @@ seedRouter.post('/projects', async (req, res) => {
     /** Create ProjectWorkflow + ProjectStage records. Returns { pw, stages } */
     async function attachWorkflow(params: {
       projectId:    string;
-      workflow:     NonNullable<ReturnType<typeof wf>>;
+      workflow:     NonNullable<ReturnType<typeof wfByKeyword>>;
       order:        number;
       mode:         string;
       projectDays:  number;

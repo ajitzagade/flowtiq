@@ -9,7 +9,7 @@ import {
   FileText, Upload, History, ChevronDown, ChevronUp, X,
   User, Calendar, GitBranch, AlertTriangle, Plus, Paperclip,
   ChevronRight, ListChecks, Eye, Download, RefreshCw,
-  Lock, Unlock, ArrowUp, ArrowDown,
+  Lock, Unlock, GripVertical,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -607,14 +607,14 @@ function StageCard({
 // =============================================
 
 function WorkflowCard({
-  workflow, projectId, users, onRefresh, onMoveUp, onMoveDown,
+  workflow, projectId, users, onRefresh, isDragging, isDragOver,
 }: {
   workflow: ProjectWorkflow & { stages?: (ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] })[] };
   projectId: string;
   users: Array<{ id: string; firstName: string; lastName: string }>;
   onRefresh: () => void;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
+  isDragging?: boolean;
+  isDragOver?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -632,15 +632,28 @@ function WorkflowCard({
   const accentColor = WORKFLOW_COLORS[workflow.name] || '#3b82f6';
 
   return (
-    <div className="card overflow-hidden">
+    <div className={cn(
+      'card overflow-hidden transition-all duration-150',
+      isDragging && 'opacity-40 shadow-xl scale-[0.99]',
+      isDragOver && 'ring-2 ring-blue-400 shadow-md',
+    )}>
       {/* Workflow header */}
       <div
-        className="px-5 py-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50 transition-colors"
+        className="px-3 py-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setCollapsed(!collapsed)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && setCollapsed(!collapsed)}
       >
+        {/* Drag handle */}
+        <div
+          className="text-slate-300 hover:text-slate-500 flex-shrink-0 cursor-grab active:cursor-grabbing transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          title="Drag to reorder"
+        >
+          <GripVertical size={16} />
+        </div>
+
         {/* Icon */}
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0"
@@ -675,28 +688,6 @@ function WorkflowCard({
           <ProgressBar pct={pct} color={accentColor} />
         </div>
 
-        {(onMoveUp || onMoveDown) && (
-          <div className="flex flex-col gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={onMoveUp}
-              disabled={!onMoveUp}
-              className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-0 disabled:pointer-events-none transition-colors rounded"
-              title="Move up"
-            >
-              <ArrowUp size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={onMoveDown}
-              disabled={!onMoveDown}
-              className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-0 disabled:pointer-events-none transition-colors rounded"
-              title="Move down"
-            >
-              <ArrowDown size={13} />
-            </button>
-          </div>
-        )}
         {collapsed
           ? <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
           : <ChevronDown size={16} className="text-slate-400 flex-shrink-0" />}
@@ -943,6 +934,8 @@ export default function ProjectDetailPage() {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+  const [draggingWfId, setDraggingWfId] = useState<string | null>(null);
+  const [dragOverWfId, setDragOverWfId] = useState<string | null>(null);
 
   const { data: project, isLoading } = useQuery<ProjectDetail>({
     queryKey: ['project', id],
@@ -995,14 +988,15 @@ export default function ProjectDetailPage() {
     });
   }, [projectWorkflows, wfOrder]);
 
-  const moveWorkflow = (wfId: string, direction: 'up' | 'down') => {
+  const dropWorkflow = (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
     const current = orderedWorkflows.map((pw) => pw.id);
-    const idx = current.indexOf(wfId);
-    if (direction === 'up' && idx <= 0) return;
-    if (direction === 'down' && idx >= current.length - 1) return;
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const fromIdx = current.indexOf(draggedId);
+    const toIdx   = current.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
     const newOrder = [...current];
-    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    newOrder.splice(fromIdx, 1);
+    newOrder.splice(toIdx, 0, draggedId);
     setWfOrder(newOrder);
     localStorage.setItem(`wf-order-${id}`, JSON.stringify(newOrder));
   };
@@ -1144,16 +1138,37 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
-            {orderedWorkflows.map((pw, idx) => (
-              <WorkflowCard
+            {orderedWorkflows.map((pw) => (
+              <div
                 key={pw.id}
-                workflow={pw as ProjectWorkflow & { stages?: (ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] })[] }}
-                projectId={project.id}
-                users={users}
-                onRefresh={handleRefresh}
-                onMoveUp={idx > 0 ? () => moveWorkflow(pw.id, 'up') : undefined}
-                onMoveDown={idx < orderedWorkflows.length - 1 ? () => moveWorkflow(pw.id, 'down') : undefined}
-              />
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', pw.id);
+                  setDraggingWfId(pw.id);
+                }}
+                onDragEnd={() => { setDraggingWfId(null); setDragOverWfId(null); }}
+                onDragOver={(e) => { e.preventDefault(); if (pw.id !== draggingWfId) setDragOverWfId(pw.id); }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverWfId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const draggedId = e.dataTransfer.getData('text/plain');
+                  if (draggedId) dropWorkflow(draggedId, pw.id);
+                  setDraggingWfId(null);
+                  setDragOverWfId(null);
+                }}
+              >
+                <WorkflowCard
+                  workflow={pw as ProjectWorkflow & { stages?: (ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] })[] }}
+                  projectId={project.id}
+                  users={users}
+                  onRefresh={handleRefresh}
+                  isDragging={draggingWfId === pw.id}
+                  isDragOver={dragOverWfId === pw.id && draggingWfId !== pw.id}
+                />
+              </div>
             ))}
 
             {/* Legacy stages (if any) */}
