@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Search, FolderKanban, Edit, Eye, Trash2, X,
   ChevronLeft, ChevronRight, LayoutList, Kanban, ChevronDown, GitBranch,
+  ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { ProjectProgress } from '@/components/ProjectProgress';
@@ -301,12 +302,16 @@ function WorkflowSection({
   searchTerm,
   onEdit,
   defaultExpanded,
+  onMoveUp,
+  onMoveDown,
 }: {
   workflow: WorkflowTemplate | null;
   projects: Project[];
   searchTerm: string;
   onEdit: (p: Project) => void;
   defaultExpanded: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const [manualExpanded, setManualExpanded] = useState(defaultExpanded);
   const expanded = searchTerm.length > 0 ? true : manualExpanded;
@@ -342,10 +347,32 @@ function WorkflowSection({
             <span className="badge badge-blue text-[10px] py-0">Default</span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2.5 py-1">
             {projects.length} project{projects.length !== 1 ? 's' : ''}
           </span>
+          {(onMoveUp || onMoveDown) && (
+            <div className="flex flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={onMoveUp}
+                disabled={!onMoveUp}
+                className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-0 disabled:pointer-events-none transition-colors rounded"
+                title="Move up"
+              >
+                <ArrowUp size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={onMoveDown}
+                disabled={!onMoveDown}
+                className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-0 disabled:pointer-events-none transition-colors rounded"
+                title="Move down"
+              >
+                <ArrowDown size={13} />
+              </button>
+            </div>
+          )}
           <ChevronDown
             size={16}
             aria-hidden="true"
@@ -372,6 +399,13 @@ function WorkflowSection({
 // ── KanbanBoard — groups projects by workflowId, renders accordion sections ────
 function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   const [boardSearch, setBoardSearch] = useState('');
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('kanban-section-order');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
   const { data: allProjectsData, isLoading } = useQuery({
     queryKey: ['projects', 'kanban'],
@@ -405,11 +439,34 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     byWorkflow.get(key)!.push(p);
   }
 
-  // Default workflow first, then others alphabetically
-  const orderedWorkflows: WorkflowTemplate[] = [
+  // Default workflow first, then others alphabetically — then apply user-preferred order
+  const defaultSorted: WorkflowTemplate[] = [
     ...workflows.filter((w) => w.isDefault),
     ...workflows.filter((w) => !w.isDefault).sort((a, b) => a.name.localeCompare(b.name)),
   ];
+
+  const orderedWorkflows = useMemo(() => {
+    if (sectionOrder.length === 0) return defaultSorted;
+    const orderMap = new Map(sectionOrder.map((wid, i) => [wid, i]));
+    return [...defaultSorted].sort((a, b) => {
+      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : 999;
+      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : 999;
+      return ai - bi;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflows, sectionOrder]);
+
+  const moveSection = (wfId: string, direction: 'up' | 'down') => {
+    const current = orderedWorkflows.map((w) => w.id);
+    const idx = current.indexOf(wfId);
+    if (direction === 'up' && idx <= 0) return;
+    if (direction === 'down' && idx >= current.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const newOrder = [...current];
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    setSectionOrder(newOrder);
+    localStorage.setItem('kanban-section-order', JSON.stringify(newOrder));
+  };
 
   const noWorkflowProjects = byWorkflow.get(null) ?? [];
 
@@ -437,6 +494,8 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
             searchTerm={boardSearch}
             onEdit={onEdit}
             defaultExpanded={idx === 0}
+            onMoveUp={idx > 0 ? () => moveSection(workflow.id, 'up') : undefined}
+            onMoveDown={idx < orderedWorkflows.length - 1 ? () => moveSection(workflow.id, 'down') : undefined}
           />
         );
       })}

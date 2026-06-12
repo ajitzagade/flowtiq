@@ -3,19 +3,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, patch, post, uploadFile } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, CheckCircle2, Clock, AlertCircle, Circle,
   FileText, Upload, History, ChevronDown, ChevronUp, X,
   User, Calendar, GitBranch, AlertTriangle, Plus, Paperclip,
   ChevronRight, ListChecks, Eye, Download, RefreshCw,
-  Lock, Unlock,
+  Lock, Unlock, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
   formatDate, formatDateTime, getStatusBadgeClass, getPriorityBadgeClass, cn, getErrorMessage,
 } from '@/lib/utils';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import type { Project, ProjectWorkflow, ProjectStage, FollowUp, StageSubTask } from '@flowtiq/shared-types';
 
@@ -70,7 +70,7 @@ function ProgressBar({ pct, color = '#3b82f6' }: { pct: number; color?: string }
 // DOCUMENT THUMBNAIL
 // =============================================
 
-type DocType = { id: string; originalName: string; fileType: string; mimeType?: string; filePath: string; createdAt: string };
+type DocType = { id: string; originalName: string; fileType: string; mimeType?: string; filePath: string; createdAt: string; stageId?: string; projectWorkflowId?: string };
 
 function getFileIcon(fileType: string, mimeType?: string) {
   const ft = (fileType || '').toLowerCase();
@@ -220,8 +220,9 @@ function StageDocuments({
         ))}
         {extra > 0 && (
           <Link
-            href={`/documents?projectId=${projectId}&stageId=${stageId}`}
+            href={`/projects/${projectId}?tab=documents`}
             className="w-14 h-14 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-sm font-semibold text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-colors flex-shrink-0"
+            title="View all documents"
           >
             +{extra}
           </Link>
@@ -606,12 +607,14 @@ function StageCard({
 // =============================================
 
 function WorkflowCard({
-  workflow, projectId, users, onRefresh,
+  workflow, projectId, users, onRefresh, onMoveUp, onMoveDown,
 }: {
   workflow: ProjectWorkflow & { stages?: (ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] })[] };
   projectId: string;
   users: Array<{ id: string; firstName: string; lastName: string }>;
   onRefresh: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -672,6 +675,28 @@ function WorkflowCard({
           <ProgressBar pct={pct} color={accentColor} />
         </div>
 
+        {(onMoveUp || onMoveDown) && (
+          <div className="flex flex-col gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={!onMoveUp}
+              className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-0 disabled:pointer-events-none transition-colors rounded"
+              title="Move up"
+            >
+              <ArrowUp size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={!onMoveDown}
+              className="p-0.5 text-slate-300 hover:text-slate-600 disabled:opacity-0 disabled:pointer-events-none transition-colors rounded"
+              title="Move down"
+            >
+              <ArrowDown size={13} />
+            </button>
+          </div>
+        )}
         {collapsed
           ? <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
           : <ChevronDown size={16} className="text-slate-400 flex-shrink-0" />}
@@ -795,14 +820,14 @@ function DocumentsTab({ project }: { project: ProjectDetail }) {
   const docs = docsData?.items || [];
 
   // Group by workflow → stage
-  const ungrouped = docs.filter((d: DocType & { stageId?: string; projectWorkflow?: { id: string; name: string } | null }) => !d.stageId);
+  const ungrouped = docs.filter((d) => !d.stageId && !d.projectWorkflowId);
 
   const byWorkflow = (project.projectWorkflows || []).map((pw) => {
-    const pwDocs = docs.filter((d: DocType & { projectWorkflowId?: string; stageId?: string }) => d.projectWorkflowId === pw.id && !d.stageId);
+    const pwDocs = docs.filter((d) => d.projectWorkflowId === pw.id && !d.stageId);
     const stages = pw.stages || [];
     const byStage = stages.map((s) => ({
       stage: s,
-      docs: docs.filter((d: DocType & { stageId?: string }) => d.stageId === s.id),
+      docs: docs.filter((d) => d.stageId === s.id),
     })).filter((g) => g.docs.length > 0);
     return { workflow: pw, docs: pwDocs, stages: byStage };
   }).filter((g) => g.docs.length > 0 || g.stages.length > 0);
@@ -901,9 +926,23 @@ function DocRow({ doc, onPreview }: { doc: DocType; onPreview: (doc: DocType) =>
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'workflows' | 'documents' | 'followups'>('workflows');
+
+  const initialTab = (() => {
+    const t = searchParams.get('tab');
+    if (t === 'documents' || t === 'followups') return t;
+    return 'workflows';
+  })();
+  const [activeTab, setActiveTab] = useState<'workflows' | 'documents' | 'followups'>(initialTab);
   const [showAddWorkflow, setShowAddWorkflow] = useState(false);
+  const [wfOrder, setWfOrder] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem(`wf-order-${id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
   const { data: project, isLoading } = useQuery<ProjectDetail>({
     queryKey: ['project', id],
@@ -945,6 +984,29 @@ export default function ProjectDetailPage() {
   }
 
   const projectWorkflows = project.projectWorkflows || [];
+
+  const orderedWorkflows = useMemo(() => {
+    if (wfOrder.length === 0) return projectWorkflows;
+    const orderMap = new Map(wfOrder.map((wid, i) => [wid, i]));
+    return [...projectWorkflows].sort((a, b) => {
+      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : 999;
+      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : 999;
+      return ai - bi;
+    });
+  }, [projectWorkflows, wfOrder]);
+
+  const moveWorkflow = (wfId: string, direction: 'up' | 'down') => {
+    const current = orderedWorkflows.map((pw) => pw.id);
+    const idx = current.indexOf(wfId);
+    if (direction === 'up' && idx <= 0) return;
+    if (direction === 'down' && idx >= current.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const newOrder = [...current];
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    setWfOrder(newOrder);
+    localStorage.setItem(`wf-order-${id}`, JSON.stringify(newOrder));
+  };
+
   const allWorkflowStages = projectWorkflows.flatMap((pw) => pw.stages || []);
   const totalStages = allWorkflowStages.length;
   const completedStages = allWorkflowStages.filter((s) => s.status === 'completed').length;
@@ -1082,13 +1144,15 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
-            {projectWorkflows.map((pw) => (
+            {orderedWorkflows.map((pw, idx) => (
               <WorkflowCard
                 key={pw.id}
                 workflow={pw as ProjectWorkflow & { stages?: (ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] })[] }}
                 projectId={project.id}
                 users={users}
                 onRefresh={handleRefresh}
+                onMoveUp={idx > 0 ? () => moveWorkflow(pw.id, 'up') : undefined}
+                onMoveDown={idx < orderedWorkflows.length - 1 ? () => moveWorkflow(pw.id, 'down') : undefined}
               />
             ))}
 
