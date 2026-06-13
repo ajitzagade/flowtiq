@@ -949,6 +949,19 @@ export default function ProjectDetailPage() {
 
   const users = usersData?.items || [];
 
+  const projectWorkflows = project?.projectWorkflows || [];
+
+  // Must be before any early returns to satisfy Rules of Hooks
+  const orderedWorkflows = useMemo(() => {
+    if (wfOrder.length === 0) return projectWorkflows;
+    const orderMap = new Map(wfOrder.map((wid, i) => [wid, i]));
+    return [...projectWorkflows].sort((a, b) => {
+      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : 999;
+      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : 999;
+      return ai - bi;
+    });
+  }, [projectWorkflows, wfOrder]);
+
   const handleRefresh = () => {
     qc.invalidateQueries({ queryKey: ['project', id] });
   };
@@ -975,18 +988,6 @@ export default function ProjectDetailPage() {
       </>
     );
   }
-
-  const projectWorkflows = project.projectWorkflows || [];
-
-  const orderedWorkflows = useMemo(() => {
-    if (wfOrder.length === 0) return projectWorkflows;
-    const orderMap = new Map(wfOrder.map((wid, i) => [wid, i]));
-    return [...projectWorkflows].sort((a, b) => {
-      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : 999;
-      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : 999;
-      return ai - bi;
-    });
-  }, [projectWorkflows, wfOrder]);
 
   const dropWorkflow = (draggedId: string, targetId: string) => {
     if (draggedId === targetId) return;
