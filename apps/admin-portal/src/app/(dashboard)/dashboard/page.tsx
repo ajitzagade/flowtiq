@@ -1,12 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { get } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import { useAuthStore } from '@/store/auth';
 import {
   FolderKanban, Clock, FileText, CheckCircle2, AlertTriangle,
-  TrendingUp, Users, Building2, ArrowRight, GitBranch,
+  TrendingUp, Users, Building2, ArrowRight, GitBranch, ChevronDown,
 } from 'lucide-react';
 import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
 import { ProjectProgress } from '@/components/ProjectProgress';
@@ -115,23 +116,32 @@ const PRIORITY_COLORS: Record<string, string> = {
 function WorkflowPipelineSection({ pipeline }: {
   pipeline: NonNullable<DashboardStats['workflowPipeline']>;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
   if (!pipeline || pipeline.length === 0) return null;
 
   return (
     <div className="card">
       <div className="card-header">
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex items-center gap-2 text-left group"
+        >
           <GitBranch size={18} className="text-slate-500" />
           <h3 className="font-semibold text-slate-900">Workflow Pipeline</h3>
-          <span className="text-xs text-slate-400">— active projects per stage</span>
-        </div>
+          <span className="text-xs text-slate-400 hidden sm:inline">— active projects per stage</span>
+          <ChevronDown
+            size={16}
+            className={cn('text-slate-400 transition-transform duration-200 ml-1', collapsed && '-rotate-90')}
+          />
+        </button>
         <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
           View all <ArrowRight size={14} />
         </Link>
       </div>
-      <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      {!collapsed && (
+      <div className="p-4 columns-1 lg:columns-2 gap-4 space-y-0">
         {pipeline.map((workflow) => (
-          <div key={workflow.id} className="border border-slate-200 rounded-xl overflow-hidden">
+          <div key={workflow.id} className="break-inside-avoid mb-4 border border-slate-200 rounded-xl overflow-hidden">
             {/* Workflow header */}
             <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
               <div className="flex items-center gap-2 min-w-0">
@@ -196,6 +206,7 @@ function WorkflowPipelineSection({ pipeline }: {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
