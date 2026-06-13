@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
 
 export function FaviconUpdater() {
-  const logo = useAuthStore((s) => s.tenant?.logo);
+  const logo = useAuthStore((s) => s.tenant?.branding?.logo);
 
   useEffect(() => {
     if (!logo) return;
