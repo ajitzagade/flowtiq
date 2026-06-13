@@ -129,7 +129,7 @@ function WorkflowPipelineSection({ pipeline }: {
           View all <ArrowRight size={14} />
         </Link>
       </div>
-      <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {pipeline.map((workflow) => (
           <div key={workflow.id} className="border border-slate-200 rounded-xl overflow-hidden">
             {/* Workflow header */}
