@@ -417,6 +417,26 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     queryFn: () => get<WorkflowTemplate[]>('/workflows'),
   });
 
+  const workflows = allWorkflows ?? [];
+
+  // Default workflow first, then others alphabetically — then apply user-preferred order
+  const defaultSorted: WorkflowTemplate[] = [
+    ...workflows.filter((w) => w.isDefault),
+    ...workflows.filter((w) => !w.isDefault).sort((a, b) => a.name.localeCompare(b.name)),
+  ];
+
+  // Must be before any early returns to satisfy Rules of Hooks
+  const orderedWorkflows = useMemo(() => {
+    if (sectionOrder.length === 0) return defaultSorted;
+    const orderMap = new Map(sectionOrder.map((wid, i) => [wid, i]));
+    return [...defaultSorted].sort((a, b) => {
+      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : 999;
+      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : 999;
+      return ai - bi;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflows, sectionOrder]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -429,7 +449,6 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   }
 
   const projects = allProjectsData?.items ?? [];
-  const workflows = allWorkflows ?? [];
 
   // Group projects by their workflowId (null = no workflow assigned)
   const byWorkflow = new Map<string | null, Project[]>();
@@ -438,23 +457,6 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
     if (!byWorkflow.has(key)) byWorkflow.set(key, []);
     byWorkflow.get(key)!.push(p);
   }
-
-  // Default workflow first, then others alphabetically — then apply user-preferred order
-  const defaultSorted: WorkflowTemplate[] = [
-    ...workflows.filter((w) => w.isDefault),
-    ...workflows.filter((w) => !w.isDefault).sort((a, b) => a.name.localeCompare(b.name)),
-  ];
-
-  const orderedWorkflows = useMemo(() => {
-    if (sectionOrder.length === 0) return defaultSorted;
-    const orderMap = new Map(sectionOrder.map((wid, i) => [wid, i]));
-    return [...defaultSorted].sort((a, b) => {
-      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : 999;
-      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : 999;
-      return ai - bi;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflows, sectionOrder]);
 
   const moveSection = (wfId: string, direction: 'up' | 'down') => {
     const current = orderedWorkflows.map((w) => w.id);
