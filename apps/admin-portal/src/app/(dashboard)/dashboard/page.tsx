@@ -121,11 +121,11 @@ function WorkflowPipelineSection({ pipeline }: {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          className="flex items-center gap-2 text-left group"
-        >
+      <div
+        className="card-header cursor-pointer select-none"
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <div className="flex items-center gap-2">
           <GitBranch size={18} className="text-slate-500" />
           <h3 className="font-semibold text-slate-900">Workflow Pipeline</h3>
           <span className="text-xs text-slate-400 hidden sm:inline">— active projects per stage</span>
@@ -133,15 +133,19 @@ function WorkflowPipelineSection({ pipeline }: {
             size={16}
             className={cn('text-slate-400 transition-transform duration-200 ml-1', collapsed && '-rotate-90')}
           />
-        </button>
-        <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+        </div>
+        <Link
+          href="/projects"
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           View all <ArrowRight size={14} />
         </Link>
       </div>
       {!collapsed && (
-      <div className="p-4 columns-1 lg:columns-2 gap-4 space-y-0">
+      <div className="p-4 columns-1 lg:columns-2 gap-x-4">
         {pipeline.map((workflow) => (
-          <div key={workflow.id} className="break-inside-avoid mb-4 border border-slate-200 rounded-xl overflow-hidden">
+          <div key={workflow.id} className="break-inside-avoid mb-4 last:mb-0 border border-slate-200 rounded-xl overflow-hidden">
             {/* Workflow header */}
             <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
               <div className="flex items-center gap-2 min-w-0">
