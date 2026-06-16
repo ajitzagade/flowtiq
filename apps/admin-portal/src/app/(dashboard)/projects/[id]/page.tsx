@@ -253,7 +253,7 @@ function StageCard({
   stage: ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] };
   projectId: string;
   projectWorkflowId: string;
-  users: Array<{ id: string; firstName: string; lastName: string }>;
+  users: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
   onRefresh: () => void;
 }) {
   const qc = useQueryClient();
