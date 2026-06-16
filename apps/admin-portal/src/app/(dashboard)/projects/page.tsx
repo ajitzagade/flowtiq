@@ -543,7 +543,7 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
             projects={workflowProjects}
             searchTerm={boardSearch}
             onEdit={onEdit}
-            defaultExpanded={idx === 0}
+            defaultExpanded={false}
             onMoveUp={idx > 0 ? () => moveSection(workflow.id, 'up') : undefined}
             onMoveDown={idx < orderedWorkflows.length - 1 ? () => moveSection(workflow.id, 'down') : undefined}
             isHighlighted={isHighlighted}
@@ -561,7 +561,7 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
           projects={noWorkflowProjects}
           searchTerm={boardSearch}
           onEdit={onEdit}
-          defaultExpanded={orderedWorkflows.length === 0}
+          defaultExpanded={false}
         />
       )}
 

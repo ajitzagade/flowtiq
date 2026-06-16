@@ -118,7 +118,7 @@ function WorkflowCard({ workflow, onStageClick }: {
   workflow: NonNullable<DashboardStats['workflowPipeline']>[number];
   onStageClick: (workflowId: string, stageKey: string, count: number) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div className="break-inside-avoid mb-4 last:mb-0 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       {/* Workflow header — clickable to expand/collapse */}
@@ -211,7 +211,7 @@ function WorkflowCard({ workflow, onStageClick }: {
 function WorkflowPipelineSection({ pipeline }: {
   pipeline: NonNullable<DashboardStats['workflowPipeline']>;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const router = useRouter();
   if (!pipeline || pipeline.length === 0) return null;
 

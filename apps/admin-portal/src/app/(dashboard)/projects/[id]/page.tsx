@@ -257,7 +257,7 @@ function StageCard({
   onRefresh: () => void;
 }) {
   const qc = useQueryClient();
-  const [expanded, setExpanded] = useState(stage.status === 'in_progress');
+  const [expanded, setExpanded] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [showSubTaskForm, setShowSubTaskForm] = useState(false);
   const [newStatus, setNewStatus] = useState(stage.status);
@@ -688,7 +688,7 @@ function WorkflowCard({
   isDragging?: boolean;
   isDragOver?: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const stages = workflow.stages || [];
   const completed = stages.filter((s) => s.status === 'completed').length;
