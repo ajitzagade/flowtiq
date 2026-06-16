@@ -349,16 +349,20 @@ function WorkflowSection({
     : []; // null workflow → no stages → all land in __no_stage__
 
   return (
-    <div ref={sectionRef} className={cn('card overflow-hidden transition-all duration-300', isHighlighted && 'ring-2 ring-blue-400 ring-offset-1')}>
+    <div
+      ref={sectionRef}
+      className={cn('overflow-hidden transition-all duration-300 rounded-xl border bg-white', isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : '')}
+      style={{ borderColor: '#dde3f8', boxShadow: '0 4px 16px rgba(99,102,241,0.08), 0 1px 4px rgba(0,0,0,0.06)' }}
+    >
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setManualExpanded(!manualExpanded)}
-        className={cn('w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left', isHighlighted && 'bg-blue-50/60')}
+        className={cn('w-full px-5 py-4 flex items-center justify-between transition-colors text-left', isHighlighted ? 'bg-blue-50/60' : 'bg-gradient-to-r from-slate-50 to-white hover:from-indigo-50/60 hover:to-white')}
       >
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <GitBranch size={14} className="text-blue-500" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
+            <GitBranch size={15} className="text-white" />
           </div>
           <span className="font-semibold text-slate-800 text-sm">
             {workflow?.name ?? 'No Workflow Assigned'}
@@ -368,7 +372,12 @@ function WorkflowSection({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2.5 py-1">
+          <span
+            className="text-xs font-bold rounded-full px-3 py-1 flex-shrink-0"
+            style={projects.length > 0
+              ? { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }
+              : { background: '#f1f5f9', color: '#94a3b8' }}
+          >
             {projects.length} project{projects.length !== 1 ? 's' : ''}
           </span>
           {(onMoveUp || onMoveDown) && (
@@ -402,7 +411,7 @@ function WorkflowSection({
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-100 p-4">
+        <div className="p-4" style={{ borderTop: '1px solid #eef0f8' }}>
           <WorkflowKanban
             stages={stages}
             projects={projects}

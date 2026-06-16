@@ -211,7 +211,7 @@ function WorkflowCard({ workflow, onStageClick }: {
 function WorkflowPipelineSection({ pipeline }: {
   pipeline: NonNullable<DashboardStats['workflowPipeline']>;
 }) {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const router = useRouter();
   if (!pipeline || pipeline.length === 0) return null;
 
@@ -322,10 +322,10 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 xl:items-stretch">
           {/* Recent / Active Projects */}
-          <div className="xl:col-span-2 card">
-            <div className="card-header">
+          <div className="xl:col-span-2 card flex flex-col min-h-0">
+            <div className="card-header flex-shrink-0">
               <div>
                 <h3 className="font-semibold text-slate-900">Active Projects</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Sorted by priority — urgent first</p>
@@ -334,16 +334,19 @@ export default function DashboardPage() {
                 View all <ArrowRight size={14} />
               </Link>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y overflow-y-auto flex-1 min-h-0" style={{ borderColor: '#eef0f8' }}>
               {stats?.recentProjects?.length === 0 && (
                 <div className="empty-state py-10">
                   <FolderKanban size={40} className="text-slate-200 mb-3" />
                   <p className="text-slate-500">No projects yet</p>
                 </div>
               )}
-              {stats?.recentProjects?.map((project) => (
+              {stats?.recentProjects?.map((project, idx) => (
                 <Link key={project.id} href={`/projects/${project.id}`}>
-                  <div className="px-6 py-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                  <div
+                    className="px-6 py-4 transition-colors cursor-pointer hover:bg-indigo-50/50"
+                    style={idx % 2 === 1 ? { backgroundColor: '#f5f3ff' } : { backgroundColor: '#ffffff' }}
+                  >
                     <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -380,7 +383,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Right column */}
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {/* Upcoming follow-ups */}
             <div className="card">
               <div className="card-header">
@@ -408,11 +411,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent activity */}
-            <div className="card">
-              <div className="card-header">
+            <div className="card flex flex-col flex-1 min-h-0">
+              <div className="card-header flex-shrink-0">
                 <h3 className="font-semibold text-slate-900">Recent Activity</h3>
               </div>
-              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+              <div className="divide-y divide-slate-100 overflow-y-auto flex-1 min-h-0">
                 {stats?.recentActivity?.slice(0, 8).map((log) => (
                   <div key={log.id} className="px-4 py-3">
                     <p className="text-sm text-slate-700">

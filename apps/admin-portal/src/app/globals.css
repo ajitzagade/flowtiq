@@ -105,7 +105,9 @@
 
   /* Cards */
   .card {
-    @apply bg-white rounded-xl border border-slate-200 shadow-card;
+    @apply bg-white rounded-xl border;
+    border-color: #dde3f8;
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   .card-header {
