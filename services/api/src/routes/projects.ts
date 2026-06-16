@@ -28,7 +28,7 @@ function computeProgress(stages: Array<{ status: string }>) {
 }
 
 // GET /api/projects
-projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_all']), async (req, res, next) => {
+projectsRouter.get('/', requireAnyPermission(['projects:read', 'projects:view_all']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId, userId, isSuperAdmin, permissions } = authReq.user;
@@ -147,7 +147,7 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
 });
 
 // GET /api/projects/:id
-projectsRouter.get('/:id', requirePermission('projects:view'), async (req, res, next) => {
+projectsRouter.get('/:id', requirePermission('projects:read'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -452,7 +452,7 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
 });
 
 // PATCH /api/projects/:id
-projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, next) => {
+projectsRouter.patch('/:id', requirePermission('projects:update'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;

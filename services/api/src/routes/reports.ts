@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 
 export const reportsRouter = Router();
 reportsRouter.use(authenticate);
-reportsRouter.use(requirePermission('reports:view'));
+reportsRouter.use(requirePermission('reports:read'));
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 

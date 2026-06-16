@@ -31,7 +31,7 @@ function deriveWorkflowStatus(stages: Array<{ status: string }>): string {
 
 // GET /api/project-workflows/project/:projectId
 // List all workflows attached to a project
-projectWorkflowsRouter.get('/project/:projectId', requirePermission('projects:view'), async (req, res, next) => {
+projectWorkflowsRouter.get('/project/:projectId', requirePermission('projects:read'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -87,7 +87,7 @@ const addWorkflowSchema = z.object({
 
 // POST /api/project-workflows/project/:projectId
 // Attach a workflow template to a project
-projectWorkflowsRouter.post('/project/:projectId', requirePermission('projects:edit'), async (req, res, next) => {
+projectWorkflowsRouter.post('/project/:projectId', requirePermission('projects:update'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -178,7 +178,7 @@ projectWorkflowsRouter.post('/project/:projectId', requirePermission('projects:e
 
 // PATCH /api/project-workflows/:id
 // Update workflow status or order
-projectWorkflowsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, next) => {
+projectWorkflowsRouter.patch('/:id', requirePermission('projects:update'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -211,7 +211,7 @@ projectWorkflowsRouter.patch('/:id', requirePermission('projects:edit'), async (
 
 // DELETE /api/project-workflows/:id
 // Remove a workflow from a project (and its stages)
-projectWorkflowsRouter.delete('/:id', requirePermission('projects:edit'), async (req, res, next) => {
+projectWorkflowsRouter.delete('/:id', requirePermission('projects:update'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -268,7 +268,7 @@ projectWorkflowsRouter.delete('/:id', requirePermission('projects:edit'), async 
 });
 
 // GET /api/project-workflows/:id
-projectWorkflowsRouter.get('/:id', requirePermission('projects:view'), async (req, res, next) => {
+projectWorkflowsRouter.get('/:id', requirePermission('projects:read'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
