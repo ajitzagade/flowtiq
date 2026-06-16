@@ -151,7 +151,7 @@ export default function UsersPage() {
   const { user: authUser } = useAuthStore();
   const userPermissions = (authUser?.permissions as string[] | undefined) ?? [];
   const canCreate = authUser?.isSuperAdmin || userPermissions.includes('users:create');
-  const canEdit = authUser?.isSuperAdmin || userPermissions.includes('users:update');
+  const canEdit = authUser?.isSuperAdmin || userPermissions.includes('users:edit');
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', page, search, showInactive],

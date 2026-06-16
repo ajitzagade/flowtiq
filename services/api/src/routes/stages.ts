@@ -9,7 +9,7 @@ export const stagesRouter = Router();
 stagesRouter.use(authenticate);
 
 // GET /api/stages/project/:projectId
-stagesRouter.get('/project/:projectId', requirePermission('projects:read'), async (req, res, next) => {
+stagesRouter.get('/project/:projectId', requirePermission('projects:view'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { tenantId } = authReq.user;
@@ -49,7 +49,7 @@ stagesRouter.get('/project/:projectId', requirePermission('projects:read'), asyn
 });
 
 // GET /api/stages/:id
-stagesRouter.get('/:id', requirePermission('projects:read'), async (req, res, next) => {
+stagesRouter.get('/:id', requirePermission('projects:view'), async (req, res, next) => {
   try {
     const stage = await prisma.projectStage.findUnique({
       where: { id: req.params.id },
@@ -131,7 +131,7 @@ async function syncProjectTeamMembers(projectId: string) {
 
 // PATCH /api/stages/:id
 // Records history for EVERY update (including duplicate values as required)
-stagesRouter.patch('/:id', requirePermission('projects:update'), async (req, res, next) => {
+stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;
@@ -343,7 +343,7 @@ const createSubTaskSchema = z.object({
 });
 
 // POST /api/stages/:id/sub-tasks
-stagesRouter.post('/:id/sub-tasks', requirePermission('projects:update'), async (req, res, next) => {
+stagesRouter.post('/:id/sub-tasks', requirePermission('projects:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;
@@ -425,7 +425,7 @@ stagesRouter.post('/:id/sub-tasks', requirePermission('projects:update'), async 
 });
 
 // PATCH /api/stages/:stageId/sub-tasks/:subTaskId
-stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:update'), async (req, res, next) => {
+stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:edit'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;
@@ -504,7 +504,7 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
 });
 
 // DELETE /api/stages/:stageId/sub-tasks/:subTaskId
-stagesRouter.delete('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:update'), async (req, res, next) => {
+stagesRouter.delete('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:edit'), async (req, res, next) => {
   try {
     const subTask = await prisma.stageSubTask.findFirst({
       where: { id: req.params.subTaskId, stageId: req.params.stageId },

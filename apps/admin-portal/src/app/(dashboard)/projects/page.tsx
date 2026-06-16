@@ -820,7 +820,7 @@ function ProjectsPageInner() {
   const { user } = useAuthStore();
   const userPermissions = (user?.permissions as string[] | undefined) ?? [];
   const canCreateProject = user?.isSuperAdmin || userPermissions.includes('projects:create');
-  const canEditProject = user?.isSuperAdmin || userPermissions.includes('projects:update');
+  const canEditProject = user?.isSuperAdmin || userPermissions.includes('projects:edit');
   const canDeleteProject = user?.isSuperAdmin || userPermissions.includes('projects:delete');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');

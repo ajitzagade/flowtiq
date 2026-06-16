@@ -14,11 +14,11 @@ import { useSidebarStore } from '@/store/sidebar';
 // permission code required to see a nav item (null = always visible)
 const NAV_ITEMS: Array<{ key: string; label: string; href: string; icon: React.ElementType; requiredPermission: string | null }> = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, requiredPermission: null },
-  { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban, requiredPermission: 'projects:read' },
+  { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban, requiredPermission: 'projects:view' },
   { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2, requiredPermission: 'roles:manage' },
-  { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock, requiredPermission: 'followups:create' },
+  { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock, requiredPermission: 'follow_ups:create' },
   { key: 'documents', label: 'Documents', href: '/documents', icon: FileText, requiredPermission: 'documents:download' },
-  { key: 'users', label: 'Users', href: '/users', icon: Users, requiredPermission: 'users:read' },
+  { key: 'users', label: 'Users', href: '/users', icon: Users, requiredPermission: 'users:view' },
   { key: 'roles', label: 'Roles & Permissions', href: '/roles', icon: Shield, requiredPermission: 'roles:manage' },
   { key: 'workflows', label: 'Workflows', href: '/workflows', icon: GitBranch, requiredPermission: 'roles:manage' },
   { key: 'audit-logs', label: 'Audit Logs', href: '/audit-logs', icon: ClipboardList, requiredPermission: 'roles:manage' },
