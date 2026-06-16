@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { Plus, GitBranch, Trash2, Edit, Star, ChevronRight, X, GripVertical } from 'lucide-react';
+import { Plus, GitBranch, Trash2, Edit, Star, ChevronRight, X, GripVertical, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, cn, getErrorMessage } from '@/lib/utils';
-import type { WorkflowTemplate } from '@flowtiq/shared-types';
+import type { WorkflowTemplate, User as UserType } from '@flowtiq/shared-types';
 
 interface StageInput {
   key: string;
@@ -17,6 +17,7 @@ interface StageInput {
   isRequired: boolean;
   requiresApproval: boolean;
   description: string;
+  defaultMemberId: string;
 }
 
 const STAGE_COLORS = ['#94a3b8', '#38bdf8', '#3b82f6', '#8b5cf6', '#f59e0b', '#14b8a6', '#10b981', '#ef4444'];
@@ -25,7 +26,7 @@ function generateKey(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'stage';
 }
 
-function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | null; onClose: () => void }) {
+function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTemplate | null; onClose: () => void; users: UserType[] }) {
   const qc = useQueryClient();
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -38,11 +39,11 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
   const [saving, setSaving] = useState(false);
   const [stages, setStages] = useState<StageInput[]>(
     workflow?.stages
-      ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string }>)
+      ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string; defaultMemberId?: string }>)
           .sort((a, b) => a.order - b.order)
-          .map((s) => ({ key: s.key, name: s.name, order: s.order, color: s.color || '#6366f1', isRequired: s.isRequired !== false, requiresApproval: s.requiresApproval || false, description: s.description || '' }))
+          .map((s) => ({ key: s.key, name: s.name, order: s.order, color: s.color || '#6366f1', isRequired: s.isRequired !== false, requiresApproval: s.requiresApproval || false, description: s.description || '', defaultMemberId: s.defaultMemberId || '' }))
       : [
-          { key: 'stage_1', name: 'Stage 1', order: 1, color: '#94a3b8', isRequired: true, requiresApproval: false, description: '' },
+          { key: 'stage_1', name: 'Stage 1', order: 1, color: '#94a3b8', isRequired: true, requiresApproval: false, description: '', defaultMemberId: '' },
         ]
   );
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -50,7 +51,7 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
 
   const addStage = () => {
     const order = stages.length + 1;
-    setStages((prev) => [...prev, { key: `stage_${order}`, name: `Stage ${order}`, order, color: STAGE_COLORS[(order - 1) % STAGE_COLORS.length], isRequired: true, requiresApproval: false, description: '' }]);
+    setStages((prev) => [...prev, { key: `stage_${order}`, name: `Stage ${order}`, order, color: STAGE_COLORS[(order - 1) % STAGE_COLORS.length], isRequired: true, requiresApproval: false, description: '', defaultMemberId: '' }]);
   };
 
   const removeStage = (idx: number) => {
@@ -100,7 +101,15 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
     if (stages.length === 0) { toast.error('At least one stage is required'); return; }
     setSaving(true);
     try {
-      const payload = { name: name.trim(), description: description.trim() || undefined, isDefault, stages };
+      const payload = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        isDefault,
+        stages: stages.map((s) => ({
+          ...s,
+          defaultMemberId: s.defaultMemberId || undefined,
+        })),
+      };
       if (workflow) {
         await patch(`/workflows/${workflow.id}`, payload);
         toast.success('Workflow updated');
@@ -217,12 +226,29 @@ function WorkflowModal({ workflow, onClose }: { workflow?: WorkflowTemplate | nu
                       <X size={14} />
                     </button>
                   </div>
-                  <input
-                    className="form-input py-1 text-xs mt-2 w-full text-slate-500"
-                    value={stage.description}
-                    onChange={(e) => updateStage(idx, 'description', e.target.value)}
-                    placeholder="Stage description (optional)"
-                  />
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      className="form-input py-1 text-xs text-slate-500"
+                      value={stage.description}
+                      onChange={(e) => updateStage(idx, 'description', e.target.value)}
+                      placeholder="Stage description (optional)"
+                    />
+                    <div className="relative">
+                      <User size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <select
+                        className="form-input py-1 text-xs pl-7 text-slate-600 w-full"
+                        value={stage.defaultMemberId}
+                        onChange={(e) => updateStage(idx, 'defaultMemberId', e.target.value)}
+                      >
+                        <option value="">Default member (optional)</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.firstName} {u.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -249,6 +275,12 @@ export default function WorkflowsPage() {
     queryFn: () => get<WorkflowTemplate[]>('/workflows'),
   });
 
+  const { data: usersData } = useQuery({
+    queryKey: ['users', 'active'],
+    queryFn: () => get<{ items: UserType[] }>('/users', { pageSize: 200, isActive: 'true' }),
+  });
+  const users: UserType[] = usersData?.items ?? [];
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => del(`/workflows/${id}`),
     onSuccess: () => { toast.success('Workflow deleted'); qc.invalidateQueries({ queryKey: ['workflows'] }); },
@@ -264,6 +296,7 @@ export default function WorkflowsPage() {
         <WorkflowModal
           workflow={editWorkflow}
           onClose={() => { setShowModal(false); setEditWorkflow(null); }}
+          users={users}
         />
       )}
       <div className="p-4 sm:p-6 space-y-4 animate-slide-in">
@@ -327,31 +360,41 @@ export default function WorkflowsPage() {
 
               {/* Stage flow visualization */}
               <div className="space-y-1">
-                {(workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string }>).map((stage, idx) => (
-                  <div key={stage.key} className="flex items-center gap-2">
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                      style={{ backgroundColor: stage.color || '#6366f1' }}
-                    >
-                      {stage.order}
-                    </div>
-                    <div className="flex-1 bg-slate-50 rounded px-3 py-1.5 flex items-center justify-between gap-2">
-                      <span className="text-sm text-slate-700 truncate">{stage.name}</span>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {stage.isRequired !== false
-                          ? <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Required</span>
-                          : <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>
-                        }
-                        {stage.requiresApproval && (
-                          <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Approval</span>
-                        )}
+                {(workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string; defaultMemberId?: string }>).map((stage, idx) => {
+                  const defaultMember = stage.defaultMemberId ? users.find((u) => u.id === stage.defaultMemberId) : null;
+                  return (
+                    <div key={stage.key} className="flex items-center gap-2">
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                        style={{ backgroundColor: stage.color || '#6366f1' }}
+                      >
+                        {stage.order}
                       </div>
+                      <div className="flex-1 bg-slate-50 rounded px-3 py-1.5 flex items-center justify-between gap-2 min-w-0">
+                        <div className="min-w-0">
+                          <span className="text-sm text-slate-700 truncate block">{stage.name}</span>
+                          {defaultMember && (
+                            <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <User size={9} /> {defaultMember.firstName} {defaultMember.lastName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {stage.isRequired !== false
+                            ? <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Required</span>
+                            : <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Optional</span>
+                          }
+                          {stage.requiresApproval && (
+                            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Approval</span>
+                          )}
+                        </div>
+                      </div>
+                      {idx < workflow.stages.length - 1 && (
+                        <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+                      )}
                     </div>
-                    {idx < workflow.stages.length - 1 && (
-                      <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

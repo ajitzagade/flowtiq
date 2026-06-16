@@ -10,6 +10,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Plus, Search, Users, Edit, Trash2, X, UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDate, formatRelative, getInitials, getAvatarColor, cn, getErrorMessage } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth';
 import type { User, Role } from '@flowtiq/shared-types';
 
 const createSchema = z.object({
@@ -146,11 +147,17 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const { user: authUser } = useAuthStore();
+  const userPermissions = (authUser?.permissions as string[] | undefined) ?? [];
+  const canCreate = authUser?.isSuperAdmin || userPermissions.includes('users:create');
+  const canEdit = authUser?.isSuperAdmin || userPermissions.includes('users:update');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['users', page, search],
+    queryKey: ['users', page, search, showInactive],
     queryFn: () => get<{ items: User[]; total: number; totalPages: number }>('/users', {
       page, pageSize: 15, search: search || undefined,
+      isActive: showInactive ? 'all' : 'true',
     }),
     placeholderData: (prev) => prev,
   });
@@ -169,6 +176,20 @@ export default function UsersPage() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: (id: string) => del(`/users/${id}?hard=true`),
+    onSuccess: () => {
+      toast.success('User permanently deleted');
+      qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const handleHardDelete = (user: User) => {
+    if (!confirm(`Permanently delete ${user.firstName} ${user.lastName}?\n\nThis cannot be undone. All their account data will be removed.`)) return;
+    hardDeleteMutation.mutate(user.id);
+  };
 
   const users = data?.items || [];
   const totalPages = data?.totalPages || 1;
@@ -197,9 +218,20 @@ export default function UsersPage() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
-            <button onClick={() => setShowModal(true)} className="btn-primary ml-auto">
-              <Plus size={16} /> New User
-            </button>
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => { setShowInactive(e.target.checked); setPage(1); }}
+                className="accent-blue-600"
+              />
+              Show inactive
+            </label>
+            {canCreate && (
+              <button onClick={() => setShowModal(true)} className="btn-primary ml-auto">
+                <Plus size={16} /> New User
+              </button>
+            )}
           </div>
         </div>
 
@@ -230,9 +262,11 @@ export default function UsersPage() {
                   <div className="empty-state">
                     <Users size={48} className="text-slate-200 mb-3" />
                     <p className="font-medium text-slate-500">No users found</p>
-                    <button onClick={() => setShowModal(true)} className="btn-primary mt-4">
-                      <Plus size={16} /> New User
-                    </button>
+                    {canCreate && (
+                      <button onClick={() => setShowModal(true)} className="btn-primary mt-4">
+                        <Plus size={16} /> New User
+                      </button>
+                    )}
                   </div>
                 </td></tr>
               )}
@@ -277,25 +311,39 @@ export default function UsersPage() {
                     <td className="text-sm text-slate-500">{formatDate(user.createdAt)}</td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setEditUser(user)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
-                          className={cn(
-                            'p-1.5 rounded-lg transition-colors',
-                            user.isActive
-                              ? 'text-slate-400 hover:text-red-600 hover:bg-red-50'
-                              : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
-                          )}
-                          title={user.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {user.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => setEditUser(user)}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        )}
+                        {canEdit && (
+                          <button
+                            onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                            className={cn(
+                              'p-1.5 rounded-lg transition-colors',
+                              user.isActive
+                                ? 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                                : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                            )}
+                            title={user.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {user.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                          </button>
+                        )}
+                        {canEdit && !user.isActive && (
+                          <button
+                            onClick={() => handleHardDelete(user)}
+                            disabled={hardDeleteMutation.isPending}
+                            className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
+                            title="Permanently delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

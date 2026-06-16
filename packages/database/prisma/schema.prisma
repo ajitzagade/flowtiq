@@ -194,6 +194,7 @@ model Project {
   followUpOwnerId  String?
   reportingOwnerId String?
   metadata         Json?     @default("{}")
+  deletedAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -244,8 +245,10 @@ model ProjectStage {
   stageOrder        Int
   isRequired        Boolean   @default(true)
   status            String    @default("pending")
-  // assignedTo: user id (legacy string, no FK)
+  // assignedTo: primary assignee user id (legacy single-user)
   assignedTo        String?
+  // assignedToIds: multi-member assignment (includes primary assignee)
+  assignedToIds     String[]  @default([])
   // assignedById: user id (no FK) — who made the assignment
   assignedById      String?
   assignedAt        DateTime?
@@ -273,6 +276,7 @@ model StageSubTask {
   name        String
   description String?
   status      String    @default("pending")
+  assignedTo  String?
   order       Int
   isRequired  Boolean   @default(false)
   notes       String?

@@ -29,6 +29,7 @@ export default function NotificationsPage() {
         pageSize: 50,
         isRead: isRead !== '' ? isRead : undefined,
       }),
+    refetchInterval: 15000,
   });
 
   const markReadMutation = useMutation({

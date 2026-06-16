@@ -10,13 +10,14 @@ workflowsRouter.use(authenticate);
 
 // GET /api/workflows
 // Normalize stages so both seed format (stageKey/stageName) and API format (key/name) work
-function normalizeStages(stages: unknown): Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean }> {
+function normalizeStages(stages: unknown): Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean; defaultMemberId?: string }> {
   if (!Array.isArray(stages)) return [];
   return stages.map((s: Record<string, unknown>) => ({
     ...s,
     key: (s.key || s.stageKey || '') as string,
     name: (s.name || s.stageName || '') as string,
     order: (s.order ?? 0) as number,
+    defaultMemberId: (s.defaultMemberId || undefined) as string | undefined,
   }));
 }
 
@@ -72,6 +73,7 @@ const stageConfigSchema = z.object({
   color: z.string().optional(),
   isRequired: z.boolean().default(true),
   requiresApproval: z.boolean().default(false),
+  defaultMemberId: z.string().optional(),
   canSkip: z.boolean().default(false),
   checklist: z.array(z.object({
     id: z.string(),

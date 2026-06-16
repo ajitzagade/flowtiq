@@ -12,6 +12,7 @@ import {
 import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
 import { ProjectProgress } from '@/components/ProjectProgress';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface DashboardStats {
   totalProjects: number;
@@ -113,11 +114,111 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-slate-400',
 };
 
+function WorkflowCard({ workflow, onStageClick }: {
+  workflow: NonNullable<DashboardStats['workflowPipeline']>[number];
+  onStageClick: (workflowId: string, stageKey: string, count: number) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="break-inside-avoid mb-4 last:mb-0 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      {/* Workflow header — clickable to expand/collapse */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 hover:from-slate-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <ChevronDown
+            size={15}
+            className={cn('text-slate-400 flex-shrink-0 transition-transform duration-200', !open && '-rotate-90')}
+          />
+          <span className="font-semibold text-slate-800 truncate text-sm">{workflow.name}</span>
+          {workflow.isDefault && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0">
+              Default
+            </span>
+          )}
+        </div>
+        {/* Project count pill */}
+        <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+          <span className={cn(
+            'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm',
+            workflow.totalProjects > 0
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-100 text-slate-400',
+          )}>
+            <span className="text-sm leading-none">{workflow.totalProjects}</span>
+            <span className="font-normal opacity-90">{workflow.totalProjects !== 1 ? 'projects' : 'project'}</span>
+          </span>
+        </div>
+      </button>
+
+      {/* Stages list */}
+      {open && (
+        <div className="divide-y divide-slate-100 bg-white">
+          {workflow.stages.map((stage, idx) => {
+            const max = Math.max(...workflow.stages.map((s) => s.count), 1);
+            const pct = Math.round((stage.count / max) * 100);
+            const stageColor = stage.color || '#94a3b8';
+            const isClickable = stage.count > 0;
+            const isEven = idx % 2 === 1;
+            return (
+              <div
+                key={stage.key}
+                onClick={() => onStageClick(workflow.id, stage.key, stage.count)}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-2.5 transition-colors group',
+                  isClickable ? 'cursor-pointer hover:bg-blue-50/60' : 'cursor-default',
+                  isEven && !isClickable && 'bg-slate-50/60',
+                  isEven && isClickable && 'bg-slate-50/40',
+                )}
+                title={isClickable ? `View ${stage.count} project${stage.count !== 1 ? 's' : ''} in ${stage.name}` : undefined}
+              >
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stageColor }} />
+                <span className={cn('text-sm flex-1 min-w-0 truncate', isClickable ? 'text-slate-800 font-medium' : 'text-slate-500')}>
+                  {stage.name}
+                </span>
+                {/* Progress bar */}
+                <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden flex-shrink-0">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: stageColor }} />
+                </div>
+                {/* Count badge */}
+                {stage.count > 0 ? (
+                  <span
+                    className="flex-shrink-0 min-w-[28px] h-6 px-2 rounded-full text-xs font-bold text-white flex items-center justify-center shadow-sm"
+                    style={{ backgroundColor: stageColor }}
+                  >
+                    {stage.count}
+                  </span>
+                ) : (
+                  <span className="flex-shrink-0 min-w-[28px] h-6 px-2 rounded-full text-xs font-medium text-slate-300 bg-slate-100 flex items-center justify-center">
+                    0
+                  </span>
+                )}
+                <ArrowRight size={13} className={cn('flex-shrink-0 transition-opacity', isClickable ? 'text-blue-400 opacity-0 group-hover:opacity-100' : 'opacity-0')} />
+              </div>
+            );
+          })}
+          {workflow.stages.length === 0 && (
+            <div className="px-4 py-3 text-sm text-slate-400 text-center">No stages configured</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WorkflowPipelineSection({ pipeline }: {
   pipeline: NonNullable<DashboardStats['workflowPipeline']>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const router = useRouter();
   if (!pipeline || pipeline.length === 0) return null;
+
+  const handleStageClick = (workflowId: string, stageKey: string, count: number) => {
+    if (count === 0) return;
+    router.push(`/projects?view=kanban&workflowId=${workflowId}&stage=${stageKey}`);
+  };
 
   return (
     <div className="card">
@@ -143,73 +244,11 @@ function WorkflowPipelineSection({ pipeline }: {
         </Link>
       </div>
       {!collapsed && (
-      <div className="p-4 columns-1 lg:columns-2 gap-x-4">
-        {pipeline.map((workflow) => (
-          <div key={workflow.id} className="break-inside-avoid mb-4 last:mb-0 border border-slate-200 rounded-xl overflow-hidden">
-            {/* Workflow header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-medium text-slate-800 truncate">{workflow.name}</span>
-                {workflow.isDefault && (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 flex-shrink-0">
-                    Default
-                  </span>
-                )}
-              </div>
-              <span className="text-sm font-semibold text-slate-700 flex-shrink-0 ml-2">
-                {workflow.totalProjects} project{workflow.totalProjects !== 1 ? 's' : ''}
-              </span>
-            </div>
-
-            {/* Stages */}
-            <div className="divide-y divide-slate-100">
-              {workflow.stages.map((stage) => {
-                const max = Math.max(...workflow.stages.map((s) => s.count), 1);
-                const pct = Math.round((stage.count / max) * 100);
-                const stageColor = stage.color || '#94a3b8';
-                return (
-                  <div
-                    key={stage.key}
-                    className={cn(
-                      'flex items-center gap-3 px-4 py-2.5 transition-colors',
-                      stage.count > 0 && 'bg-slate-50/60',
-                    )}
-                  >
-                    <div
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: stageColor }}
-                    />
-                    <span className="text-sm text-slate-600 flex-1 min-w-0 truncate">{stage.name}</span>
-                    {/* Bar */}
-                    <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden flex-shrink-0">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: stageColor }}
-                      />
-                    </div>
-                    {/* Count badge */}
-                    {stage.count > 0 ? (
-                      <span
-                        className="flex-shrink-0 min-w-[24px] h-6 px-2 rounded-full text-xs font-bold text-white flex items-center justify-center shadow-sm"
-                        style={{ backgroundColor: stageColor }}
-                      >
-                        {stage.count}
-                      </span>
-                    ) : (
-                      <span className="flex-shrink-0 min-w-[24px] h-6 px-2 rounded-full text-xs font-medium text-slate-300 bg-slate-100 flex items-center justify-center">
-                        0
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-              {workflow.stages.length === 0 && (
-                <div className="px-4 py-3 text-sm text-slate-400 text-center">No stages configured</div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+        <div className="p-4 columns-1 lg:columns-2 gap-x-4">
+          {pipeline.map((workflow) => (
+            <WorkflowCard key={workflow.id} workflow={workflow} onStageClick={handleStageClick} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -235,6 +274,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard', 'stats'],
     queryFn: () => get<DashboardStats>('/dashboard/stats'),
+    refetchInterval: 30000,
   });
 
   if (isLoading) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { ProjectProgress } from '@/components/ProjectProgress';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDate, getStatusBadgeClass, getPriorityBadgeClass, cn, truncate, getErrorMessage } from '@/lib/utils';
 import Link from 'next/link';
 import type { Project, User, WorkflowTemplate } from '@flowtiq/shared-types';
@@ -104,12 +104,14 @@ function WorkflowKanban({
   searchTerm,
   onEdit,
   sectionWorkflowId,
+  highlightStageKey,
 }: {
   stages: StageColumn[];
   projects: Project[];
   searchTerm: string;
   onEdit: (p: Project) => void;
   sectionWorkflowId: string | null;
+  highlightStageKey?: string | null;
 }) {
   const qc = useQueryClient();
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -129,7 +131,11 @@ function WorkflowKanban({
   const buckets: Record<string, Project[]> = { __no_stage__: [] };
   for (const s of stages) buckets[s.key] = [];
   for (const p of filtered) {
-    const key = p.currentStage ?? '';
+    // For multi-workflow projects: find the active stage key within THIS workflow section
+    const pws = p.projectWorkflows as Array<{ workflowTemplateId: string; currentStageKey?: string | null }> | undefined;
+    const pw = pws?.find((w) => w.workflowTemplateId === sectionWorkflowId);
+    // Prefer per-workflow active stage; fall back to Project.currentStage for legacy single-workflow projects
+    const key = pw?.currentStageKey ?? (pws && pws.length > 0 ? null : (p.currentStage ?? '')) ?? '';
     if (key && allStageKeys.has(key)) {
       buckets[key].push(p);
     } else {
@@ -139,7 +145,10 @@ function WorkflowKanban({
 
   const moveMutation = useMutation({
     mutationFn: ({ id, stageKey }: { id: string; stageKey: string }) =>
-      patch(`/projects/${id}`, { currentStage: stageKey === '__no_stage__' ? null : stageKey }),
+      patch(`/projects/${id}`, {
+        currentStage: stageKey === '__no_stage__' ? null : stageKey,
+        workflowTemplateId: sectionWorkflowId ?? undefined,
+      }),
     onSuccess: (_, vars) => {
       const stageName = vars.stageKey === '__no_stage__'
         ? 'No Stage'
@@ -223,6 +232,7 @@ function WorkflowKanban({
           const colProjects = buckets[col.key] ?? [];
           const isOver = dragOverStage === col.key && draggingId !== null;
           const isMoving = moveMutation.isPending && moveMutation.variables?.stageKey === col.key;
+          const isHighlighted = highlightStageKey === col.key;
 
           return (
             <div
@@ -230,10 +240,11 @@ function WorkflowKanban({
               data-stage-key={col.key}
               className={cn(
                 'flex flex-col w-64 flex-shrink-0 rounded-xl border bg-white transition-all duration-150 overflow-hidden',
-                isOver ? 'border-blue-300 shadow-lg' : 'border-slate-200 shadow-sm',
+                isOver ? 'border-blue-300 shadow-lg' : isHighlighted ? 'border-blue-400 shadow-xl ring-2 ring-blue-300 ring-offset-1' : 'border-slate-200 shadow-sm',
                 col.isNoStage && 'opacity-75',
+                isHighlighted && 'bg-blue-50/40',
               )}
-              style={{ borderTopColor: col.color, borderTopWidth: 3 }}
+              style={{ borderTopColor: col.color, borderTopWidth: isHighlighted ? 4 : 3 }}
               onDragOver={handleDragOver}
               onDragEnter={(e) => handleDragEnter(e, col.key)}
               onDragLeave={(e) => handleDragLeave(e, col.key)}
@@ -304,6 +315,9 @@ function WorkflowSection({
   defaultExpanded,
   onMoveUp,
   onMoveDown,
+  isHighlighted,
+  highlightStageKey,
+  sectionRef,
 }: {
   workflow: WorkflowTemplate | null;
   projects: Project[];
@@ -312,29 +326,35 @@ function WorkflowSection({
   defaultExpanded: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  isHighlighted?: boolean;
+  highlightStageKey?: string | null;
+  sectionRef?: React.RefObject<HTMLDivElement>;
 }) {
-  const [manualExpanded, setManualExpanded] = useState(defaultExpanded);
-  const expanded = searchTerm.length > 0 ? true : manualExpanded;
+  const [manualExpanded, setManualExpanded] = useState(defaultExpanded || !!isHighlighted);
+  // If highlighted from outside, force expand
+  const expanded = searchTerm.length > 0 || isHighlighted ? true : manualExpanded;
 
   // Build stages from workflow template stages (with their colors)
+  // Handle both { key, name } (new workflows) and { stageKey, stageName } (legacy) formats
   const stages: StageColumn[] = workflow?.stages
-    ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; requiresApproval?: boolean }>)
+    ? (workflow.stages as Array<{ key?: string; stageKey?: string; name?: string; stageName?: string; order: number; color?: string; requiresApproval?: boolean }>)
         .sort((a, b) => a.order - b.order)
         .map((s, idx) => ({
-          key: s.key,
-          name: s.name,
+          key: (s.key ?? s.stageKey ?? '').trim(),
+          name: (s.name ?? s.stageName ?? '').trim(),
           order: s.order,
           color: s.color || PALETTE[idx % PALETTE.length],
         }))
+        .filter((s) => s.key)
     : []; // null workflow → no stages → all land in __no_stage__
 
   return (
-    <div className="card overflow-hidden">
+    <div ref={sectionRef} className={cn('card overflow-hidden transition-all duration-300', isHighlighted && 'ring-2 ring-blue-400 ring-offset-1')}>
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setManualExpanded(!manualExpanded)}
-        className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left"
+        className={cn('w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left', isHighlighted && 'bg-blue-50/60')}
       >
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
@@ -389,6 +409,7 @@ function WorkflowSection({
             searchTerm={searchTerm}
             onEdit={onEdit}
             sectionWorkflowId={workflow?.id ?? null}
+            highlightStageKey={isHighlighted ? highlightStageKey : null}
           />
         </div>
       )}
@@ -397,8 +418,13 @@ function WorkflowSection({
 }
 
 // ── KanbanBoard — groups projects by workflowId, renders accordion sections ────
-function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
+function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
+  onEdit: (p: Project) => void;
+  highlightWorkflowId?: string | null;
+  highlightStageKey?: string | null;
+}) {
   const [boardSearch, setBoardSearch] = useState('');
+  const highlightRef = useRef<HTMLDivElement>(null);
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -410,6 +436,7 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   const { data: allProjectsData, isLoading } = useQuery({
     queryKey: ['projects', 'kanban'],
     queryFn: () => get<{ items: Project[] }>('/projects', { pageSize: 500 }),
+    refetchInterval: 30000,
   });
 
   const { data: allWorkflows } = useQuery({
@@ -437,6 +464,15 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflows, sectionOrder]);
 
+  // Auto-scroll to highlighted workflow section after data loads
+  useEffect(() => {
+    if (!highlightWorkflowId || !highlightRef.current) return;
+    const timer = setTimeout(() => {
+      highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [highlightWorkflowId, highlightRef.current]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -450,12 +486,23 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
 
   const projects = allProjectsData?.items ?? [];
 
-  // Group projects by their workflowId (null = no workflow assigned)
+  // Group projects under EACH workflow they belong to via projectWorkflows
   const byWorkflow = new Map<string | null, Project[]>();
   for (const p of projects) {
-    const key = p.workflowId ?? null;
-    if (!byWorkflow.has(key)) byWorkflow.set(key, []);
-    byWorkflow.get(key)!.push(p);
+    const pws = p.projectWorkflows as Array<{ workflowTemplateId: string; currentStageKey?: string | null }> | undefined;
+    if (pws && pws.length > 0) {
+      // Project appears in every workflow section it's attached to
+      for (const pw of pws) {
+        const key = pw.workflowTemplateId;
+        if (!byWorkflow.has(key)) byWorkflow.set(key, []);
+        byWorkflow.get(key)!.push(p);
+      }
+    } else {
+      // Legacy: single workflowId or no workflow
+      const key = p.workflowId ?? null;
+      if (!byWorkflow.has(key)) byWorkflow.set(key, []);
+      byWorkflow.get(key)!.push(p);
+    }
   }
 
   const moveSection = (wfId: string, direction: 'up' | 'down') => {
@@ -488,6 +535,7 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
       {/* One accordion section per workflow — each with its OWN stage columns */}
       {orderedWorkflows.map((workflow, idx) => {
         const workflowProjects = byWorkflow.get(workflow.id) ?? [];
+        const isHighlighted = highlightWorkflowId === workflow.id;
         return (
           <WorkflowSection
             key={workflow.id}
@@ -498,6 +546,9 @@ function KanbanBoard({ onEdit }: { onEdit: (p: Project) => void }) {
             defaultExpanded={idx === 0}
             onMoveUp={idx > 0 ? () => moveSection(workflow.id, 'up') : undefined}
             onMoveDown={idx < orderedWorkflows.length - 1 ? () => moveSection(workflow.id, 'down') : undefined}
+            isHighlighted={isHighlighted}
+            highlightStageKey={highlightStageKey}
+            sectionRef={isHighlighted ? highlightRef : undefined}
           />
         );
       })}
@@ -559,8 +610,8 @@ function ProjectModal({
   }, [onClose]);
 
   const { data: users } = useQuery<{ items: User[] }>({
-    queryKey: ['users', 'all'],
-    queryFn: () => get<{ items: User[] }>('/users?pageSize=100'),
+    queryKey: ['users', 'active'],
+    queryFn: () => get<{ items: User[] }>('/users', { pageSize: 200, isActive: 'true' }),
   });
 
   const { data: workflows } = useQuery<WorkflowTemplate[]>({
@@ -764,10 +815,13 @@ function ProjectModal({
 }
 
 // ── ProjectsPage ───────────────────────────────────────────────────────────────
-export default function ProjectsPage() {
+function ProjectsPageInner() {
   const qc = useQueryClient();
   const { user } = useAuthStore();
-  const isAdmin = user?.isSuperAdmin || (user?.roles as Array<{ name: string }> | undefined)?.some((r) => r.name === 'Admin');
+  const userPermissions = (user?.permissions as string[] | undefined) ?? [];
+  const canCreateProject = user?.isSuperAdmin || userPermissions.includes('projects:create');
+  const canEditProject = user?.isSuperAdmin || userPermissions.includes('projects:update');
+  const canDeleteProject = user?.isSuperAdmin || userPermissions.includes('projects:delete');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
@@ -775,7 +829,20 @@ export default function ProjectsPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [view, setView] = useState<'list' | 'kanban'>('kanban');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [view, setView] = useState<'list' | 'kanban'>(() =>
+    searchParams.get('view') === 'list' ? 'list' : 'kanban'
+  );
+  const [highlightWorkflowId] = useState<string | null>(() => searchParams.get('workflowId'));
+  const [highlightStageKey, setHighlightStageKey] = useState<string | null>(() => searchParams.get('stage'));
+
+  // Clear highlight after 3 seconds
+  useEffect(() => {
+    if (!highlightStageKey) return;
+    const timer = setTimeout(() => setHighlightStageKey(null), 3000);
+    return () => clearTimeout(timer);
+  }, [highlightStageKey]);
 
   const { data: workflows } = useQuery<WorkflowTemplate[]>({
     queryKey: ['workflows'],
@@ -794,6 +861,7 @@ export default function ProjectsPage() {
         workflowId: workflowFilter || undefined,
       }),
     placeholderData: (prev) => prev,
+    refetchInterval: 30000,
   });
 
   const deleteMutation = useMutation({
@@ -892,15 +960,21 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <button onClick={() => setShowModal(true)} className="btn-primary">
-              <Plus size={16} /> New Project
-            </button>
+            {canCreateProject && (
+              <button onClick={() => setShowModal(true)} className="btn-primary">
+                <Plus size={16} /> New Project
+              </button>
+            )}
           </div>
         </div>
 
         {/* Kanban View */}
         {view === 'kanban' && (
-          <KanbanBoard onEdit={(p) => setEditProject(p)} />
+          <KanbanBoard
+            onEdit={(p) => setEditProject(p)}
+            highlightWorkflowId={highlightWorkflowId}
+            highlightStageKey={highlightStageKey}
+          />
         )}
 
         {/* List View */}
@@ -939,15 +1013,21 @@ export default function ProjectsPage() {
                           <FolderKanban size={48} className="text-slate-200 mb-3" />
                           <p className="font-medium text-slate-500">No projects found</p>
                           <p className="text-slate-400 text-sm mt-1">Create your first project to get started</p>
-                          <button onClick={() => setShowModal(true)} className="btn-primary mt-4">
-                            <Plus size={16} /> New Project
-                          </button>
+                          {canCreateProject && (
+                            <button onClick={() => setShowModal(true)} className="btn-primary mt-4">
+                              <Plus size={16} /> New Project
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
                   )}
                   {projects.map((project) => (
-                    <tr key={project.id}>
+                    <tr
+                      key={project.id}
+                      className="row-clickable group"
+                      onClick={() => router.push(`/projects/${project.id}`)}
+                    >
                       <td>
                         <div>
                           <p className="font-medium text-slate-900">{truncate(project.name, 40)}</p>
@@ -998,8 +1078,9 @@ export default function ProjectsPage() {
                           <span className="text-slate-700">{project.owner.firstName} {project.owner.lastName}</span>
                         ) : <span className="text-slate-300">—</span>}
                       </td>
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          <ChevronRight size={15} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity mr-1 flex-shrink-0" />
                           <Link href={`/projects/${project.id}`}>
                             <button
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -1009,24 +1090,26 @@ export default function ProjectsPage() {
                               <Eye size={16} />
                             </button>
                           </Link>
-                          <button
-                            onClick={() => setEditProject(project)}
-                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                            aria-label={`Edit ${project.name}`}
-                            title="Edit"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          {isAdmin && (
+                          {canEditProject && (
+                            <button
+                              onClick={() => setEditProject(project)}
+                              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                              aria-label={`Edit ${project.name}`}
+                              title="Edit"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          )}
+                          {canDeleteProject && (
                             <button
                               onClick={() => {
-                                if (confirm('Cancel this project?')) {
+                                if (confirm('Delete this project? This action cannot be undone.')) {
                                   deleteMutation.mutate(project.id);
                                 }
                               }}
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               aria-label={`Delete ${project.name}`}
-                              title="Cancel"
+                              title="Delete"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -1067,5 +1150,13 @@ export default function ProjectsPage() {
         )}
       </div>
     </>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProjectsPageInner />
+    </Suspense>
   );
 }

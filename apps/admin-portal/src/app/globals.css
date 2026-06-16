@@ -134,11 +134,23 @@
   }
 
   .table tbody tr {
-    @apply border-b border-slate-100 hover:bg-slate-50/50 transition-colors;
+    @apply border-b border-slate-100 transition-colors;
+  }
+
+  .table tbody tr:nth-child(even) {
+    background-color: rgb(248 250 252 / 0.7);
+  }
+
+  .table tbody tr:hover {
+    background-color: rgb(239 246 255 / 0.55) !important;
   }
 
   .table tbody tr:last-child {
     @apply border-0;
+  }
+
+  .table tbody tr.row-clickable {
+    @apply cursor-pointer;
   }
 
   .table td {

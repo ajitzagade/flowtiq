@@ -66,7 +66,13 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
       }
     }
 
-    if (status) where.status = status;
+    // By default, exclude soft-deleted (cancelled) projects unless explicitly requested
+    if (status) {
+      where.status = status;
+    } else {
+      where.deletedAt = null; // exclude soft-deleted
+      where.status = { not: 'cancelled' };
+    }
     if (priority) where.priority = priority;
     if (ownerId) where.ownerId = ownerId;
     if (workflowId) where.workflowId = workflowId;
@@ -80,7 +86,23 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
         include: {
           owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
           workflow: { select: { id: true, name: true } },
-          _count: { select: { documents: true, followUps: true, projectWorkflows: true } },
+          projectWorkflows: {
+            orderBy: { order: 'asc' },
+            select: {
+              id: true,
+              workflowTemplateId: true,
+              name: true,
+              status: true,
+              order: true,
+              stages: {
+                where: { status: 'in_progress' },
+                select: { stageKey: true },
+                orderBy: { stageOrder: 'asc' },
+                take: 1,
+              },
+            },
+          },
+          _count: { select: { documents: true, followUps: true } },
         },
       }),
       prisma.project.count({ where }),
@@ -101,8 +123,17 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
           ...p,
           documentsCount: p._count.documents,
           followUpsCount: p._count.followUps,
-          workflowsCount: p._count.projectWorkflows,
+          workflowsCount: p.projectWorkflows.length,
           pendingFollowUps: followUpMap.get(p.id) || 0,
+          // Expose current active stage key per workflow for kanban placement
+          projectWorkflows: p.projectWorkflows.map((pw) => ({
+            id: pw.id,
+            workflowTemplateId: pw.workflowTemplateId,
+            name: pw.name,
+            status: pw.status,
+            order: pw.order,
+            currentStageKey: (pw.stages as Array<{ stageKey: string }> | undefined)?.[0]?.stageKey ?? null,
+          })),
         })),
         total,
         page: parseInt(page),
@@ -343,6 +374,14 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
         ? [data.workflowId]
         : [];
 
+    // Ensure project.workflowId is set for legacy kanban grouping — use first selected workflow
+    if (wfIds.length > 0 && !project.workflowId) {
+      await prisma.project.update({
+        where: { id: project.id },
+        data: { workflowId: wfIds[0] },
+      });
+    }
+
     if (wfIds.length > 0) {
       for (let idx = 0; idx < wfIds.length; idx++) {
         const tmpl = await prisma.workflowTemplate.findFirst({
@@ -372,6 +411,8 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
               isRequired: (s.isRequired ?? true) as boolean,
               status: 'pending',
               checklist: (s.checklist as object[]) || [],
+              // Inherit default member from workflow template stage configuration
+              ...(s.defaultMemberId ? { assignedTo: s.defaultMemberId as string } : {}),
             })),
           });
         }
@@ -425,8 +466,8 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
       return;
     }
 
-    // Strip workflowIds — not a Project column; handled separately below
-    const { startDate, dueDate, completionDate, workflowIds: newWorkflowIds, ...rest } = req.body;
+    // Strip workflowIds and workflowTemplateId — not Project columns; handled separately below
+    const { startDate, dueDate, completionDate, workflowIds: newWorkflowIds, workflowTemplateId: dragWorkflowTemplateId, ...rest } = req.body;
 
     const updated = await prisma.project.update({
       where: { id: req.params.id },
@@ -441,6 +482,32 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
       },
     });
 
+    // Kanban drag-drop: update ProjectStage records for the target workflow
+    // When workflowTemplateId is provided, update the specific workflow's stages
+    if (rest.currentStage && dragWorkflowTemplateId) {
+      const pw = await prisma.projectWorkflow.findFirst({
+        where: { projectId: req.params.id, workflowTemplateId: dragWorkflowTemplateId as string },
+        select: { id: true },
+      });
+      if (pw) {
+        // Clear any existing in_progress stages in this workflow
+        await prisma.projectStage.updateMany({
+          where: { projectWorkflowId: pw.id, status: 'in_progress' },
+          data: { status: 'pending' },
+        });
+        // Set the target stage to in_progress
+        await prisma.projectStage.updateMany({
+          where: { projectWorkflowId: pw.id, stageKey: rest.currentStage as string },
+          data: { status: 'in_progress', startDate: new Date() },
+        });
+        // Ensure workflow is marked in_progress
+        await prisma.projectWorkflow.update({
+          where: { id: pw.id },
+          data: { status: 'in_progress' },
+        });
+      }
+    }
+
     // Sync workflows if workflowIds was provided in the payload
     if (Array.isArray(newWorkflowIds)) {
       const existingPws = await prisma.projectWorkflow.findMany({
@@ -453,12 +520,14 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
       // Attach newly selected workflows
       const maxOrder = existingPws.length;
       let orderIdx = maxOrder;
+      let firstNewTmplId: string | null = null;
       for (const tmplId of desiredIds) {
         if (!existingTemplateIds.has(tmplId)) {
           const tmpl = await prisma.workflowTemplate.findFirst({
             where: { id: tmplId, tenantId: tenantId as string },
           });
           if (!tmpl) continue;
+          if (!firstNewTmplId) firstNewTmplId = tmpl.id;
           orderIdx++;
           const pw = await prisma.projectWorkflow.create({
             data: { projectId: req.params.id, workflowTemplateId: tmpl.id, name: tmpl.name, order: orderIdx, status: 'not_started' },
@@ -475,9 +544,22 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
                 isRequired: (s.isRequired ?? true) as boolean,
                 status: 'pending',
                 checklist: [],
+                // Inherit default member from workflow template stage configuration
+                ...(s.defaultMemberId ? { assignedTo: s.defaultMemberId as string } : {}),
               })),
             });
           }
+        }
+      }
+
+      // Ensure project.workflowId is set for kanban grouping
+      if (!project.workflowId) {
+        const fallbackId = (newWorkflowIds as string[])[0] ?? firstNewTmplId;
+        if (fallbackId) {
+          await prisma.project.update({
+            where: { id: req.params.id },
+            data: { workflowId: fallbackId },
+          });
         }
       }
     }
@@ -516,7 +598,7 @@ projectsRouter.delete('/:id', requirePermission('projects:delete'), async (req, 
 
     await prisma.project.update({
       where: { id: req.params.id },
-      data: { status: 'cancelled' },
+      data: { status: 'cancelled', deletedAt: new Date() },
     });
 
     await createAuditLog({
@@ -528,7 +610,7 @@ projectsRouter.delete('/:id', requirePermission('projects:delete'), async (req, 
       entityName: project.name,
     });
 
-    res.json({ success: true, message: 'Project cancelled' });
+    res.json({ success: true, message: 'Project deleted' });
   } catch (err) {
     next(err);
   }

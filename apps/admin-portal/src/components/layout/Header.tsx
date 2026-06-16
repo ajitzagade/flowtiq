@@ -15,7 +15,7 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
   const { data: notifData } = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: () => get<{ items: unknown[]; unreadCount: number }>('/notifications?pageSize=5&isRead=false'),
-    refetchInterval: 60000,
+    refetchInterval: 15000,
     enabled: !!user,
   });
 

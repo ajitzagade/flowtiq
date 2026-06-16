@@ -211,6 +211,7 @@ export interface StageConfig {
   icon?: string;
   isRequired: boolean;
   requiresApproval: boolean;
+  defaultMemberId?: string;
   approverRoleIds?: string[];
   requiredDocuments?: string[];
   checklist?: ChecklistItem[];
@@ -363,6 +364,7 @@ export interface ProjectStage {
   isRequired: boolean;
   status: StageStatus;
   assignedTo?: string;
+  assignedToIds: string[];
   assignedById?: string;
   assignedAt?: string;
   startDate?: string;
@@ -373,6 +375,7 @@ export interface ProjectStage {
   updatedAt: string;
   // populated
   assignedUser?: User;
+  assignedUsers?: User[];
   history?: StageHistory[];
   documents?: Document[];
   subTasks?: StageSubTask[];
@@ -384,12 +387,15 @@ export interface StageSubTask {
   name: string;
   description?: string;
   status: StageStatus;
+  assignedTo?: string;
   order: number;
   isRequired: boolean;
   notes?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  // populated
+  assignedUser?: User;
 }
 
 export interface StageHistory {
@@ -410,6 +416,7 @@ export interface StageHistory {
 export interface UpdateStageInput {
   status?: StageStatus;
   assignedTo?: string;
+  assignedToIds?: string[];
   notes?: string;
   startDate?: string;
   completionDate?: string;

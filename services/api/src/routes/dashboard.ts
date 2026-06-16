@@ -20,7 +20,7 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         prisma.tenant.count({ where: { isActive: true } }),
         prisma.user.count({ where: { tenantId: { not: null } } }),
         prisma.user.count({ where: { tenantId: { not: null }, isActive: true } }),
-        prisma.project.count(),
+        prisma.project.count({ where: { deletedAt: null } }),
         prisma.document.count({ where: { isActive: true } }),
       ]);
 
@@ -52,7 +52,11 @@ dashboardRouter.get('/stats', async (req, res, next) => {
     // Tenant stats
     const canViewAll = permissions.includes('projects:view_all');
 
-    const projectWhere: Record<string, unknown> = { tenantId: tenantId as string };
+    const projectWhere: Record<string, unknown> = {
+      tenantId: tenantId as string,
+      deletedAt: null,            // exclude soft-deleted
+      status: { not: 'cancelled' }, // exclude cancelled
+    };
     if (!canViewAll) {
       projectWhere.OR = [
         { ownerId: userId },
@@ -146,7 +150,7 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         projectId: { in: activeProjectIds },
         workflowTemplateId: { in: workflowTemplates.map((w) => w.id) },
       },
-      select: { id: true, workflowTemplateId: true },
+      select: { id: true, workflowTemplateId: true, projectId: true },
     });
     const activeProjectWorkflowIds = activeProjectWorkflows.map((pw) => pw.id);
 
@@ -166,13 +170,16 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       _count: { id: true },
     });
 
-    // Build a map: workflowTemplateId → Set of projectWorkflowIds
+    // Build maps: workflowTemplateId → Set of projectWorkflowIds / projectIds
     const templateToWorkflowIds = new Map<string, Set<string>>();
+    const templateToProjectIds = new Map<string, Set<string>>();
     for (const pw of activeProjectWorkflows) {
       if (!templateToWorkflowIds.has(pw.workflowTemplateId)) {
         templateToWorkflowIds.set(pw.workflowTemplateId, new Set());
+        templateToProjectIds.set(pw.workflowTemplateId, new Set());
       }
       templateToWorkflowIds.get(pw.workflowTemplateId)!.add(pw.id);
+      templateToProjectIds.get(pw.workflowTemplateId)!.add(pw.projectId);
     }
 
     const workflowPipeline = workflowTemplates.map((w) => {
@@ -210,7 +217,8 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         };
       });
 
-      const totalProjects = stagesWithCounts.reduce((s, st) => s + st.count, 0);
+      // Total = unique active projects linked to this workflow template
+      const totalProjects = templateToProjectIds.get(w.id)?.size ?? 0;
       return { id: w.id, name: w.name, isDefault: w.isDefault, totalProjects, stages: stagesWithCounts };
     });
 

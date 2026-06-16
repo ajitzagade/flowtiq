@@ -263,9 +263,14 @@ function StageCard({
   const [newStatus, setNewStatus] = useState(stage.status);
   const [comment, setComment] = useState('');
   const [notes, setNotes] = useState(stage.notes || '');
+  // Multi-assignee: primary assignedTo + all assignees
   const [assignedTo, setAssignedTo] = useState(stage.assignedTo || '');
+  const [assignedToIds, setAssignedToIds] = useState<string[]>(
+    (stage as ProjectStage & { assignedToIds?: string[] }).assignedToIds || [],
+  );
   const [subTaskName, setSubTaskName] = useState('');
   const [subTaskRequired, setSubTaskRequired] = useState(false);
+  const [subTaskAssignee, setSubTaskAssignee] = useState('');
 
   const updateMutation = useMutation({
     mutationFn: (data: object) => patch(`/stages/${stage.id}`, data),
@@ -302,6 +307,10 @@ function StageCard({
   });
 
   const assignedUser = users.find((u) => u.id === stage.assignedTo);
+  const stageAssignedToIds = (stage as ProjectStage & { assignedToIds?: string[] }).assignedToIds || [];
+  const allAssignedUsers = users.filter((u) =>
+    stageAssignedToIds.includes(u.id) || u.id === stage.assignedTo,
+  );
 
   const borderColor: Record<string, string> = {
     completed: 'border-l-emerald-500',
@@ -343,10 +352,12 @@ function StageCard({
             }
           </div>
           <p className="font-semibold text-slate-900 truncate">{stage.stageName}</p>
-          {assignedUser && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <User size={11} className="text-slate-400" />
-              <span className="text-xs text-slate-500">{assignedUser.firstName} {assignedUser.lastName}</span>
+          {allAssignedUsers.length > 0 && (
+            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+              <User size={11} className="text-slate-400 flex-shrink-0" />
+              <span className="text-xs text-slate-500">
+                {allAssignedUsers.map((u) => `${u.firstName} ${u.lastName}`).join(', ')}
+              </span>
             </div>
           )}
         </div>
@@ -406,53 +417,82 @@ function StageCard({
                 </button>
               </div>
               {showSubTaskForm && (
-                <div className="flex gap-2 mb-2">
-                  <input
-                    className="form-input text-xs py-1 flex-1"
-                    value={subTaskName}
-                    onChange={(e) => setSubTaskName(e.target.value)}
-                    placeholder="Sub-task name..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && subTaskName.trim()) {
-                        addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired });
-                      }
-                    }}
-                  />
-                  <label className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
-                    <input type="checkbox" checked={subTaskRequired} onChange={(e) => setSubTaskRequired(e.target.checked)} className="rounded" />
-                    Required
-                  </label>
-                  <button
-                    onClick={() => addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired })}
-                    disabled={!subTaskName.trim() || addSubTaskMutation.isPending}
-                    className="btn-primary text-xs py-1 px-2"
-                  >Add</button>
-                  <button onClick={() => setShowSubTaskForm(false)} className="btn-ghost text-xs py-1"><X size={14} /></button>
+                <div className="bg-slate-50 rounded-lg p-3 mb-2 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      className="form-input text-xs py-1 flex-1"
+                      value={subTaskName}
+                      onChange={(e) => setSubTaskName(e.target.value)}
+                      placeholder="Sub-task name..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && subTaskName.trim()) {
+                          addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired, assignedTo: subTaskAssignee || undefined });
+                        }
+                      }}
+                    />
+                    <label className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
+                      <input type="checkbox" checked={subTaskRequired} onChange={(e) => setSubTaskRequired(e.target.checked)} className="rounded" />
+                      Required
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      className="form-select text-xs py-1 flex-1"
+                      value={subTaskAssignee}
+                      onChange={(e) => setSubTaskAssignee(e.target.value)}
+                    >
+                      <option value="">— Assign member (optional) —</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        if (subTaskName.trim()) {
+                          addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired, assignedTo: subTaskAssignee || undefined });
+                          setSubTaskAssignee('');
+                        }
+                      }}
+                      disabled={!subTaskName.trim() || addSubTaskMutation.isPending}
+                      className="btn-primary text-xs py-1 px-2"
+                    >Add</button>
+                    <button onClick={() => { setShowSubTaskForm(false); setSubTaskAssignee(''); }} className="btn-ghost text-xs py-1"><X size={14} /></button>
+                  </div>
                 </div>
               )}
               <div className="space-y-1">
-                {stage.subTasks?.map((st) => (
-                  <div key={st.id} className="flex items-center gap-2 py-1">
-                    <input
-                      type="checkbox"
-                      checked={st.status === 'completed'}
-                      onChange={() => updateSubTaskMutation.mutate({
-                        subTaskId: st.id,
-                        data: { status: st.status === 'completed' ? 'pending' : 'completed' },
-                      })}
-                      className="rounded flex-shrink-0"
-                    />
-                    <span className={cn('text-sm flex-1', st.status === 'completed' && 'line-through text-slate-400')}>
-                      {st.name}
-                    </span>
-                    {!st.isRequired && (
-                      <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">optional</span>
-                    )}
-                    {st.status === 'completed' && (
-                      <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
-                    )}
-                  </div>
-                ))}
+                {stage.subTasks?.map((st) => {
+                  const stAssignee = users.find((u) => u.id === (st as StageSubTask & { assignedTo?: string }).assignedTo);
+                  return (
+                    <div key={st.id} className="flex items-center gap-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={st.status === 'completed'}
+                        onChange={() => updateSubTaskMutation.mutate({
+                          subTaskId: st.id,
+                          data: { status: st.status === 'completed' ? 'pending' : 'completed' },
+                        })}
+                        className="rounded flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className={cn('text-sm', st.status === 'completed' && 'line-through text-slate-400')}>
+                          {st.name}
+                        </span>
+                        {stAssignee && (
+                          <span className="text-[10px] text-slate-400 ml-2 select-text">
+                            {stAssignee.firstName} {stAssignee.lastName}
+                          </span>
+                        )}
+                      </div>
+                      {!st.isRequired && (
+                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">optional</span>
+                      )}
+                      {st.status === 'completed' && (
+                        <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -531,7 +571,7 @@ function StageCard({
                 <p className="text-sm font-medium text-slate-700">Update Stage</p>
                 <button onClick={() => setShowUpdateForm(false)}><X size={16} className="text-slate-400" /></button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
                   <label className="form-label text-xs">Status</label>
                   <select
@@ -545,17 +585,48 @@ function StageCard({
                   </select>
                 </div>
                 <div>
-                  <label className="form-label text-xs">Assign To</label>
-                  <select
-                    className="form-select"
-                    value={assignedTo}
-                    onChange={(e) => setAssignedTo(e.target.value)}
-                  >
-                    <option value="">— Unassigned —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
-                    ))}
-                  </select>
+                  <label className="form-label text-xs">Assign Members</label>
+                  <div className="mt-1 max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                    {users.map((u) => {
+                      const isChecked = assignedToIds.includes(u.id) || assignedTo === u.id;
+                      return (
+                        <label
+                          key={u.id}
+                          className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50 select-none"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                const newIds = assignedToIds.filter((id) => id !== u.id);
+                                setAssignedToIds(newIds);
+                                if (assignedTo === u.id) {
+                                  setAssignedTo(newIds[0] || '');
+                                }
+                              } else {
+                                const newIds = [...assignedToIds, u.id];
+                                setAssignedToIds(newIds);
+                                if (!assignedTo) setAssignedTo(u.id);
+                              }
+                            }}
+                            className="accent-blue-600 flex-shrink-0"
+                          />
+                          <span className="text-sm text-slate-700 select-text">{u.firstName} {u.lastName}</span>
+                          <span className="text-xs text-slate-400 ml-auto select-text">{u.email}</span>
+                        </label>
+                      );
+                    })}
+                    {users.length === 0 && (
+                      <p className="text-xs text-slate-400 px-3 py-2">No active users available</p>
+                    )}
+                  </div>
+                  {assignedToIds.length > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {assignedToIds.length} member{assignedToIds.length !== 1 ? 's' : ''} assigned
+                      {assignedTo && ` • Primary: ${users.find((u) => u.id === assignedTo)?.firstName || ''} ${users.find((u) => u.id === assignedTo)?.lastName || ''}`}
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
@@ -584,6 +655,7 @@ function StageCard({
                       status: newStatus,
                       notes,
                       assignedTo: assignedTo || null,
+                      assignedToIds,
                       comment,
                     })
                   }
@@ -940,11 +1012,12 @@ export default function ProjectDetailPage() {
   const { data: project, isLoading } = useQuery<ProjectDetail>({
     queryKey: ['project', id],
     queryFn: () => get<ProjectDetail>(`/projects/${id}`),
+    refetchInterval: 30000,
   });
 
   const { data: usersData } = useQuery<{ items: Array<{ id: string; firstName: string; lastName: string; email: string }> }>({
-    queryKey: ['users', 'all'],
-    queryFn: () => get('/users', { pageSize: '200' }),
+    queryKey: ['users', 'active'],
+    queryFn: () => get('/users', { pageSize: 200, isActive: 'true' }),
   });
 
   const users = usersData?.items || [];

@@ -16,7 +16,7 @@ function tenantScope(req: AuthRequest) {
 }
 
 // GET /api/users
-usersRouter.get('/', requirePermission('users:view'), async (req, res, next) => {
+usersRouter.get('/', requirePermission('users:read'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
@@ -31,8 +31,14 @@ usersRouter.get('/', requirePermission('users:view'), async (req, res, next) => 
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (isActive !== undefined) {
-      where.isActive = isActive === 'true';
+    // Default to active users only; pass isActive=false or isActive=all to override
+    if (isActive === 'false') {
+      where.isActive = false;
+    } else if (isActive === 'all') {
+      // no filter — show all
+    } else {
+      // default: active only
+      where.isActive = true;
     }
 
     const [users, total] = await Promise.all([
@@ -72,7 +78,7 @@ usersRouter.get('/', requirePermission('users:view'), async (req, res, next) => 
 });
 
 // GET /api/users/:id
-usersRouter.get('/:id', requirePermission('users:view'), async (req, res, next) => {
+usersRouter.get('/:id', requirePermission('users:read'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
@@ -187,7 +193,7 @@ usersRouter.post('/', requirePermission('users:create'), async (req, res, next) 
 });
 
 // PATCH /api/users/:id
-usersRouter.patch('/:id', requirePermission('users:edit'), async (req, res, next) => {
+usersRouter.patch('/:id', requirePermission('users:update'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
@@ -234,10 +240,13 @@ usersRouter.patch('/:id', requirePermission('users:edit'), async (req, res, next
 });
 
 // DELETE /api/users/:id
-usersRouter.delete('/:id', requirePermission('users:edit'), async (req, res, next) => {
+// ?hard=true → permanently delete (only allowed for already-inactive users with no owned data)
+// default  → soft delete (set isActive: false)
+usersRouter.delete('/:id', requirePermission('users:update'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const tenantId = tenantScope(authReq);
+    const hardDelete = req.query.hard === 'true';
 
     const user = await prisma.user.findFirst({ where: { id: req.params.id, tenantId } });
     if (!user) {
@@ -245,11 +254,62 @@ usersRouter.delete('/:id', requirePermission('users:edit'), async (req, res, nex
       return;
     }
 
-    // Soft delete
-    await prisma.user.update({
-      where: { id: req.params.id },
-      data: { isActive: false },
-    });
+    if (!hardDelete) {
+      // Soft delete
+      await prisma.user.update({
+        where: { id: req.params.id },
+        data: { isActive: false },
+      });
+
+      await createAuditLog({
+        req: authReq,
+        action: 'DELETED',
+        module: 'users',
+        entityId: user.id,
+        entityType: 'user',
+        entityName: `${user.firstName} ${user.lastName}`,
+      });
+
+      res.json({ success: true, message: 'User deactivated' });
+      return;
+    }
+
+    // ── Hard delete ────────────────────────────────────────────────────────────
+    // Must be already deactivated before permanent removal
+    if (user.isActive) {
+      res.status(400).json({
+        success: false,
+        error: 'User must be deactivated before permanent deletion. Deactivate first, then permanently delete.',
+      });
+      return;
+    }
+
+    // Check for blocking FK references that cannot be safely deleted
+    const [ownedProjects, ownedFollowUps, createdFollowUps, stageHistoryCount, followUpHistoryCount] = await Promise.all([
+      prisma.project.count({ where: { ownerId: req.params.id } }),
+      prisma.followUp.count({ where: { ownerId: req.params.id } }),
+      prisma.followUp.count({ where: { createdById: req.params.id } }),
+      prisma.stageHistory.count({ where: { changedById: req.params.id } }),
+      prisma.followUpHistory.count({ where: { createdById: req.params.id } }),
+    ]);
+
+    const blockers: string[] = [];
+    if (ownedProjects > 0) blockers.push(`owns ${ownedProjects} project${ownedProjects !== 1 ? 's' : ''}`);
+    if (ownedFollowUps > 0) blockers.push(`is assigned to ${ownedFollowUps} follow-up${ownedFollowUps !== 1 ? 's' : ''}`);
+    if (createdFollowUps > 0) blockers.push(`created ${createdFollowUps} follow-up${createdFollowUps !== 1 ? 's' : ''}`);
+    if (stageHistoryCount > 0) blockers.push(`has ${stageHistoryCount} stage history record${stageHistoryCount !== 1 ? 's' : ''}`);
+    if (followUpHistoryCount > 0) blockers.push(`has ${followUpHistoryCount} follow-up history record${followUpHistoryCount !== 1 ? 's' : ''}`);
+
+    if (blockers.length > 0) {
+      res.status(400).json({
+        success: false,
+        error: `Cannot permanently delete this user: they ${blockers.join(', ')}. Reassign or archive their data before deleting.`,
+      });
+      return;
+    }
+
+    // All clear — hard delete (UserRole, RefreshToken, Notification cascade automatically)
+    await prisma.user.delete({ where: { id: req.params.id } });
 
     await createAuditLog({
       req: authReq,
@@ -258,9 +318,10 @@ usersRouter.delete('/:id', requirePermission('users:edit'), async (req, res, nex
       entityId: user.id,
       entityType: 'user',
       entityName: `${user.firstName} ${user.lastName}`,
+      metadata: { permanent: true },
     });
 
-    res.json({ success: true, message: 'User deactivated' });
+    res.json({ success: true, message: 'User permanently deleted' });
   } catch (err) {
     next(err);
   }

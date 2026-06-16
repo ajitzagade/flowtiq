@@ -11,22 +11,23 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { useSidebarStore } from '@/store/sidebar';
 
-const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban },
-  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2 },
-  { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock },
-  { key: 'documents', label: 'Documents', href: '/documents', icon: FileText },
-  { key: 'users', label: 'Users', href: '/users', icon: Users },
-  { key: 'roles', label: 'Roles & Permissions', href: '/roles', icon: Shield },
-  { key: 'workflows', label: 'Workflows', href: '/workflows', icon: GitBranch },
-  { key: 'audit-logs', label: 'Audit Logs', href: '/audit-logs', icon: ClipboardList },
-  { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell },
-  { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+// permission code required to see a nav item (null = always visible)
+const NAV_ITEMS: Array<{ key: string; label: string; href: string; icon: React.ElementType; requiredPermission: string | null }> = [
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, requiredPermission: null },
+  { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban, requiredPermission: 'projects:read' },
+  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2, requiredPermission: 'roles:manage' },
+  { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock, requiredPermission: 'followups:create' },
+  { key: 'documents', label: 'Documents', href: '/documents', icon: FileText, requiredPermission: 'documents:download' },
+  { key: 'users', label: 'Users', href: '/users', icon: Users, requiredPermission: 'users:read' },
+  { key: 'roles', label: 'Roles & Permissions', href: '/roles', icon: Shield, requiredPermission: 'roles:manage' },
+  { key: 'workflows', label: 'Workflows', href: '/workflows', icon: GitBranch, requiredPermission: 'roles:manage' },
+  { key: 'audit-logs', label: 'Audit Logs', href: '/audit-logs', icon: ClipboardList, requiredPermission: 'roles:manage' },
+  { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell, requiredPermission: null },
+  { key: 'settings', label: 'Settings', href: '/settings', icon: Settings, requiredPermission: null },
 ];
 
-const SUPER_ADMIN_ITEMS = [
-  { key: 'tenants', label: 'Tenants', href: '/tenants', icon: Building2 },
+const SUPER_ADMIN_ITEMS: Array<{ key: string; label: string; href: string; icon: React.ElementType; requiredPermission: string | null }> = [
+  { key: 'tenants', label: 'Tenants', href: '/tenants', icon: Building2, requiredPermission: null },
 ];
 
 export function Sidebar() {
@@ -34,9 +35,17 @@ export function Sidebar() {
   const { user, tenant, logout } = useAuthStore();
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebarStore();
 
-  const navItems = user?.isSuperAdmin
+  const userPermissions = (user?.permissions as string[] | undefined) ?? [];
+
+  const allItems = user?.isSuperAdmin
     ? [...SUPER_ADMIN_ITEMS, ...NAV_ITEMS]
     : NAV_ITEMS;
+
+  const navItems = user?.isSuperAdmin
+    ? allItems
+    : allItems.filter((item) =>
+        item.requiredPermission === null || userPermissions.includes(item.requiredPermission),
+      );
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
