@@ -99,7 +99,7 @@ async function createNotification(params: {
       type: params.type,
       title: params.title,
       message: params.message,
-      data: params.data,
+      data: params.data as object | undefined,
     },
   });
 }
