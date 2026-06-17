@@ -24,7 +24,7 @@ test.describe('Users page layout', () => {
   });
 
   test('"New User" button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /new user/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /new user/i }).first()).toBeVisible();
   });
 
   test('search input is present', async ({ page }) => {
@@ -82,10 +82,14 @@ test.describe('Users search', () => {
 
   test('searching by name filters rows', async ({ page }) => {
     const search = page.locator('input[placeholder*="name or email" i]');
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/users') && resp.status() === 200,
+      { timeout: 15000 }
+    );
     await search.fill('xxxxxx_does_not_exist');
-    await page.waitForTimeout(500);
+    await responsePromise;
+    await page.waitForTimeout(300);
     const rowCount = await page.locator('table tbody tr').count();
-    // 0 rows or "no users found" empty state
     const emptyState = page.getByText(/no users found/i);
     const hasEmpty = await emptyState.isVisible().catch(() => false);
     expect(rowCount === 0 || hasEmpty).toBeTruthy();
@@ -126,7 +130,7 @@ test.describe('New User modal', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/users');
     await page.locator('table tbody tr').first().waitFor({ timeout: 10000 });
-    await page.getByRole('button', { name: /new user/i }).click();
+    await page.getByRole('button', { name: /new user/i }).first().click();
   });
 
   test('modal opens with title "New User"', async ({ page }) => {
@@ -135,12 +139,13 @@ test.describe('New User modal', () => {
   });
 
   test('modal has First Name, Last Name, Email, Password, Phone, Roles fields', async ({ page }) => {
-    await expect(page.getByText(/first name/i)).toBeVisible();
-    await expect(page.getByText(/last name/i)).toBeVisible();
-    await expect(page.getByText(/email/i).first()).toBeVisible();
-    await expect(page.getByText(/password/i)).toBeVisible();
-    await expect(page.getByText(/phone/i)).toBeVisible();
-    await expect(page.getByText(/roles/i)).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText(/first name/i)).toBeVisible();
+    await expect(dialog.getByText(/last name/i)).toBeVisible();
+    await expect(dialog.getByText(/email/i).first()).toBeVisible();
+    await expect(dialog.getByText(/password/i)).toBeVisible();
+    await expect(dialog.getByText(/phone/i)).toBeVisible();
+    await expect(dialog.getByText(/roles/i)).toBeVisible();
   });
 
   test('modal has Cancel and "Create User" buttons', async ({ page }) => {
@@ -182,18 +187,22 @@ test.describe('New User modal', () => {
 
   test('creates user successfully → toast + modal closes', async ({ page }) => {
     // Fill all required fields
-    await page.getByRole('dialog').locator('input').filter({ has: page.locator('[class*="form-input"]') }).nth(0).fill(NEW_USER_FIRST);
+    await page.getByRole('dialog').locator('input').nth(0).fill(NEW_USER_FIRST);
     await page.getByRole('dialog').locator('input').nth(1).fill(NEW_USER_LAST);
     await page.getByRole('dialog').locator('input[type="email"]').fill(NEW_USER_EMAIL);
     await page.getByRole('dialog').locator('input[type="password"]').fill('Test@12345');
 
-    // Select a role (click first available role pill)
-    const rolePills = page.getByRole('dialog').getByRole('button').filter({ hasNotText: /cancel|create/i });
-    if (await rolePills.count() > 0) {
-      await rolePills.first().click();
-    }
+    // Select a known real role pill (avoid E2E test roles which may overflow modal)
+    const rolePill = page.getByRole('dialog').locator('button[class*="rounded-full"]')
+      .filter({ hasText: /File Executive|Follow.up Executive|Project Manager|Tenant Admin/i }).first();
+    await rolePill.waitFor({ timeout: 10000 });
+    await rolePill.scrollIntoViewIfNeeded();
+    await rolePill.click();
 
-    await page.getByRole('button', { name: /create user/i }).click();
+    // Scroll Create User button into view (modal may overflow with many role pills)
+    const createBtn = page.getByRole('dialog').locator('button[type="submit"]');
+    await createBtn.scrollIntoViewIfNeeded();
+    await createBtn.click();
     await expect(page.getByText(/user created/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
   });
@@ -229,11 +238,10 @@ test.describe('Edit User modal', () => {
 test.describe('Deactivate user', () => {
   test('active user has "Deactivate" button (title="Deactivate")', async ({ page }) => {
     await page.goto('/users');
+    // Default view shows only active users — first row is always an active user
     const firstRow = page.locator('table tbody tr').first();
     await firstRow.waitFor({ timeout: 10000 });
-    // Find first active user row
-    const activeRow = page.locator('table tbody tr').filter({ hasText: /\bactive\b/i }).first();
-    await expect(activeRow.locator('button[title="Deactivate"]')).toBeVisible({ timeout: 5000 });
+    await expect(firstRow.locator('button[title="Deactivate"]')).toBeVisible({ timeout: 5000 });
   });
 
   test('"Show inactive" reveals inactive users with Activate button', async ({ page }) => {

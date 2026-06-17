@@ -162,15 +162,14 @@ test.describe('Dashboard workflow pipeline', () => {
   });
 
   test('workflow card in pipeline shows stage counts', async ({ page }) => {
-    // Pipeline starts collapsed — expand it first
+    // Pipeline section is expanded by default — just verify it shows workflow data
     const pipelineHeader = page.locator('.card-header').filter({ hasText: /workflow pipeline/i });
     await pipelineHeader.waitFor({ timeout: 10000 });
-    // If collapsed, expand it
-    const isCollapsed = await page.locator('.card-header').filter({ hasText: /workflow pipeline/i })
-      .locator('..').locator('[class*="rotate"]').count();
-    if (isCollapsed > 0) await pipelineHeader.click();
-    // At least one workflow header button with "project" text should be visible
-    await expect(page.locator('[class*="rounded-xl"]').locator('button').filter({ hasText: /project/i }).first()).toBeVisible({ timeout: 10000 });
+    // The pipeline section renders workflow cards with "projects" text in the project count pill
+    await expect(async () => {
+      const text = await page.locator('.card').filter({ hasText: /workflow pipeline/i }).textContent();
+      expect(text).toMatch(/project/i);
+    }).toPass({ timeout: 10000 });
   });
 
   test('clicking a stage with projects navigates to kanban filtered view', async ({ page }) => {

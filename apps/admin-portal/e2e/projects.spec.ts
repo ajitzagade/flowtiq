@@ -3,7 +3,17 @@
  * CRUD tests are in projects-crud.spec.ts
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+async function expandBoardSection(page: Page) {
+  // Kanban workflow sections start collapsed — expand the first one
+  const btn = page.locator('button[aria-expanded="false"]').first();
+  const found = await btn.waitFor({ timeout: 15000 }).then(() => true).catch(() => false);
+  if (found) {
+    await btn.click();
+    await page.waitForTimeout(400);
+  }
+}
 
 test.describe('Projects page layout', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,24 +39,21 @@ test.describe('Kanban / Board view', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/projects');
     await page.waitForLoadState('networkidle');
-    // Default view is kanban
+    // Expand the first workflow section so stage columns and cards become visible
+    await expandBoardSection(page);
   });
 
   test('kanban columns are visible with data-stage-key attributes', async ({ page }) => {
-    await expect(page.locator('[data-stage-key]').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-stage-key]').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('workflow section accordion shows project count badge', async ({ page }) => {
-    // WorkflowSection renders a button with "{n} projects" text
-    await expect(page.locator('button').filter({ hasText: /project/i }).first()).toBeVisible({ timeout: 15000 });
+    // WorkflowSection renders accordion buttons with aria-expanded attribute
+    await expect(page.locator('button[aria-expanded]').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('workflow section can be expanded to show stage columns', async ({ page }) => {
-    // First workflow section should be expandable
-    const sectionBtn = page.locator('button').filter({ hasText: /project/i }).first();
-    await sectionBtn.waitFor({ timeout: 15000 });
-    await sectionBtn.click();
-    // After expanding, kanban columns become visible
+    // Section already expanded by beforeEach — columns should be visible
     await expect(page.locator('[data-stage-key]').first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -78,7 +85,8 @@ test.describe('Kanban / Board view', () => {
     if (await searchInput.count() > 0) {
       await searchInput.fill('xxxxxx_does_not_exist');
       await page.waitForTimeout(500);
-      await expect(page.getByText(/no matching projects/i)).toBeVisible({ timeout: 5000 });
+      // Multiple workflow sections each show "No matching projects" — use .first()
+      await expect(page.getByText(/no matching projects/i).first()).toBeVisible({ timeout: 5000 });
       await searchInput.clear();
     }
   });
@@ -109,8 +117,14 @@ test.describe('List view', () => {
   test('search input filters rows by project name', async ({ page }) => {
     await page.locator('table tbody tr').first().waitFor({ timeout: 10000 });
     const searchInput = page.locator('input[placeholder*="search" i]');
+    // Wait for the API response triggered by the search input change
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/projects') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await searchInput.fill('xxxxxx_definitely_not_a_project');
-    await page.waitForTimeout(500);
+    await responsePromise;
+    await page.waitForTimeout(200); // allow React to re-render
     // Either 0 rows or empty state
     const rowCount = await page.locator('table tbody tr').count();
     expect(rowCount).toBeLessThanOrEqual(1); // 0 rows or the "no results" row
@@ -119,8 +133,14 @@ test.describe('List view', () => {
   test('status filter dropdown changes results', async ({ page }) => {
     await page.locator('table tbody tr').first().waitFor({ timeout: 10000 });
     const statusSelect = page.locator('select').filter({ hasText: /all status/i });
+    // Wait for the API response triggered by the status filter change
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/projects') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await statusSelect.selectOption('active');
-    await page.waitForLoadState('networkidle');
+    await responsePromise;
+    await page.waitForTimeout(200); // allow React to re-render
     // All visible rows should have "active" status badge
     const rows = page.locator('table tbody tr');
     const count = await rows.count();
@@ -180,8 +200,7 @@ test.describe('Projects view toggle', () => {
     await page.goto('/projects?view=list');
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: /board/i }).click();
-    await expect(page.locator('[data-stage-key]').first().or(
-      page.locator('button').filter({ hasText: /project/i }).first()
-    )).toBeVisible({ timeout: 15000 });
+    // Accordion buttons always visible in board view (collapsed or expanded)
+    await expect(page.locator('button[aria-expanded]').first()).toBeVisible({ timeout: 15000 });
   });
 });

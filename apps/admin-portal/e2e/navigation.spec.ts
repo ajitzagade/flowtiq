@@ -18,8 +18,8 @@ test.describe('Sidebar navigation', () => {
 
   test('sidebar shows tenant/org name', async ({ page }) => {
     // Either "Vastudeep Associates" or "Flowtiq" fallback
-    const sidebar = page.getByRole('navigation', { name: /main navigation/i });
-    await expect(sidebar.locator('p.font-bold').first()).toBeVisible({ timeout: 5000 });
+    // p.font-bold is in the <aside> logo section, above the <nav> element
+    await expect(page.locator('aside p.font-bold').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('sidebar shows logged-in user full name', async ({ page }) => {
@@ -52,7 +52,8 @@ test.describe('Sidebar navigation', () => {
   });
 
   test('Follow-ups nav item is present', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /follow.ups/i })).toBeVisible();
+    // Scope to nav to avoid strict-mode conflict with dashboard "Pending Follow-ups" link
+    await expect(page.getByRole('navigation', { name: /main navigation/i }).getByRole('link', { name: /follow.ups/i })).toBeVisible();
   });
 
   test('Documents nav item is present', async ({ page }) => {
@@ -64,7 +65,8 @@ test.describe('Sidebar navigation', () => {
   });
 
   test('Notifications nav item is present', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /^notifications$/i })).toBeVisible();
+    // Scope to nav to avoid strict-mode conflict with header bell link
+    await expect(page.getByRole('navigation', { name: /main navigation/i }).getByRole('link', { name: /^notifications$/i })).toBeVisible();
   });
 
   test('Settings nav item is present', async ({ page }) => {
@@ -168,7 +170,8 @@ test.describe('Sidebar navigation links', () => {
   });
 
   test('clicking "Follow-ups" navigates to /follow-ups', async ({ page }) => {
-    await page.getByRole('link', { name: /follow.ups/i }).click();
+    // Scope to nav to avoid strict-mode conflict with dashboard "Pending Follow-ups" link
+    await page.getByRole('navigation', { name: /main navigation/i }).getByRole('link', { name: /follow.ups/i }).click();
     await expect(page).toHaveURL(/\/follow-ups/);
   });
 
@@ -183,7 +186,8 @@ test.describe('Sidebar navigation links', () => {
   });
 
   test('clicking "Notifications" navigates to /notifications', async ({ page }) => {
-    await page.getByRole('link', { name: /^notifications$/i }).click();
+    // Scope to nav to avoid strict-mode conflict with header bell link
+    await page.getByRole('navigation', { name: /main navigation/i }).getByRole('link', { name: /^notifications$/i }).click();
     await expect(page).toHaveURL(/\/notifications/);
   });
 
@@ -200,11 +204,13 @@ test.describe('Header navigation', () => {
   });
 
   test('notification bell link is visible in header', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /notifications/i })).toBeVisible({ timeout: 10000 });
+    // Scope to header to avoid strict-mode conflict with sidebar Notifications link
+    await expect(page.locator('header').getByRole('link', { name: /notifications/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('notification bell shows unread count badge', async ({ page }) => {
-    const bellLink = page.getByRole('link', { name: /notifications/i });
+    // Scope to header to avoid strict-mode conflict with sidebar Notifications link
+    const bellLink = page.locator('header').getByRole('link', { name: /notifications/i });
     await expect(bellLink).toBeVisible({ timeout: 10000 });
     // Badge appears when unreadCount > 0 — badge has rounded-full class
     // Just verify bell link is present and functional
@@ -214,7 +220,8 @@ test.describe('Header navigation', () => {
   });
 
   test('clicking notification bell navigates to /notifications', async ({ page }) => {
-    const bellLink = page.getByRole('link', { name: /notifications/i });
+    // Scope to header to avoid strict-mode conflict with sidebar Notifications link
+    const bellLink = page.locator('header').getByRole('link', { name: /notifications/i });
     await bellLink.click();
     await expect(page).toHaveURL(/\/notifications/);
   });

@@ -15,18 +15,32 @@ followupsRouter.get('/', requireAnyPermission(['follow_ups:create', 'follow_ups:
     const { tenantId, userId, permissions, isSuperAdmin } = authReq.user;
     const {
       page = '1', pageSize = '20', status, ownerId, projectId,
-      overdue, sortBy = 'nextFollowUp', sortOrder = 'asc',
+      overdue, sortBy = 'nextFollowUp', sortOrder = 'asc', search,
     } = req.query as Record<string, string>;
 
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     const canViewAll = isSuperAdmin || permissions.includes('follow_ups:create');
 
-    const where: Record<string, unknown> = { tenantId: tenantId as string };
+    const andConditions: Record<string, unknown>[] = [];
 
     if (!canViewAll) {
-      where.OR = [{ ownerId: userId }, { createdById: userId }];
+      andConditions.push({ OR: [{ ownerId: userId }, { createdById: userId }] });
     }
 
+    if (search) {
+      andConditions.push({
+        OR: [
+          { project: { name: { contains: search, mode: 'insensitive' } } },
+          { project: { clientName: { contains: search, mode: 'insensitive' } } },
+          { notes: { contains: search, mode: 'insensitive' } },
+          { owner: { firstName: { contains: search, mode: 'insensitive' } } },
+          { owner: { lastName: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    const where: Record<string, unknown> = { tenantId: tenantId as string };
+    if (andConditions.length > 0) where.AND = andConditions;
     if (status) where.status = status;
     if (ownerId) where.ownerId = ownerId;
     if (projectId) where.projectId = projectId;

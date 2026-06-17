@@ -31,14 +31,14 @@ test.describe('Create follow-up', () => {
   });
 
   test('"New Follow-up" button opens create modal', async ({ page }) => {
-    await page.getByRole('button', { name: /new follow.up/i }).click();
+    await page.getByRole('button', { name: /new follow.up/i }).first().click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible();
     await expect(modal.getByText(/new follow.up/i)).toBeVisible();
   });
 
   test('create modal has project, owner, and date fields', async ({ page }) => {
-    await page.getByRole('button', { name: /new follow.up/i }).click();
+    await page.getByRole('button', { name: /new follow.up/i }).first().click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible();
 
@@ -51,7 +51,7 @@ test.describe('Create follow-up', () => {
   });
 
   test('submitting without required fields shows validation errors', async ({ page }) => {
-    await page.getByRole('button', { name: /new follow.up/i }).click();
+    await page.getByRole('button', { name: /new follow.up/i }).first().click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible();
 
@@ -60,7 +60,7 @@ test.describe('Create follow-up', () => {
   });
 
   test('creates a follow-up and shows success toast', async ({ page }) => {
-    await page.getByRole('button', { name: /new follow.up/i }).click();
+    await page.getByRole('button', { name: /new follow.up/i }).first().click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible();
 
@@ -107,7 +107,7 @@ test.describe('Complete follow-up', () => {
 
     if (count === 0) {
       // Create a follow-up to complete
-      await page.getByRole('button', { name: /new follow.up/i }).click();
+      await page.getByRole('button', { name: /new follow.up/i }).first().click();
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
@@ -168,7 +168,7 @@ test.describe('Update follow-up', () => {
 
   test('changing status to cancelled saves and updates the row', async ({ page }) => {
     // Create a fresh follow-up so we can safely cancel it without affecting real data
-    await page.getByRole('button', { name: /new follow.up/i }).click();
+    await page.getByRole('button', { name: /new follow.up/i }).first().click();
     const createModal = page.getByRole('dialog');
     await expect(createModal).toBeVisible();
 

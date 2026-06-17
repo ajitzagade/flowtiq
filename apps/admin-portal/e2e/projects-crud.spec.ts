@@ -47,18 +47,15 @@ test.describe('Create project', () => {
     await modal.locator("input[placeholder*=\"Sunrise\"], input[placeholder*=\"project\"]").first().fill(NEW_PROJECT_NAME);
     await modal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill(CLIENT_NAME);
 
-    // Select a project owner — wait for users to load
-    const ownerSelect = modal.getByLabel(/project owner/i);
+    // Select a project owner — wait for users to load (Owner is second select, after Priority)
+    const ownerSelect = modal.locator('select').nth(1);
     await ownerSelect.waitFor({ timeout: 10000 });
     // Choose first real option (not the placeholder "Select owner")
-    const options = await ownerSelect.locator('option').all();
-    const firstRealOption = options.find(async (o) => {
-      const val = await o.getAttribute('value');
-      return val && val.length > 0;
-    });
-    if (firstRealOption) {
-      const val = await firstRealOption.getAttribute('value');
-      await ownerSelect.selectOption(val!);
+    const options = ownerSelect.locator('option:not([value=""])');
+    await options.first().waitFor({ state: 'attached', timeout: 10000 });
+    const firstVal = await options.first().getAttribute('value');
+    if (firstVal) {
+      await ownerSelect.selectOption(firstVal);
     }
 
     await page.getByRole('button', { name: /create project/i }).click();
@@ -84,7 +81,7 @@ test.describe('Create project', () => {
     await modal.locator("input[placeholder*=\"Sunrise\"], input[placeholder*=\"project\"]").first().fill(runName);
     await modal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill('List View Client');
 
-    const ownerSelect = modal.getByLabel(/project owner/i);
+    const ownerSelect = modal.locator('select').nth(1);
     await ownerSelect.waitFor({ timeout: 10000 });
     const options = ownerSelect.locator('option:not([value=""])');
     await options.first().waitFor({ state: 'attached', timeout: 10000 });
@@ -95,7 +92,8 @@ test.describe('Create project', () => {
     await expect(page.getByText('Project created')).toBeVisible({ timeout: 10000 });
 
     // Newly created project should appear in the table
-    await expect(page.getByRole('cell', { name: runName })).toBeVisible({ timeout: 15000 });
+    // Use .first() to avoid strict mode when actions cell also contains project name in aria-labels
+    await expect(page.getByRole('cell', { name: runName }).first()).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -106,8 +104,8 @@ test.describe('Edit project', () => {
     await page.getByRole('button', { name: /list/i }).click();
     await page.waitForLoadState('networkidle');
 
-    // Find the first project's edit button (Edit icon button per row)
-    const editButtons = page.getByRole('button', { name: /edit/i });
+    // Find the first project's edit button (use title="Edit" to avoid matching View/Delete buttons)
+    const editButtons = page.locator('button[title="Edit"]');
     await editButtons.first().waitFor({ timeout: 10000 });
     await editButtons.first().click();
 
@@ -132,7 +130,7 @@ test.describe('Edit project', () => {
     const editableName = `E2E Edit Source ${Date.now()}`;
     await createModal.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first().fill(editableName);
     await createModal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill('Edit Client');
-    const ownerSelect = createModal.getByLabel(/project owner/i);
+    const ownerSelect = createModal.locator('select').nth(1);
     await ownerSelect.waitFor({ timeout: 10000 });
     const firstOpt = ownerSelect.locator('option:not([value=""])').first();
     await firstOpt.waitFor({ state: 'attached', timeout: 10000 });
@@ -140,10 +138,11 @@ test.describe('Edit project', () => {
     await page.getByRole('button', { name: /create project/i }).click();
     await expect(page.getByText('Project created')).toBeVisible({ timeout: 10000 });
 
-    // Locate the row with our project and click its edit button
+    // Locate the row with our project and click its edit button (use title="Edit" to avoid
+    // matching View/Delete buttons whose aria-labels also contain the project name)
     const row = page.getByRole('row', { name: new RegExp(editableName, 'i') });
     await row.waitFor({ timeout: 10000 });
-    await row.getByRole('button', { name: /edit/i }).click();
+    await row.locator('button[title="Edit"]').click();
 
     const editModal = page.getByRole('dialog');
     await expect(editModal).toBeVisible();
@@ -153,6 +152,6 @@ test.describe('Edit project', () => {
     await page.getByRole('button', { name: /save changes/i }).click();
 
     await expect(page.getByText('Project updated')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('cell', { name: UPDATED_PROJECT_NAME })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: UPDATED_PROJECT_NAME }).first()).toBeVisible({ timeout: 10000 });
   });
 });

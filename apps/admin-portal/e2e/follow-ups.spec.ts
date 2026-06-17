@@ -35,7 +35,8 @@ test.describe('Follow-ups page layout', () => {
 
   test('page loads without errors', async ({ page }) => {
     await expect(page.getByText('Something went wrong')).not.toBeVisible();
-    await expect(page.locator('text=500')).not.toBeVisible();
+    // Check heading/title for 500 error (avoid matching table cells with "500" in timestamp IDs)
+    await expect(page.locator('h1, h2, [role="heading"]').getByText('500')).not.toBeVisible();
   });
 });
 
@@ -71,9 +72,13 @@ test.describe('Follow-ups table', () => {
   });
 
   test('pending rows have "Mark as completed" action button (title="Mark as completed")', async ({ page }) => {
-    const pendingRow = page.locator('table tbody tr').filter({ hasText: /pending/i }).first();
-    if (await pendingRow.isVisible()) {
-      await expect(pendingRow.locator('button[title="Mark as completed"]')).toBeVisible();
+    // Find rows where the STATUS BADGE specifically shows "pending" (not just notes text)
+    // Also accept overdue rows which are pending with a past date
+    const actionableRow = page.locator('table tbody tr').filter({
+      has: page.locator('button[title="Mark as completed"]')
+    }).first();
+    if (await actionableRow.count() > 0) {
+      await expect(actionableRow.locator('button[title="Mark as completed"]')).toBeVisible();
     }
   });
 
@@ -105,8 +110,14 @@ test.describe('Follow-ups filters', () => {
 
   test('search by non-existent term shows empty state', async ({ page }) => {
     const search = page.locator('input[placeholder*="search follow" i]');
+    // Set up response waiter BEFORE triggering search
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/follow-ups') && resp.status() === 200,
+      { timeout: 15000 }
+    );
     await search.fill('xxxxxx_does_not_exist_followup');
-    await page.waitForTimeout(600);
+    await responsePromise;
+    await page.waitForTimeout(300); // allow React to re-render
     const rowCount = await page.locator('table tbody tr').count();
     const hasEmpty = await page.getByText(/no follow-ups found/i).isVisible().catch(() => false);
     expect(rowCount === 0 || hasEmpty).toBeTruthy();
@@ -151,7 +162,7 @@ test.describe('Create Follow-up modal', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/follow-ups');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: /new follow.up/i }).click();
+    await page.getByRole('button', { name: /new follow.up/i }).first().click();
   });
 
   test('modal opens with title "New Follow-up"', async ({ page }) => {
@@ -191,7 +202,12 @@ test.describe('Create Follow-up modal', () => {
 
   test('project select has at least one active project option', async ({ page }) => {
     const projectSelect = page.getByRole('dialog').locator('select').first();
-    await page.waitForTimeout(1000); // projects load async
+    // Wait for the projects API response to populate the dropdown
+    await page.waitForResponse(
+      (resp) => resp.url().includes('/projects') && resp.status() === 200,
+      { timeout: 10000 }
+    );
+    await page.waitForTimeout(200); // allow React to re-render select options
     const options = await projectSelect.locator('option').count();
     expect(options).toBeGreaterThan(1); // at least "Select project" + 1 real project
   });

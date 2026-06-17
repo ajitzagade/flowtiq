@@ -270,7 +270,8 @@ test.describe('Reports KPI cards', () => {
   });
 
   test('8 KPI cards are visible', async ({ page }) => {
-    // Each KPI card has a text-2xl numeric value
+    // Wait for KPI cards to render (they load after API data arrives)
+    await page.locator('.card p.text-2xl').first().waitFor({ timeout: 15000 }).catch(() => {});
     const kpiValues = page.locator('.card p.text-2xl');
     const count = await kpiValues.count();
     expect(count).toBeGreaterThanOrEqual(4); // at minimum 4 are always shown
@@ -545,7 +546,7 @@ test.describe('Reports page navigation', () => {
   test('reports page has aria-current="page" on sidebar link when active', async ({ page }) => {
     await page.goto('/reports');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('navigation', { name: /main navigation/i }).waitFor({ timeout: 10000 });
+    await page.locator('nav[aria-label="Main navigation"]').waitFor({ timeout: 10000 });
     const reportsLink = page.getByRole('link', { name: /^reports$/i });
     if (await reportsLink.count() > 0) {
       await expect(reportsLink).toHaveAttribute('aria-current', 'page');
