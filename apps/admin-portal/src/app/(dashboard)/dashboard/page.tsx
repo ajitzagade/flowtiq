@@ -344,8 +344,12 @@ export default function DashboardPage() {
               {stats?.recentProjects?.map((project, idx) => (
                 <Link key={project.id} href={`/projects/${project.id}`}>
                   <div
-                    className="px-6 py-4 transition-colors cursor-pointer hover:bg-indigo-50/50"
-                    style={idx % 2 === 1 ? { backgroundColor: '#f5f3ff' } : { backgroundColor: '#ffffff' }}
+                    className={cn(
+                      'px-6 py-4 transition-colors cursor-pointer',
+                      idx % 2 === 1
+                        ? 'bg-violet-50 hover:bg-violet-100'
+                        : 'bg-white hover:bg-indigo-50',
+                    )}
                   >
                     <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div className="flex-1 min-w-0">
