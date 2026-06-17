@@ -75,15 +75,19 @@ test.describe('Flow: Create project → appears in kanban', () => {
     await page.getByRole('button', { name: /new project/i }).click();
     await page.getByRole('dialog').waitFor({ timeout: 5000 });
 
-    // Fill project name (required)
-    const nameInput = page.getByRole('dialog').locator('input').first();
-    await nameInput.fill(FLOW_PROJECT_NAME);
+    const dialog = page.getByRole('dialog');
 
-    // Fill client name if required
-    const clientInput = page.getByRole('dialog').locator('input').nth(1);
-    if (await clientInput.isVisible()) {
-      await clientInput.fill('E2E Client');
-    }
+    // Fill project name (required) — placeholder: "e.g. Sunrise Residency - Building Plan"
+    await dialog.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first().fill(FLOW_PROJECT_NAME);
+
+    // Fill client name (required) — placeholder: "Client or company name"
+    await dialog.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill('E2E Client');
+
+    // Select project owner (required) — owner select is nth(1) after Priority
+    const ownerSelect = dialog.locator('select').nth(1);
+    const firstOwnerOpt = ownerSelect.locator('option:not([value=""])').first();
+    await firstOwnerOpt.waitFor({ state: 'attached', timeout: 10000 });
+    await ownerSelect.selectOption(await firstOwnerOpt.getAttribute('value') ?? '');
 
     // Submit
     await page.getByRole('button', { name: /create project/i }).click();

@@ -7,6 +7,13 @@
  *   3. Update a follow-up → verify notes saved
  *
  * Uses a future date to avoid the follow-up being immediately "overdue".
+ *
+ * NOTE: Labels in the follow-up form have no `for=` attribute, so
+ * getByLabel() is unreliable. Use direct locators instead:
+ *   Project select  → modal.locator('select').first()
+ *   Assigned To     → modal.locator('select').nth(1)
+ *   Date input      → modal.locator('input[type="date"]')
+ *   Notes textarea  → modal.locator('textarea')
  */
 
 import { test, expect } from '@playwright/test';
@@ -35,9 +42,12 @@ test.describe('Create follow-up', () => {
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible();
 
-    await expect(modal.getByLabel(/project/i)).toBeVisible({ timeout: 10000 });
-    await expect(modal.getByLabel(/assigned to/i)).toBeVisible({ timeout: 10000 });
-    await expect(modal.getByLabel(/next follow.up date/i)).toBeVisible();
+    // Project select (first select in the modal)
+    await expect(modal.locator('select').first()).toBeVisible({ timeout: 10000 });
+    // Assigned To select (second select)
+    await expect(modal.locator('select').nth(1)).toBeVisible({ timeout: 10000 });
+    // Date input
+    await expect(modal.locator('input[type="date"]')).toBeVisible();
   });
 
   test('submitting without required fields shows validation errors', async ({ page }) => {
@@ -55,25 +65,23 @@ test.describe('Create follow-up', () => {
     await expect(modal).toBeVisible();
 
     // Wait for projects dropdown to load
-    const projectSelect = modal.getByLabel(/project/i);
-    await projectSelect.waitFor({ timeout: 10000 });
+    const projectSelect = modal.locator('select').first();
     const firstProject = projectSelect.locator('option:not([value=""])').first();
-    await firstProject.waitFor({ timeout: 10000 });
+    await firstProject.waitFor({ state: 'attached', timeout: 10000 });
     await projectSelect.selectOption(await firstProject.getAttribute('value') ?? '');
 
     // Wait for users dropdown to load
-    const ownerSelect = modal.getByLabel(/assigned to/i);
-    await ownerSelect.waitFor({ timeout: 10000 });
+    const ownerSelect = modal.locator('select').nth(1);
     const firstUser = ownerSelect.locator('option:not([value=""])').first();
-    await firstUser.waitFor({ timeout: 10000 });
+    await firstUser.waitFor({ state: 'attached', timeout: 10000 });
     await ownerSelect.selectOption(await firstUser.getAttribute('value') ?? '');
 
     // Set follow-up date (7 days from now)
-    await modal.getByLabel(/next follow.up date/i).fill(futureDateString(7));
+    await modal.locator('input[type="date"]').fill(futureDateString(7));
 
     // Add a unique note to find later
     const uniqueNote = `E2E test follow-up ${Date.now()}`;
-    await modal.getByLabel(/notes/i).fill(uniqueNote);
+    await modal.locator('textarea').fill(uniqueNote);
 
     await page.getByRole('button', { name: /create follow.up/i }).click();
 
@@ -103,20 +111,18 @@ test.describe('Complete follow-up', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const projectSelect = modal.getByLabel(/project/i);
-      await projectSelect.waitFor({ timeout: 10000 });
+      const projectSelect = modal.locator('select').first();
       const firstProject = projectSelect.locator('option:not([value=""])').first();
-      await firstProject.waitFor({ timeout: 10000 });
+      await firstProject.waitFor({ state: 'attached', timeout: 10000 });
       await projectSelect.selectOption(await firstProject.getAttribute('value') ?? '');
 
-      const ownerSelect = modal.getByLabel(/assigned to/i);
-      await ownerSelect.waitFor({ timeout: 10000 });
+      const ownerSelect = modal.locator('select').nth(1);
       const firstUser = ownerSelect.locator('option:not([value=""])').first();
-      await firstUser.waitFor({ timeout: 10000 });
+      await firstUser.waitFor({ state: 'attached', timeout: 10000 });
       await ownerSelect.selectOption(await firstUser.getAttribute('value') ?? '');
 
-      await modal.getByLabel(/next follow.up date/i).fill(futureDateString(3));
-      await modal.getByLabel(/notes/i).fill('To be completed by E2E test');
+      await modal.locator('input[type="date"]').fill(futureDateString(3));
+      await modal.locator('textarea').fill('To be completed by E2E test');
       await page.getByRole('button', { name: /create follow.up/i }).click();
       await expect(page.getByText('Follow-up created')).toBeVisible({ timeout: 10000 });
       await expect(modal).not.toBeVisible({ timeout: 5000 });
@@ -125,16 +131,15 @@ test.describe('Complete follow-up', () => {
     // Find a pending row and click its "Mark as completed" button
     const pendingRow = page.locator('tbody tr').filter({ hasText: /pending/i }).first();
     await pendingRow.waitFor({ timeout: 10000 });
-    const completeBtn = pendingRow.getByTitle(/mark as completed/i);
+    const completeBtn = pendingRow.locator('button[title="Mark as completed"]');
     await completeBtn.click();
 
     await expect(page.getByText('Follow-up completed')).toBeVisible({ timeout: 10000 });
 
-    // The row's status badge should now show "completed" (it may disappear if filtered, but badge should update)
     // Give the query a moment to refetch
     await page.waitForTimeout(1000);
     // Filter by "Completed" status to confirm
-    await page.getByRole('combobox').filter({ hasText: /all status/i }).selectOption('completed');
+    await page.locator('select.form-select').selectOption('completed');
     await page.waitForLoadState('networkidle');
     await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 10000 });
   });
@@ -158,7 +163,7 @@ test.describe('Update follow-up', () => {
     await expect(modal).toBeVisible();
     await expect(modal.getByText(/update follow.up/i)).toBeVisible();
     // Status select should be pre-populated
-    await expect(modal.getByRole('combobox')).toBeVisible();
+    await expect(modal.locator('select').first()).toBeVisible();
   });
 
   test('changing status to cancelled saves and updates the row', async ({ page }) => {
@@ -167,21 +172,19 @@ test.describe('Update follow-up', () => {
     const createModal = page.getByRole('dialog');
     await expect(createModal).toBeVisible();
 
-    const projectSelect = createModal.getByLabel(/project/i);
-    await projectSelect.waitFor({ timeout: 10000 });
+    const projectSelect = createModal.locator('select').first();
     const firstProject = projectSelect.locator('option:not([value=""])').first();
-    await firstProject.waitFor({ timeout: 10000 });
+    await firstProject.waitFor({ state: 'attached', timeout: 10000 });
     await projectSelect.selectOption(await firstProject.getAttribute('value') ?? '');
 
-    const ownerSelect = createModal.getByLabel(/assigned to/i);
-    await ownerSelect.waitFor({ timeout: 10000 });
+    const ownerSelect = createModal.locator('select').nth(1);
     const firstUser = ownerSelect.locator('option:not([value=""])').first();
-    await firstUser.waitFor({ timeout: 10000 });
+    await firstUser.waitFor({ state: 'attached', timeout: 10000 });
     await ownerSelect.selectOption(await firstUser.getAttribute('value') ?? '');
 
     const uniqueNote = `Cancel E2E ${Date.now()}`;
-    await createModal.getByLabel(/next follow.up date/i).fill(futureDateString(5));
-    await createModal.getByLabel(/notes/i).fill(uniqueNote);
+    await createModal.locator('input[type="date"]').fill(futureDateString(5));
+    await createModal.locator('textarea').fill(uniqueNote);
     await page.getByRole('button', { name: /create follow.up/i }).click();
     await expect(page.getByText('Follow-up created')).toBeVisible({ timeout: 10000 });
     await expect(createModal).not.toBeVisible({ timeout: 5000 });
@@ -193,7 +196,8 @@ test.describe('Update follow-up', () => {
 
     const editModal = page.getByRole('dialog');
     await expect(editModal).toBeVisible();
-    await editModal.getByRole('combobox', { name: /status/i }).selectOption('cancelled');
+    // Status select is the first select in the update modal
+    await editModal.locator('select').first().selectOption('cancelled');
     await page.getByRole('button', { name: /save changes/i }).click();
 
     await expect(page.getByText('Follow-up updated')).toBeVisible({ timeout: 10000 });

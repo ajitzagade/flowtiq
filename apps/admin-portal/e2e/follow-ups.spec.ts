@@ -160,10 +160,12 @@ test.describe('Create Follow-up modal', () => {
   });
 
   test('modal has Project, Assigned To, Date, Notes fields', async ({ page }) => {
-    await expect(page.getByText(/project/i).first()).toBeVisible();
-    await expect(page.getByText(/assigned to/i)).toBeVisible();
-    await expect(page.getByText(/next follow.up date/i)).toBeVisible();
-    await expect(page.getByText(/notes/i)).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/project/i).first()).toBeVisible();
+    await expect(dialog.getByText(/assigned to/i).first()).toBeVisible();
+    await expect(dialog.getByText(/next follow.up date/i)).toBeVisible();
+    await expect(dialog.getByText(/notes/i).first()).toBeVisible();
   });
 
   test('modal has Cancel and "Create Follow-up" buttons', async ({ page }) => {
