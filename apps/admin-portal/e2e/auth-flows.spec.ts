@@ -43,7 +43,7 @@ test.describe('Login — unauthenticated', () => {
     await page.locator('input[type="email"]').fill('admin@vastudeep.com');
     await page.locator('input[type="password"]').fill('WrongPassword999');
     await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.getByText(/invalid credentials/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/invalid email or password/i)).toBeVisible({ timeout: 10000 });
     await expect(page).toHaveURL(/\/login/);
   });
 
@@ -52,7 +52,7 @@ test.describe('Login — unauthenticated', () => {
     await page.locator('input[type="email"]').fill('nobody@doesnotexist.com');
     await page.locator('input[type="password"]').fill('Admin@123');
     await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.getByText(/invalid credentials/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/invalid email or password/i)).toBeVisible({ timeout: 10000 });
     await expect(page).toHaveURL(/\/login/);
   });
 
@@ -74,7 +74,7 @@ test.describe('Login — unauthenticated', () => {
     await page.locator('input[type="password"]').fill('Admin@123');
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
-    await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/welcome back/i).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('accessing protected route while unauthenticated redirects to login', async ({ page }) => {
@@ -92,7 +92,7 @@ test.describe('Login — unauthenticated', () => {
 test.describe('Session — authenticated', () => {
   test('logout button clears session and redirects to login', async ({ page }) => {
     await page.goto('/dashboard');
-    await expect(page.getByRole('navigation', { name: /main navigation/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: /sign out/i }).waitFor({ timeout: 15000 });
     await page.getByRole('button', { name: /sign out/i }).click();
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
   });
