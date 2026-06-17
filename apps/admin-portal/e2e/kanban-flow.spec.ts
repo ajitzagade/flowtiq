@@ -195,17 +195,30 @@ test.describe('Flow: Drag-drop moves card to correct column', () => {
       return;
     }
 
-    // Drag the card to the target column using low-level mouse events which
-    // reliably trigger HTML5 dragstart/dragover/drop handlers in headless Chromium.
-    const cardBox = await firstCard.boundingBox();
-    const colBox = await targetColumn.boundingBox();
-    if (!cardBox || !colBox) { test.skip(); return; }
+    // Simulate HTML5 drag-and-drop via programmatic DragEvents dispatched in the page
+    // context. Mouse events (mousedown/mousemove/mouseup) do NOT trigger React's
+    // onDragStart/onDrop handlers. Instead we dispatch dragstart on the card (which
+    // sets the draggingId React state) then dispatch dragover+drop on the target column.
+    // A 200ms gap lets React process the state update before the drop fires.
+    const dragged = await page.evaluate(async ([pid, stageKey]) => {
+      const card = document.querySelector(`[data-project-id="${pid}"]`);
+      const col  = document.querySelector(`[data-stage-key="${stageKey}"]`);
+      if (!card || !col) return false;
 
-    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-    await page.mouse.down();
-    // Move in steps so dragover fires at intermediate positions
-    await page.mouse.move(colBox.x + colBox.width / 2, colBox.y + colBox.height / 2, { steps: 20 });
-    await page.mouse.up();
+      const dt = new DataTransfer();
+      card.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+
+      // Wait for React to process setDraggingId state update
+      await new Promise((r) => setTimeout(r, 200));
+
+      col.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      col.dispatchEvent(new DragEvent('dragover',  { bubbles: true, cancelable: true, dataTransfer: dt }));
+      col.dispatchEvent(new DragEvent('drop',      { bubbles: true, cancelable: true, dataTransfer: dt }));
+      card.dispatchEvent(new DragEvent('dragend',  { bubbles: true, cancelable: true, dataTransfer: dt }));
+      return true;
+    }, [projectId, targetKey]);
+
+    if (!dragged) { test.skip(); return; }
 
     // Verify "Moved to" toast appears
     await expect(page.getByText(/moved to/i)).toBeVisible({ timeout: 10000 });

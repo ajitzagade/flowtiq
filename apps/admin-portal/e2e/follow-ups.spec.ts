@@ -125,8 +125,13 @@ test.describe('Follow-ups filters', () => {
 
   test('filtering by "pending" status shows only pending rows', async ({ page }) => {
     const statusSelect = page.locator('select.form-select');
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/follow-ups') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await statusSelect.selectOption('pending');
-    await page.waitForTimeout(600);
+    await responsePromise.catch(() => page.waitForTimeout(800));
+    await page.waitForTimeout(300);
     const rows = page.locator('table tbody tr');
     const count = await rows.count();
     if (count > 0 && !(await page.getByText(/no follow-ups found/i).isVisible())) {
@@ -137,11 +142,18 @@ test.describe('Follow-ups filters', () => {
 
   test('filtering by "completed" status shows only completed rows', async ({ page }) => {
     const statusSelect = page.locator('select.form-select');
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/follow-ups') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await statusSelect.selectOption('completed');
-    await page.waitForTimeout(600);
+    await responsePromise.catch(() => page.waitForTimeout(800));
+    await page.waitForTimeout(300);
+    const isEmpty = await page.getByText(/no follow-ups found/i).isVisible().catch(() => false);
+    if (isEmpty) return; // no completed rows — pass gracefully
     const rows = page.locator('table tbody tr');
     const count = await rows.count();
-    if (count > 0 && !(await page.getByText(/no follow-ups found/i).isVisible())) {
+    if (count > 0) {
       const firstRowText = await rows.first().textContent();
       expect(firstRowText).toMatch(/completed/i);
     }

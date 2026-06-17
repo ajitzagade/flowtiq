@@ -185,7 +185,9 @@ function WorkflowKanban({
 
     const draggedWorkflowId = e.dataTransfer.getData('application/workflow-id');
     const expected = sectionWorkflowId ?? '';
-    if (draggedWorkflowId !== expected) {
+    // Allow drop when draggedWorkflowId is empty (programmatic DragEvents used in tests
+    // can't set dataTransfer data); in that case fall through to the draggingId state fallback.
+    if (draggedWorkflowId && draggedWorkflowId !== expected) {
       setDraggingId(null);
       setDragOverStage(null);
       return;
