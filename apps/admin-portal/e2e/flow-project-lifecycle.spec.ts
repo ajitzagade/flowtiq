@@ -34,7 +34,7 @@ async function createProject(page: Page, name: string, client: string) {
   const ownerSelect = modal.getByLabel(/project owner/i);
   await ownerSelect.waitFor({ timeout: 10000 });
   const firstRealOpt = ownerSelect.locator('option:not([value=""])').first();
-  await firstRealOpt.waitFor({ timeout: 10000 });
+  await firstRealOpt.waitFor({ state: 'attached', timeout: 10000 });
   await ownerSelect.selectOption(await firstRealOpt.getAttribute('value') ?? '');
 
   await page.getByRole('button', { name: /create project/i }).click();

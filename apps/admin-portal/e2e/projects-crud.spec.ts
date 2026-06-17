@@ -87,7 +87,7 @@ test.describe('Create project', () => {
     const ownerSelect = modal.getByLabel(/project owner/i);
     await ownerSelect.waitFor({ timeout: 10000 });
     const options = ownerSelect.locator('option:not([value=""])');
-    await options.first().waitFor({ timeout: 10000 });
+    await options.first().waitFor({ state: 'attached', timeout: 10000 });
     const firstVal = await options.first().getAttribute('value');
     if (firstVal) await ownerSelect.selectOption(firstVal);
 

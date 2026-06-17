@@ -57,7 +57,7 @@ test('Upload document → appears in documents list with correct file type badge
   const projectSelect = modal.locator('select').first();
   await page.waitForTimeout(1000);
   const firstProjectOpt = projectSelect.locator('option:not([value=""])').first();
-  await firstProjectOpt.waitFor({ timeout: 10000 });
+  await firstProjectOpt.waitFor({ state: 'attached', timeout: 10000 });
   await projectSelect.selectOption(await firstProjectOpt.getAttribute('value') ?? '');
 
   // Upload the test file
@@ -99,7 +99,7 @@ test('Newly uploaded document shows version "v1"', async ({ page }) => {
   const projectSelect = modal.locator('select').first();
   await page.waitForTimeout(1000);
   const firstOpt = projectSelect.locator('option:not([value=""])').first();
-  await firstOpt.waitFor({ timeout: 10000 });
+  await firstOpt.waitFor({ state: 'attached', timeout: 10000 });
   await projectSelect.selectOption(await firstOpt.getAttribute('value') ?? '');
 
   await page.locator('#file-input').setInputFiles(TEST_FILE_PATH);
@@ -154,7 +154,7 @@ test('Delete document → toast "Document deleted" + row removed from list', asy
   const projectSelect = modal.locator('select').first();
   await page.waitForTimeout(1000);
   const firstOpt = projectSelect.locator('option:not([value=""])').first();
-  await firstOpt.waitFor({ timeout: 10000 });
+  await firstOpt.waitFor({ state: 'attached', timeout: 10000 });
   await projectSelect.selectOption(await firstOpt.getAttribute('value') ?? '');
 
   await page.locator('#file-input').setInputFiles(TEST_FILE_PATH);
