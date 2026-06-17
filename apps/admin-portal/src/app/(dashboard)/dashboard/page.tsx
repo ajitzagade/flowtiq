@@ -325,7 +325,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 xl:items-stretch">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 xl:items-start">
           {/* Recent / Active Projects */}
           <div className="xl:col-span-2 card flex flex-col min-h-0">
             <div className="card-header flex-shrink-0">
@@ -429,7 +429,9 @@ export default function DashboardPage() {
                   return (
                     <div key={log.id} className="px-4 py-3">
                       <p className="text-sm text-slate-700">
-                        <span className="font-medium">{log.userEmail?.split('@')[0]}</span>{' '}
+                        <span className="font-medium">
+                          {(log.metadata?.userName as string) || log.userEmail?.split('@')[0]}
+                        </span>{' '}
                         {getActionLabel(log.action)}{' '}
                         {log.entityName && <span className="text-slate-500">"{log.entityName}"</span>}
                       </p>

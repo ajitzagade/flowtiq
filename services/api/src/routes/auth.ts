@@ -62,6 +62,8 @@ authRouter.post('/login', async (req, res, next) => {
       tenantId: user.tenantId,
       isSuperAdmin: user.isSuperAdmin,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       roles,
       permissions: Array.from(permissions),
     };
@@ -90,7 +92,7 @@ authRouter.post('/login', async (req, res, next) => {
       entityId: user.id,
       entityType: 'user',
       entityName: `${user.firstName} ${user.lastName}`,
-      metadata: { email: user.email },
+      metadata: { email: user.email, userName: `${user.firstName} ${user.lastName}` },
     });
 
     res.json({
@@ -185,6 +187,8 @@ authRouter.post('/refresh', async (req, res, next) => {
       tenantId: user.tenantId,
       isSuperAdmin: user.isSuperAdmin,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       roles,
       permissions: Array.from(permissions),
     });

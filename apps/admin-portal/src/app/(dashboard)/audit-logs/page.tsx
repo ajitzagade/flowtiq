@@ -128,7 +128,12 @@ export default function AuditLogsPage() {
                   <td className="text-sm text-slate-600 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
                   <td>
                     <p className="font-medium text-slate-800 text-sm">{log.userEmail || '—'}</p>
-                    {log.userRole && <p className="text-xs text-slate-400">{log.userRole}</p>}
+                    {log.userRole && (
+                      <p className="text-xs text-slate-400">
+                        {log.userRole}
+                        {log.metadata?.userName ? ` (${log.metadata.userName as string})` : ''}
+                      </p>
+                    )}
                   </td>
                   <td>
                     <span className={ACTION_COLORS[log.action] || 'badge-gray badge'}>

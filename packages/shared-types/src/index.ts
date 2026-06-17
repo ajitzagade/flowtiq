@@ -666,6 +666,8 @@ export interface JwtPayload {
   tenantId: string | null;
   isSuperAdmin: boolean;
   email: string;
+  firstName?: string;
+  lastName?: string;
   roles: string[];
   permissions: string[];
 }

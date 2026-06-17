@@ -16,7 +16,16 @@ interface AuditLogParams {
 
 export async function createAuditLog(params: AuditLogParams): Promise<void> {
   const { req, action, module, entityId, entityType, entityName, previousData, newData, metadata } = params;
-  const user = (req as Request & { user?: { userId: string; tenantId: string | null; email: string; isSuperAdmin: boolean; roles: string[] } }).user;
+  const user = (req as Request & { user?: { userId: string; tenantId: string | null; email: string; isSuperAdmin: boolean; firstName?: string; lastName?: string; roles: string[] } }).user;
+
+  const userName = user?.firstName && user?.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : undefined;
+
+  const mergedMetadata = {
+    ...(metadata || {}),
+    ...(userName && !(metadata as Record<string, unknown>)?.userName ? { userName } : {}),
+  };
 
   try {
     await prisma.auditLog.create({
@@ -34,7 +43,7 @@ export async function createAuditLog(params: AuditLogParams): Promise<void> {
         newData: newData as object,
         ipAddress: req.ip || req.socket.remoteAddress,
         userAgent: req.headers['user-agent'],
-        metadata: metadata as object,
+        metadata: mergedMetadata as object,
       },
     });
   } catch (error) {

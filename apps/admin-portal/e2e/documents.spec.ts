@@ -16,7 +16,7 @@ test.describe('Documents page layout', () => {
   });
 
   test('"Upload Document" button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /upload document/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /upload document/i }).first()).toBeVisible();
   });
 
   test('search input is present', async ({ page }) => {
@@ -37,62 +37,52 @@ test.describe('Documents page layout', () => {
   });
 });
 
-test.describe('Documents table', () => {
+test.describe('Documents grouped view', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/documents');
     await page.waitForLoadState('networkidle');
     await Promise.race([
-      page.locator('table tbody tr').first().waitFor({ timeout: 10000 }),
-      page.getByText(/no documents found/i).waitFor({ timeout: 10000 }),
+      page.locator('a[title="Download"]').first().waitFor({ timeout: 10000 }),
+      page.getByText(/no documents yet/i).waitFor({ timeout: 10000 }),
     ]).catch(() => {});
   });
 
-  test('table has expected columns: Document, Project, Type, Size, Version, Uploaded By, Date, Actions', async ({ page }) => {
-    const isEmpty = await page.getByText(/no documents found/i).isVisible().catch(() => false);
-    if (!isEmpty && await page.locator('table tbody tr').count() > 0) {
-      await expect(page.locator('th').filter({ hasText: /document/i }).first()).toBeVisible();
-      await expect(page.locator('th').filter({ hasText: /project/i }).first()).toBeVisible();
-      await expect(page.locator('th').filter({ hasText: /type/i }).first()).toBeVisible();
-      await expect(page.locator('th').filter({ hasText: /size/i }).first()).toBeVisible();
-      await expect(page.locator('th').filter({ hasText: /version/i }).first()).toBeVisible();
+  test('documents are shown in grouped accordion sections', async ({ page }) => {
+    const isEmpty = await page.getByText(/no documents yet/i).isVisible().catch(() => false);
+    if (!isEmpty) {
+      // Project-level headers exist (contain FolderOpen icon buttons)
+      const projectHeaders = page.locator('.card button').filter({ hasText: /\w/ });
+      expect(await projectHeaders.count()).toBeGreaterThan(0);
     }
   });
 
   test('document rows show file type badge', async ({ page }) => {
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible() && !(await page.getByText(/no documents found/i).isVisible())) {
-      const text = await firstRow.textContent();
+    const downloadLinks = page.locator('a[title="Download"]');
+    if (await downloadLinks.count() > 0) {
+      const firstDocRow = page.locator('a[title="Download"]').first().locator('../..');
+      const text = await page.locator('span.badge').first().textContent().catch(() => '');
       expect(text).toMatch(/pdf|doc|docx|xls|xlsx|jpg|png/i);
     }
   });
 
-  test('document rows show version number', async ({ page }) => {
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible() && !(await page.getByText(/no documents found/i).isVisible())) {
-      const text = await firstRow.textContent();
-      expect(text).toMatch(/v\d+/i);
-    }
-  });
-
   test('each document row has a download link (title="Download")', async ({ page }) => {
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible() && !(await page.getByText(/no documents found/i).isVisible())) {
-      await expect(firstRow.locator('a[title="Download"]')).toBeVisible();
+    const isEmpty = await page.getByText(/no documents yet/i).isVisible().catch(() => false);
+    if (!isEmpty && await page.locator('a[title="Download"]').count() > 0) {
+      await expect(page.locator('a[title="Download"]').first()).toBeVisible();
     }
   });
 
   test('download link opens in new tab (target="_blank")', async ({ page }) => {
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible() && !(await page.getByText(/no documents found/i).isVisible())) {
-      const downloadLink = firstRow.locator('a[title="Download"]');
-      await expect(downloadLink).toHaveAttribute('target', '_blank');
+    const isEmpty = await page.getByText(/no documents yet/i).isVisible().catch(() => false);
+    if (!isEmpty && await page.locator('a[title="Download"]').count() > 0) {
+      await expect(page.locator('a[title="Download"]').first()).toHaveAttribute('target', '_blank');
     }
   });
 
   test('each document row has a delete button (title="Delete")', async ({ page }) => {
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible() && !(await page.getByText(/no documents found/i).isVisible())) {
-      await expect(firstRow.locator('button[title="Delete"]')).toBeVisible();
+    const isEmpty = await page.getByText(/no documents yet/i).isVisible().catch(() => false);
+    if (!isEmpty && await page.locator('button[title="Delete"]').count() > 0) {
+      await expect(page.locator('button[title="Delete"]').first()).toBeVisible();
     }
   });
 });
@@ -106,9 +96,9 @@ test.describe('Documents search and filter', () => {
   test('searching by non-existent term shows empty state', async ({ page }) => {
     await page.locator('input[placeholder*="search document" i]').fill('xxxxxx_no_such_file_zzz');
     await page.waitForTimeout(600);
-    const rowCount = await page.locator('table tbody tr').count();
-    const isEmpty = await page.getByText(/no documents found/i).isVisible().catch(() => false);
-    expect(rowCount === 0 || isEmpty).toBeTruthy();
+    const isEmpty = await page.getByText(/no documents match your search|no documents yet/i).isVisible().catch(() => false);
+    const noSections = await page.locator('.card button[type="button"]').filter({ hasText: /\w/ }).count() === 0;
+    expect(isEmpty || noSections).toBeTruthy();
   });
 
   test('project filter changes document list', async ({ page }) => {
@@ -131,7 +121,7 @@ test.describe('Upload Document modal', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/documents');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: /upload document/i }).click();
+    await page.getByRole('button', { name: /upload document/i }).first().click();
   });
 
   test('modal opens with title "Upload Document"', async ({ page }) => {
