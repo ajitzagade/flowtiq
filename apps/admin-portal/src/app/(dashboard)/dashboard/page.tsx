@@ -49,8 +49,11 @@ interface DashboardStats {
     id: string;
     action: string;
     module: string;
+    entityId?: string;
+    entityType?: string;
     entityName?: string;
     userEmail?: string;
+    metadata?: Record<string, string> | null;
     createdAt: string;
   }>;
   recentTenants?: Array<{
@@ -420,16 +423,32 @@ export default function DashboardPage() {
                 <h3 className="font-semibold text-slate-900">Recent Activity</h3>
               </div>
               <div className="divide-y divide-slate-100 overflow-y-auto max-h-[280px]">
-                {stats?.recentActivity?.slice(0, 8).map((log) => (
-                  <div key={log.id} className="px-4 py-3">
-                    <p className="text-sm text-slate-700">
-                      <span className="font-medium">{log.userEmail?.split('@')[0]}</span>{' '}
-                      {getActionLabel(log.action)}{' '}
-                      {log.entityName && <span className="text-slate-500">"{log.entityName}"</span>}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatRelative(log.createdAt)}</p>
-                  </div>
-                ))}
+                {stats?.recentActivity?.slice(0, 8).map((log) => {
+                  const projectName = log.metadata?.projectName as string | undefined;
+                  const projectId = log.metadata?.projectId as string | undefined;
+                  return (
+                    <div key={log.id} className="px-4 py-3">
+                      <p className="text-sm text-slate-700">
+                        <span className="font-medium">{log.userEmail?.split('@')[0]}</span>{' '}
+                        {getActionLabel(log.action)}{' '}
+                        {log.entityName && <span className="text-slate-500">"{log.entityName}"</span>}
+                      </p>
+                      {projectName && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-slate-500">Project: </span>
+                          {projectId ? (
+                            <Link href={`/projects/${projectId}`} className="text-blue-500 hover:underline">
+                              {projectName}
+                            </Link>
+                          ) : (
+                            <span>{projectName}</span>
+                          )}
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-400 mt-0.5">{formatRelative(log.createdAt)}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

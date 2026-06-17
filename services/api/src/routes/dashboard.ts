@@ -245,6 +245,17 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       where: { tenantId: tenantId as string },
       orderBy: { createdAt: 'desc' },
       take: 10,
+      select: {
+        id: true,
+        action: true,
+        module: true,
+        entityId: true,
+        entityType: true,
+        entityName: true,
+        userEmail: true,
+        metadata: true,
+        createdAt: true,
+      },
     });
 
     const statusMap = Object.fromEntries(projectsByStatus.map((s) => [s.status, s._count.id]));
