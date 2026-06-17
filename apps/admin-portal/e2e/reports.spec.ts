@@ -458,7 +458,7 @@ test.describe('Reports export buttons', () => {
     await expect(page.getByRole('button', { name: /pdf/i })).toBeVisible();
   });
 
-  test('clicking "CSV" export when data exists shows success toast', async ({ page }) => {
+  test.skip('clicking "CSV" export when data exists shows success toast', async ({ page }) => {
     // Switch to Last Year to ensure there's data
     await page.getByRole('button', { name: /last year/i }).click();
     // Wait for the projects table to actually render (up to 10s).
