@@ -27,12 +27,14 @@ async function createProject(page: Page, name: string) {
   await page.getByRole('button', { name: /new project/i }).click();
   const modal = page.getByRole('dialog');
   await modal.waitFor({ timeout: 5000 });
-  await modal.getByLabel(/project name/i).fill(name);
-  await modal.getByLabel(/client name/i).fill('Audit Client');
+  // Labels have no for= attr — use placeholder selectors
+  await modal.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first().fill(name);
+  await modal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill('Audit Client');
+  // Owner select is after Priority — select by label text proximity using getByLabel (Playwright matches adjacent labels)
   const ownerSelect = modal.getByLabel(/project owner/i);
   await ownerSelect.waitFor({ timeout: 10000 });
   const firstOpt = ownerSelect.locator('option:not([value=""])').first();
-  await firstOpt.waitFor({ timeout: 10000 });
+  await firstOpt.waitFor({ state: 'attached', timeout: 10000 });
   await ownerSelect.selectOption(await firstOpt.getAttribute('value') ?? '');
   await page.getByRole('button', { name: /create project/i }).click();
   await expect(page.getByText(/project created/i)).toBeVisible({ timeout: 10000 });
@@ -239,7 +241,9 @@ test('Audit log shows pagination controls when records exceed page size', async 
   if (await pagination.count() > 0) {
     await expect(pagination.first()).toBeVisible();
     // Prev button disabled on page 1
-    const prevBtn = page.locator('button').filter({ has: page.locator('[class*="lucide-chevron-left"]') }).first();
+    // Scope to pagination area (after table) to avoid matching sidebar collapse button
+    const paginationArea = page.locator('.flex.items-center.justify-between').last();
+    const prevBtn = paginationArea.locator('button').filter({ has: page.locator('[class*="lucide-chevron-left"]') }).first();
     if (await prevBtn.count() > 0) {
       await expect(prevBtn).toBeDisabled();
     }

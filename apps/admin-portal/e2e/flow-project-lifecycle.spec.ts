@@ -28,8 +28,8 @@ async function createProject(page: Page, name: string, client: string) {
   const modal = page.getByRole('dialog');
   await modal.waitFor({ timeout: 5000 });
 
-  await modal.getByLabel(/project name/i).fill(name);
-  await modal.getByLabel(/client name/i).fill(client);
+  await modal.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first().fill(name);
+  await modal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill(client);
 
   const ownerSelect = modal.getByLabel(/project owner/i);
   await ownerSelect.waitFor({ timeout: 10000 });

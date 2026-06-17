@@ -44,8 +44,8 @@ test.describe('Create project', () => {
     await expect(modal).toBeVisible();
 
     // Fill required fields
-    await modal.getByLabel(/project name/i).fill(NEW_PROJECT_NAME);
-    await modal.getByLabel(/client name/i).fill(CLIENT_NAME);
+    await modal.locator("input[placeholder*=\"Sunrise\"], input[placeholder*=\"project\"]").first().fill(NEW_PROJECT_NAME);
+    await modal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill(CLIENT_NAME);
 
     // Select a project owner — wait for users to load
     const ownerSelect = modal.getByLabel(/project owner/i);
@@ -81,8 +81,8 @@ test.describe('Create project', () => {
     await expect(modal).toBeVisible();
 
     const runName = `E2E List View ${Date.now()}`;
-    await modal.getByLabel(/project name/i).fill(runName);
-    await modal.getByLabel(/client name/i).fill('List View Client');
+    await modal.locator("input[placeholder*=\"Sunrise\"], input[placeholder*=\"project\"]").first().fill(runName);
+    await modal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill('List View Client');
 
     const ownerSelect = modal.getByLabel(/project owner/i);
     await ownerSelect.waitFor({ timeout: 10000 });
@@ -116,7 +116,7 @@ test.describe('Edit project', () => {
     await expect(modal.getByText(/edit project/i)).toBeVisible();
 
     // Project name field should already be filled
-    const nameInput = modal.getByLabel(/project name/i);
+    const nameInput = modal.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first();
     const currentValue = await nameInput.inputValue();
     expect(currentValue.length).toBeGreaterThan(0);
   });
@@ -130,12 +130,12 @@ test.describe('Edit project', () => {
     await page.getByRole('button', { name: /new project/i }).click();
     const createModal = page.getByRole('dialog');
     const editableName = `E2E Edit Source ${Date.now()}`;
-    await createModal.getByLabel(/project name/i).fill(editableName);
-    await createModal.getByLabel(/client name/i).fill('Edit Client');
+    await createModal.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first().fill(editableName);
+    await createModal.locator('input[placeholder*="Client or company"], input[placeholder*="client"]').first().fill('Edit Client');
     const ownerSelect = createModal.getByLabel(/project owner/i);
     await ownerSelect.waitFor({ timeout: 10000 });
     const firstOpt = ownerSelect.locator('option:not([value=""])').first();
-    await firstOpt.waitFor({ timeout: 10000 });
+    await firstOpt.waitFor({ state: 'attached', timeout: 10000 });
     await ownerSelect.selectOption(await firstOpt.getAttribute('value') ?? '');
     await page.getByRole('button', { name: /create project/i }).click();
     await expect(page.getByText('Project created')).toBeVisible({ timeout: 10000 });
@@ -147,7 +147,7 @@ test.describe('Edit project', () => {
 
     const editModal = page.getByRole('dialog');
     await expect(editModal).toBeVisible();
-    const nameInput = editModal.getByLabel(/project name/i);
+    const nameInput = editModal.locator('input[placeholder*="Sunrise"], input[placeholder*="project"]').first();
     await nameInput.clear();
     await nameInput.fill(UPDATED_PROJECT_NAME);
     await page.getByRole('button', { name: /save changes/i }).click();

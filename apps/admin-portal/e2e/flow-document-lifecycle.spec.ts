@@ -174,7 +174,8 @@ test('Delete document → toast "Document deleted" + row removed from list', asy
   await firstRow.locator('button[title="Delete"]').click();
   await expect(page.getByText(/document deleted/i)).toBeVisible({ timeout: 10000 });
 
-  await page.waitForTimeout(500);
+  // Wait for the list to re-render after delete
+  await page.waitForTimeout(1500);
   const rowsAfter = await page.locator('table tbody tr').count();
   // Row count should decrease or show empty state
   const isEmpty = await page.getByText(/no documents found/i).isVisible().catch(() => false);

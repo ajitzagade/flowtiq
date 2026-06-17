@@ -39,13 +39,13 @@ async function createFollowUp(page: Page): Promise<void> {
   const projectSelect = modal.locator('select').first();
   await page.waitForTimeout(1000); // projects load async
   const firstProjectOpt = projectSelect.locator('option:not([value=""])').first();
-  await firstProjectOpt.waitFor({ timeout: 10000 });
+  await firstProjectOpt.waitFor({ state: 'attached', timeout: 10000 });
   await projectSelect.selectOption(await firstProjectOpt.getAttribute('value') ?? '');
 
   // Select first owner
   const ownerSelect = modal.locator('select').nth(1);
   const firstOwnerOpt = ownerSelect.locator('option:not([value=""])').first();
-  await firstOwnerOpt.waitFor({ timeout: 10000 });
+  await firstOwnerOpt.waitFor({ state: 'attached', timeout: 10000 });
   await ownerSelect.selectOption(await firstOwnerOpt.getAttribute('value') ?? '');
 
   // Set future date

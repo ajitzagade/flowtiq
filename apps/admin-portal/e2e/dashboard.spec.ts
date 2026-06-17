@@ -30,10 +30,11 @@ test.describe('Dashboard stat cards', () => {
   });
 
   test('stat cards have labels (Active Projects, Follow-ups, Overdue, Documents)', async ({ page }) => {
-    await expect(page.getByText('Active Projects')).toBeVisible();
-    await expect(page.getByText('Pending Follow-ups')).toBeVisible();
-    await expect(page.getByText('Overdue')).toBeVisible();
-    await expect(page.getByText('Documents')).toBeVisible();
+    // Scope to stat-card to avoid strict-mode violations with duplicate text on the page
+    await expect(page.locator('.stat-card').filter({ hasText: 'Active Projects' }).first()).toBeVisible();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Pending Follow-ups' }).first()).toBeVisible();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Overdue' }).first()).toBeVisible();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Documents' }).first()).toBeVisible();
   });
 
   test('stat cards are clickable links to filtered views', async ({ page }) => {
@@ -53,12 +54,13 @@ test.describe('Dashboard header', () => {
   });
 
   test('shows welcome message with user first name', async ({ page }) => {
-    // Header subtitle contains "Welcome back"
-    await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 10000 });
+    // Header subtitle contains "Welcome back" — use first() as toast also matches
+    await expect(page.getByText(/welcome back/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('notification bell is visible in header', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /notifications/i })).toBeVisible();
+    // Scope to header to avoid matching the sidebar nav link
+    await expect(page.locator('header a[aria-label="Notifications"]')).toBeVisible();
   });
 
   test('avatar link navigates to settings', async ({ page }) => {
@@ -160,17 +162,32 @@ test.describe('Dashboard workflow pipeline', () => {
   });
 
   test('workflow card in pipeline shows stage counts', async ({ page }) => {
-    const pipelineSection = page.getByText('Workflow Pipeline').locator('../..');
-    // At least one workflow should be listed with a count badge
-    await expect(pipelineSection.locator('button').filter({ hasText: /project/i }).first()).toBeVisible({ timeout: 10000 });
+    // Pipeline starts collapsed — expand it first
+    const pipelineHeader = page.locator('.card-header').filter({ hasText: /workflow pipeline/i });
+    await pipelineHeader.waitFor({ timeout: 10000 });
+    // If collapsed, expand it
+    const isCollapsed = await page.locator('.card-header').filter({ hasText: /workflow pipeline/i })
+      .locator('..').locator('[class*="rotate"]').count();
+    if (isCollapsed > 0) await pipelineHeader.click();
+    // At least one workflow header button with "project" text should be visible
+    await expect(page.locator('[class*="rounded-xl"]').locator('button').filter({ hasText: /project/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('clicking a stage with projects navigates to kanban filtered view', async ({ page }) => {
-    // Find a clickable stage (count > 0, has cursor-pointer)
-    const clickableStage = page.locator('.cursor-pointer').filter({ hasText: /[1-9]\d*/ }).first();
-    if (await clickableStage.count() > 0) {
-      await clickableStage.click();
-      await expect(page).toHaveURL(/\/projects.*workflowId=.+.*stage=.+/);
+    // Expand pipeline section first
+    const pipelineHeader = page.locator('.card-header').filter({ hasText: /workflow pipeline/i });
+    await pipelineHeader.waitFor({ timeout: 10000 });
+    await pipelineHeader.click(); // expand
+    await page.waitForTimeout(300);
+    // Expand at least one workflow card to see stages
+    const workflowBtn = page.locator('[class*="rounded-xl"] button').first();
+    if (await workflowBtn.count() > 0) await workflowBtn.click();
+    await page.waitForTimeout(300);
+    // Find a stage row with count > 0 that uses the stage click handler (has data-stage-key parent)
+    const stageRows = page.locator('[class*="divide-y"] > div[class*="cursor-pointer"]');
+    if (await stageRows.count() > 0) {
+      await stageRows.first().click();
+      await expect(page).toHaveURL(/\/projects.*workflowId=.+.*stage=.+/, { timeout: 5000 });
     }
   });
 });
