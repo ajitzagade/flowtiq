@@ -325,7 +325,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 xl:items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 xl:items-stretch">
           {/* Recent / Active Projects */}
           <div className="xl:col-span-2 card flex flex-col min-h-0">
             <div className="card-header flex-shrink-0">
@@ -337,7 +337,7 @@ export default function DashboardPage() {
                 View all <ArrowRight size={14} />
               </Link>
             </div>
-            <div className="divide-y overflow-y-auto max-h-[400px]" style={{ borderColor: '#eef0f8' }}>
+            <div className="divide-y flex-1 overflow-y-auto" style={{ borderColor: '#eef0f8' }}>
               {stats?.recentProjects?.length === 0 && (
                 <div className="empty-state py-10">
                   <FolderKanban size={40} className="text-slate-200 mb-3" />
