@@ -37,9 +37,52 @@ jobs:
         run: pnpm --filter @flowtiq/admin-portal type-check
 
   # ─── E2E Tests ─────────────────────────────────────────────────────────────
-  # Temporarily disabled — will be re-enabled once all test cases are fixed.
-  # e2e:
-  #   name: E2E Tests
-  #   runs-on: ubuntu-latest
-  #   needs: type-check
-  #   ...
+  # Runs on every pull_request AND every push to main.
+  #
+  # On pull_request: tests run against production (https://flowtiq-admin.vercel.app).
+  #   This validates the test suite itself is healthy and production is not broken.
+  #   Branch protection rules require this job to pass before the PR can be merged.
+  #
+  # On push to main: waits 2 minutes for Vercel to finish redeploying, then
+  #   re-runs the full suite to confirm the new deployment is healthy.
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: type-check
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @flowtiq/admin-portal exec playwright install --with-deps chromium
+
+      # On push to main, Vercel is redeploying — wait before hitting the URL.
+      # On pull_request, production is already stable — no wait needed.
+      - name: Wait for Vercel redeployment (push to main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: sleep 120
+
+      - name: Run E2E tests against production
+        run: pnpm --filter @flowtiq/admin-portal test:e2e:prod
+        env:
+          CI: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/admin-portal/playwright-report/
+          retention-days: 14
