@@ -127,8 +127,12 @@ test.describe('Audit Logs filters', () => {
 
   test('searching by user filters rows', async ({ page }) => {
     const search = page.locator('input[placeholder*="user, entity" i]');
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/audit') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await search.fill('xxxxxx_does_not_exist_user');
-    await page.waitForTimeout(600);
+    await responsePromise.catch(() => page.waitForTimeout(800));
     const isEmpty = await page.getByText(/no audit logs found/i).isVisible().catch(() => false);
     const rowCount = await page.locator('table tbody tr').count();
     expect(rowCount === 0 || isEmpty).toBeTruthy();
@@ -137,8 +141,13 @@ test.describe('Audit Logs filters', () => {
 
   test('filtering by "projects" module shows project logs', async ({ page }) => {
     const moduleSelect = page.locator('select').filter({ has: page.locator('option[value="projects"]') }).first();
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/audit') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await moduleSelect.selectOption('projects');
-    await page.waitForTimeout(600);
+    await responsePromise;
+    await page.waitForTimeout(300);
     const rows = page.locator('table tbody tr');
     const count = await rows.count();
     if (count > 0 && !(await page.getByText(/no audit logs found/i).isVisible())) {

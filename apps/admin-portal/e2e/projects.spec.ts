@@ -199,7 +199,7 @@ test.describe('Projects view toggle', () => {
   test('toggling from List to Board shows kanban', async ({ page }) => {
     await page.goto('/projects?view=list');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: /board/i }).click();
+    await page.getByRole('button', { name: 'Board', exact: true }).click();
     // Accordion buttons always visible in board view (collapsed or expanded)
     await expect(page.locator('button[aria-expanded]').first()).toBeVisible({ timeout: 15000 });
   });

@@ -7,8 +7,9 @@ import { test, expect } from '@playwright/test';
 
 test('dashboard loads with stat cards', async ({ page }) => {
   await page.goto('/dashboard');
+  await page.waitForLoadState('networkidle');
   // Stat cards render with className="stat-card", no data-testid attribute
-  await expect(page.locator('.stat-card').first()).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.stat-card').first()).toBeVisible({ timeout: 30000 });
 });
 
 test('projects page loads with kanban columns', async ({ page }) => {

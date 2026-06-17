@@ -39,8 +39,7 @@ test.describe('Project detail page layout', () => {
   });
 
   test('project status badge is visible', async ({ page }) => {
-    const header = page.locator('.card-header, [class*="header"]').first();
-    await header.waitFor({ timeout: 10000 });
+    await page.waitForLoadState('networkidle');
     // Status badge should match known statuses
     await expect(page.getByText(/active|on hold|completed|cancelled/i).first()).toBeVisible({ timeout: 10000 });
   });
