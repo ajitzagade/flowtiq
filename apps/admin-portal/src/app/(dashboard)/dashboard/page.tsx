@@ -433,7 +433,7 @@ export default function DashboardPage() {
                           {(log.metadata?.userName as string) || log.userEmail?.split('@')[0]}
                         </span>{' '}
                         {getActionLabel(log.action)}{' '}
-                        {log.entityName && <span className="text-slate-500">"{log.entityName}"</span>}
+                        {log.entityName && <span className="text-slate-500">&ldquo;{log.entityName}&rdquo;</span>}
                       </p>
                       {projectName && (
                         <p className="text-xs text-slate-400 mt-0.5">

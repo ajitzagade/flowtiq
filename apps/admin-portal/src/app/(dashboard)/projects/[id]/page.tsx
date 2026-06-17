@@ -1022,7 +1022,7 @@ export default function ProjectDetailPage() {
 
   const users = usersData?.items || [];
 
-  const projectWorkflows = project?.projectWorkflows || [];
+  const projectWorkflows = useMemo(() => project?.projectWorkflows ?? [], [project?.projectWorkflows]);
 
   // Must be before any early returns to satisfy Rules of Hooks
   const orderedWorkflows = useMemo(() => {

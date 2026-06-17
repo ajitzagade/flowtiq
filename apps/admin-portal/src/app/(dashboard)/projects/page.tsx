@@ -488,7 +488,7 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
       highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 300);
     return () => clearTimeout(timer);
-  }, [highlightWorkflowId, highlightRef.current]);
+  }, [highlightWorkflowId]);
 
   if (isLoading) {
     return (

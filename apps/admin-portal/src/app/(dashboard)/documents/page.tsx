@@ -290,7 +290,7 @@ export default function DocumentsPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  const allDocs = data?.items || [];
+  const allDocs = useMemo(() => data?.items ?? [], [data?.items]);
 
   // Client-side search filter
   const filteredDocs = useMemo(() => {

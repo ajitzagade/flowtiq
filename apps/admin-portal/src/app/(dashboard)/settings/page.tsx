@@ -257,6 +257,7 @@ export default function SettingsPage() {
                         disabled={isUploadingLogo}
                         className="w-full border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-blue-300 hover:bg-blue-50/30 transition-colors group"
                       >
+                        {/* eslint-disable-next-line jsx-a11y/alt-text */}
                         <Image size={32} className="mx-auto text-slate-300 group-hover:text-blue-400 mb-2" />
                         <p className="text-slate-500 text-sm font-medium">
                           {isUploadingLogo ? 'Uploading...' : 'Click to upload logo'}
