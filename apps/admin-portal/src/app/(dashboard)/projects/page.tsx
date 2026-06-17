@@ -115,6 +115,7 @@ function WorkflowKanban({
 }) {
   const qc = useQueryClient();
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const draggingIdRef = useRef<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const dragCounters = useRef<Record<string, number>>({});
 
@@ -186,14 +187,17 @@ function WorkflowKanban({
     const draggedWorkflowId = e.dataTransfer.getData('application/workflow-id');
     const expected = sectionWorkflowId ?? '';
     // Allow drop when draggedWorkflowId is empty (programmatic DragEvents used in tests
-    // can't set dataTransfer data); in that case fall through to the draggingId state fallback.
+    // can't set dataTransfer data); in that case fall through to the draggingId ref fallback.
     if (draggedWorkflowId && draggedWorkflowId !== expected) {
+      draggingIdRef.current = null;
       setDraggingId(null);
       setDragOverStage(null);
       return;
     }
 
-    const projectId = e.dataTransfer.getData('text/plain') || draggingId;
+    // Use ref as fallback — avoids stale useCallback closure when the drop fires
+    // before React re-renders with updated draggingId state (e.g. programmatic DragEvents).
+    const projectId = e.dataTransfer.getData('text/plain') || draggingIdRef.current;
     if (projectId) {
       const project = filtered.find((p) => p.id === projectId);
       const currentKey = project?.currentStage ?? '__no_stage__';
@@ -201,11 +205,13 @@ function WorkflowKanban({
         moveMutation.mutate({ id: projectId, stageKey });
       }
     }
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDragOverStage(null);
-  }, [draggingId, filtered, moveMutation, sectionWorkflowId]);
+  }, [filtered, moveMutation, sectionWorkflowId]);
 
   const handleDragEnd = useCallback(() => {
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDragOverStage(null);
     dragCounters.current = {};
@@ -294,7 +300,7 @@ function WorkflowKanban({
                     key={project.id}
                     project={project}
                     isDragging={draggingId === project.id}
-                    onDragStart={setDraggingId}
+                    onDragStart={(id) => { draggingIdRef.current = id; setDraggingId(id); }}
                     onDragEnd={handleDragEnd}
                     onEdit={onEdit}
                   />
