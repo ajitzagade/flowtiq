@@ -1,1 +1,6 @@
 .vercel
+
+# Playwright
+.auth/
+playwright-report/
+test-results/
