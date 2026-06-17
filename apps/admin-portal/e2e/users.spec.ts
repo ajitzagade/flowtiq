@@ -82,13 +82,10 @@ test.describe('Users search', () => {
 
   test('searching by name filters rows', async ({ page }) => {
     const search = page.locator('input[placeholder*="name or email" i]');
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/users') && resp.status() === 200,
-      { timeout: 15000 }
-    );
     await search.fill('xxxxxx_does_not_exist');
-    await responsePromise;
-    await page.waitForTimeout(300);
+    // Wait for the empty state to appear — more reliable than waitForResponse
+    // which can resolve on a background refetch before the search response arrives.
+    await page.getByText(/no users found/i).waitFor({ timeout: 12000 }).catch(() => {});
     const rowCount = await page.locator('table tbody tr').count();
     const emptyState = page.getByText(/no users found/i);
     const hasEmpty = await emptyState.isVisible().catch(() => false);

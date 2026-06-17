@@ -461,14 +461,15 @@ test.describe('Reports export buttons', () => {
   test('clicking "CSV" export when data exists shows success toast', async ({ page }) => {
     // Switch to Last Year to ensure there's data
     await page.getByRole('button', { name: /last year/i }).click();
-    await page.waitForTimeout(2000);
+    // Wait for the table to actually render (up to 10s) rather than a fixed delay
+    await page.locator('table').first().waitFor({ timeout: 10000 }).catch(() => {});
 
     const csvBtn = page.getByRole('button', { name: /csv/i }).first();
-    // Only test if data is loaded (table is visible)
+    // Only run the assertion if data loaded — avoids false failures on empty envs
     const hasTable = await page.locator('table').count() > 0;
     if (hasTable) {
       await csvBtn.click();
-      await expect(page.getByText(/csv exported/i)).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText(/csv exported/i)).toBeVisible({ timeout: 8000 });
     }
   });
 

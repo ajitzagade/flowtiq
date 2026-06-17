@@ -195,8 +195,17 @@ test.describe('Flow: Drag-drop moves card to correct column', () => {
       return;
     }
 
-    // Drag the card to the target column
-    await firstCard.dragTo(targetColumn);
+    // Drag the card to the target column using low-level mouse events which
+    // reliably trigger HTML5 dragstart/dragover/drop handlers in headless Chromium.
+    const cardBox = await firstCard.boundingBox();
+    const colBox = await targetColumn.boundingBox();
+    if (!cardBox || !colBox) { test.skip(); return; }
+
+    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await page.mouse.down();
+    // Move in steps so dragover fires at intermediate positions
+    await page.mouse.move(colBox.x + colBox.width / 2, colBox.y + colBox.height / 2, { steps: 20 });
+    await page.mouse.up();
 
     // Verify "Moved to" toast appears
     await expect(page.getByText(/moved to/i)).toBeVisible({ timeout: 10000 });

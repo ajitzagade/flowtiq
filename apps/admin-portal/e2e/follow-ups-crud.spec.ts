@@ -101,10 +101,11 @@ test.describe('Complete follow-up', () => {
   });
 
   test('clicking "Mark as completed" updates status to completed', async ({ page }) => {
-    // We need an existing pending follow-up
-    // First check if there are any pending ones visible; if not, create one
-    const pendingRows = page.locator('tbody tr').filter({ hasText: /pending/i });
-    const count = await pendingRows.count();
+    // We need a follow-up that hasn't been completed yet.
+    // Filter by presence of the "Mark as completed" button — more reliable than
+    // text-matching because overdue pending rows show "overdue" not "pending".
+    const incompleteRows = page.locator('tbody tr').filter({ has: page.locator('button[title="Mark as completed"]') });
+    const count = await incompleteRows.count();
 
     if (count === 0) {
       // Create a follow-up to complete
@@ -129,8 +130,8 @@ test.describe('Complete follow-up', () => {
       await expect(modal).not.toBeVisible({ timeout: 5000 });
     }
 
-    // Find a pending row and click its "Mark as completed" button
-    const pendingRow = page.locator('tbody tr').filter({ hasText: /pending/i }).first();
+    // Find a row that has the "Mark as completed" button and click it
+    const pendingRow = page.locator('tbody tr').filter({ has: page.locator('button[title="Mark as completed"]') }).first();
     await pendingRow.waitFor({ timeout: 10000 });
     const completeBtn = pendingRow.locator('button[title="Mark as completed"]');
     await completeBtn.click();
@@ -183,15 +184,23 @@ test.describe('Update follow-up', () => {
     await firstUser.waitFor({ state: 'attached', timeout: 10000 });
     await ownerSelect.selectOption(await firstUser.getAttribute('value') ?? '');
 
-    const uniqueNote = `Cancel E2E ${Date.now()}`;
     await createModal.locator('input[type="date"]').fill(futureDateString(5));
-    await createModal.locator('textarea').fill(uniqueNote);
+    await createModal.locator('textarea').fill(`Cancel E2E ${Date.now()}`);
     await page.getByRole('button', { name: /create follow.up/i }).click();
     await expect(page.getByText('Follow-up created')).toBeVisible({ timeout: 10000 });
     await expect(createModal).not.toBeVisible({ timeout: 5000 });
 
-    // Find our row by its note and click edit
-    const targetRow = page.getByRole('cell', { name: new RegExp(uniqueNote) }).locator('..');
+    // Filter to pending so the newly created follow-up is at the top
+    const statusFilter = page.locator('select.form-select');
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/follow') && resp.status() === 200,
+      { timeout: 10000 }
+    );
+    await statusFilter.selectOption('pending');
+    await responsePromise.catch(() => page.waitForTimeout(800));
+
+    // Click edit on the first pending row (newest created)
+    const targetRow = page.locator('tbody tr').first();
     await targetRow.waitFor({ timeout: 10000 });
     await targetRow.getByTitle(/edit/i).click();
 
