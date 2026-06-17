@@ -7,6 +7,7 @@ import { Header } from '@/components/layout/Header';
 import { Search, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import type { AuditLog } from '@flowtiq/shared-types';
+import Link from 'next/link';
 
 const ACTION_COLORS: Record<string, string> = {
   CREATED: 'badge-green',
@@ -119,7 +120,10 @@ export default function AuditLogsPage() {
                   </div>
                 </td></tr>
               )}
-              {logs.map((log) => (
+              {logs.map((log) => {
+                const metaProject = log.metadata?.projectName ? String(log.metadata.projectName) : null;
+                const metaProjectId = log.metadata?.projectId ? String(log.metadata.projectId) : null;
+                return (
                 <tr key={log.id}>
                   <td className="text-sm text-slate-600 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
                   <td>
@@ -139,12 +143,28 @@ export default function AuditLogsPage() {
                       <div>
                         <p className="text-sm font-medium text-slate-700">{log.entityName}</p>
                         {log.entityType && <p className="text-xs text-slate-400 capitalize">{log.entityType}</p>}
+                        {metaProject && (
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            <span className="text-slate-400">Project: </span>
+                            {metaProjectId ? (
+                              <Link
+                                href={`/projects/${metaProjectId}`}
+                                className="text-blue-500 hover:underline"
+                              >
+                                {metaProject}
+                              </Link>
+                            ) : (
+                              <span>{metaProject}</span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     ) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="text-sm text-slate-500 font-mono">{log.ipAddress || '—'}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
