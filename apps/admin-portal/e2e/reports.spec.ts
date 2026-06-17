@@ -461,13 +461,15 @@ test.describe('Reports export buttons', () => {
   test('clicking "CSV" export when data exists shows success toast', async ({ page }) => {
     // Switch to Last Year to ensure there's data
     await page.getByRole('button', { name: /last year/i }).click();
-    // Wait for the table to actually render (up to 10s) rather than a fixed delay
-    await page.locator('table').first().waitFor({ timeout: 10000 }).catch(() => {});
+    // Wait for the projects table to actually render (up to 10s).
+    // Use table.table tbody tr (not just any <table>) because Recharts renders
+    // accessibility <table> elements even when there are zero project rows.
+    await page.locator('table.table tbody tr').first().waitFor({ timeout: 10000 }).catch(() => {});
 
     const csvBtn = page.getByRole('button', { name: /csv/i }).first();
-    // Only run the assertion if data loaded — avoids false failures on empty envs
-    const hasTable = await page.locator('table').count() > 0;
-    if (hasTable) {
+    // Only run the assertion if project rows actually loaded
+    const hasProjectRows = await page.locator('table.table tbody tr').count() > 0;
+    if (hasProjectRows) {
       await csvBtn.click();
       await expect(page.getByText(/csv exported/i)).toBeVisible({ timeout: 8000 });
     }

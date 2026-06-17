@@ -200,12 +200,21 @@ test.describe('Flow: Drag-drop moves card to correct column', () => {
     // onDragStart/onDrop handlers. Instead we dispatch dragstart on the card (which
     // sets the draggingId React state) then dispatch dragover+drop on the target column.
     // A 200ms gap lets React process the state update before the drop fires.
+    //
+    // IMPORTANT: We pre-set 'text/plain' on the DataTransfer before dispatching because
+    // in Chromium headless, DataTransfer.setData() calls made inside React's synthetic
+    // onDragStart handler do not always persist. The handleDrop fallback reads
+    // e.dataTransfer.getData('text/plain') first, so pre-setting guarantees the project
+    // ID is available regardless of React state timing.
     const dragged = await page.evaluate(async ([pid, stageKey]) => {
       const card = document.querySelector(`[data-project-id="${pid}"]`);
       const col  = document.querySelector(`[data-stage-key="${stageKey}"]`);
       if (!card || !col) return false;
 
       const dt = new DataTransfer();
+      // Pre-set the project ID so handleDrop can read it via getData('text/plain')
+      dt.setData('text/plain', pid as string);
+
       card.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
 
       // Wait for React to process setDraggingId state update
