@@ -40,7 +40,6 @@ test.describe('Dashboard stat cards', () => {
     // "Active Projects" card links to /projects?status=active
     const activeProjectsCard = page.locator('.stat-card').filter({ hasText: 'Active Projects' });
     await expect(activeProjectsCard).toBeVisible();
-    const link = activeProjectsCard.locator('..').locator('a').or(activeProjectsCard.closest('a'));
     // Just verify the link href contains /projects
     const href = await page.locator('a[href*="/projects"]').first().getAttribute('href');
     expect(href).toBeTruthy();

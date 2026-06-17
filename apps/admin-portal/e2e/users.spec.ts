@@ -188,7 +188,7 @@ test.describe('New User modal', () => {
     await page.getByRole('dialog').locator('input[type="password"]').fill('Test@12345');
 
     // Select a role (click first available role pill)
-    const rolePills = page.getByRole('dialog').getByRole('button').not(page.getByRole('button', { name: /cancel|create/i }));
+    const rolePills = page.getByRole('dialog').getByRole('button').filter({ hasNotText: /cancel|create/i });
     if (await rolePills.count() > 0) {
       await rolePills.first().click();
     }

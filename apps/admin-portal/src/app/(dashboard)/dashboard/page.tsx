@@ -334,7 +334,7 @@ export default function DashboardPage() {
                 View all <ArrowRight size={14} />
               </Link>
             </div>
-            <div className="divide-y overflow-y-auto flex-1 min-h-0" style={{ borderColor: '#eef0f8' }}>
+            <div className="divide-y overflow-y-auto max-h-[400px]" style={{ borderColor: '#eef0f8' }}>
               {stats?.recentProjects?.length === 0 && (
                 <div className="empty-state py-10">
                   <FolderKanban size={40} className="text-slate-200 mb-3" />
@@ -415,11 +415,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent activity */}
-            <div className="card flex flex-col flex-1 min-h-0">
+            <div className="card flex flex-col">
               <div className="card-header flex-shrink-0">
                 <h3 className="font-semibold text-slate-900">Recent Activity</h3>
               </div>
-              <div className="divide-y divide-slate-100 overflow-y-auto flex-1 min-h-0">
+              <div className="divide-y divide-slate-100 overflow-y-auto max-h-[280px]">
                 {stats?.recentActivity?.slice(0, 8).map((log) => (
                   <div key={log.id} className="px-4 py-3">
                     <p className="text-sm text-slate-700">

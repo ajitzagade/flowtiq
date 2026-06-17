@@ -198,7 +198,7 @@ test('Completing a stage → card column changes in kanban (currentStageKey adva
   const getColumn = async () => {
     const col = page.locator(`[data-project-id="${projectId}"]`)
       .locator('xpath=ancestor::*[@data-stage-key][1]');
-    return col.count() > 0 ? col.getAttribute('data-stage-key') : null;
+    return (await col.count()) > 0 ? col.getAttribute('data-stage-key') : null;
   };
   const columnBefore = await getColumn();
 

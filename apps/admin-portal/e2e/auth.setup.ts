@@ -15,9 +15,9 @@ fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
 setup('authenticate as admin', async ({ page }) => {
   await page.goto('/login');
 
-  await page.getByLabel(/email/i).fill('admin@vastudeep.com');
-  await page.getByLabel(/password/i).fill('Admin@123');
-  await page.getByRole('button', { name: /sign in|log in/i }).click();
+  await page.locator('input[type="email"]').fill('admin@vastudeep.com');
+  await page.locator('input[type="password"]').fill('Admin@123');
+  await page.getByRole('button', { name: /sign in/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 
