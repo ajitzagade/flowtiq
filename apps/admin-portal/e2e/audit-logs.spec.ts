@@ -158,8 +158,13 @@ test.describe('Audit Logs filters', () => {
 
   test('filtering by "CREATED" action shows only create logs', async ({ page }) => {
     const actionSelect = page.locator('select').filter({ has: page.locator('option[value="CREATED"]') }).first();
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/audit') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await actionSelect.selectOption('CREATED');
-    await page.waitForTimeout(600);
+    await responsePromise.catch(() => page.waitForTimeout(800));
+    await page.waitForTimeout(300);
     const rows = page.locator('table tbody tr');
     const count = await rows.count();
     if (count > 0 && !(await page.getByText(/no audit logs found/i).isVisible())) {

@@ -127,8 +127,13 @@ test('Mark follow-up as completed → toast + row shows "completed" status', asy
   await expect(page.getByText(/follow.up completed/i)).toBeVisible({ timeout: 10000 });
 
   // After completion, filtering to "completed" should find the row
+  const completedResponsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/follow') && resp.status() === 200,
+    { timeout: 10000 }
+  );
   await statusFilter.selectOption('completed');
-  await page.waitForTimeout(600);
+  await completedResponsePromise.catch(() => page.waitForTimeout(800));
+  await page.waitForTimeout(300);
 
   const completedRows = page.locator('table tbody tr').filter({ hasText: /completed/i });
   expect(await completedRows.count()).toBeGreaterThan(0);
