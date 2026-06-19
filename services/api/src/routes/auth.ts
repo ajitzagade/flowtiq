@@ -319,7 +319,6 @@ authRouter.post('/forgot-password', async (req, res, next) => {
       return;
     }
     // TODO: send password reset email (Phase 2 — email service not yet configured)
-    console.log(`[forgot-password] Reset requested for: ${email}`);
     res.json({ success: true, message: 'If an account exists, a reset link has been sent.' });
   } catch (err) {
     next(err);

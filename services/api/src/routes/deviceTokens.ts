@@ -6,12 +6,12 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 
 const registerSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).max(4096),
   platform: z.enum(['ios', 'android']),
 });
 
 const deregisterSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).max(4096),
 });
 
 // POST /api/users/device-token — register or reactivate a device token
@@ -30,6 +30,12 @@ router.post('/device-token', authenticate, async (req: AuthRequest, res: Respons
     res.status(400).json({ success: false, error: 'Tenant context required' });
     return;
   }
+
+  // Deactivate the same physical token if it belongs to another user (device transfer / re-login)
+  await prisma.deviceToken.updateMany({
+    where: { token, userId: { not: userId } },
+    data: { isActive: false },
+  });
 
   const existing = await prisma.deviceToken.findUnique({
     where: { userId_token: { userId, token } },
@@ -53,10 +59,12 @@ router.post('/device-token', authenticate, async (req: AuthRequest, res: Respons
 });
 
 // DELETE /api/users/device-token — deregister (soft-deactivate) a device token
+// Note: send { token } in the request body. Some HTTP clients strip DELETE bodies —
+// use POST /api/users/device-token/deregister as an alternative.
 router.delete('/device-token', authenticate, async (req: AuthRequest, res: Response) => {
   const parsed = deregisterSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ success: false, error: 'Invalid request body' });
+    res.status(400).json({ success: false, error: 'token is required in the request body' });
     return;
   }
 
@@ -69,6 +77,22 @@ router.delete('/device-token', authenticate, async (req: AuthRequest, res: Respo
     data: { isActive: false },
   });
 
+  res.status(200).json({ success: true });
+});
+
+// POST /api/users/device-token/deregister — alternative for clients that strip DELETE bodies
+router.post('/device-token/deregister', authenticate, async (req: AuthRequest, res: Response) => {
+  const parsed = deregisterSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, error: 'token is required in the request body' });
+    return;
+  }
+  const { token } = parsed.data;
+  const userId = req.user.userId;
+  await prisma.deviceToken.updateMany({
+    where: { userId, token },
+    data: { isActive: false },
+  });
   res.status(200).json({ success: true });
 });
 

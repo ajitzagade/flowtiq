@@ -315,14 +315,15 @@ stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, 
       }
     }
 
-    // AC-2: Push for stage status update — notify all project team members
+    // AC-2: Push for stage status update — notify all project team members (exclude acting user)
     if (status !== undefined && status !== previousStatus) {
       const projectForPush = await prisma.project.findUnique({
         where: { id: stage.projectId },
         select: { ownerId: true, teamMembers: true, tenantId: true },
       });
       if (projectForPush) {
-        const recipients = Array.from(new Set([projectForPush.ownerId, ...projectForPush.teamMembers]));
+        const recipients = Array.from(new Set([projectForPush.ownerId, ...projectForPush.teamMembers]))
+          .filter((id) => id !== userId);
         for (const uid of recipients) {
           sendPushNotification(uid, projectForPush.tenantId, {
             title: 'Stage Updated',
@@ -479,8 +480,14 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
 
     const stage = await prisma.projectStage.findUnique({
       where: { id: req.params.stageId },
-      select: { status: true, stageName: true, projectId: true },
+      select: { status: true, stageName: true, projectId: true, project: { select: { tenantId: true } } },
     });
+
+    // Tenant isolation: ensure the stage belongs to the authenticated user's tenant
+    if (!stage || (stage.project.tenantId !== authReq.user.tenantId && !authReq.user.isSuperAdmin)) {
+      res.status(404).json({ success: false, error: 'Sub-task not found' });
+      return;
+    }
 
     const updated = await prisma.stageSubTask.update({
       where: { id: req.params.subTaskId },
@@ -552,10 +559,15 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
 // DELETE /api/stages/:stageId/sub-tasks/:subTaskId
 stagesRouter.delete('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:edit'), async (req, res, next) => {
   try {
+    const authReq = req as AuthRequest;
     const subTask = await prisma.stageSubTask.findFirst({
       where: { id: req.params.subTaskId, stageId: req.params.stageId },
+      include: { stage: { select: { project: { select: { tenantId: true } } } } },
     });
-    if (!subTask) {
+    if (
+      !subTask ||
+      (subTask.stage.project.tenantId !== authReq.user.tenantId && !authReq.user.isSuperAdmin)
+    ) {
       res.status(404).json({ success: false, error: 'Sub-task not found' });
       return;
     }

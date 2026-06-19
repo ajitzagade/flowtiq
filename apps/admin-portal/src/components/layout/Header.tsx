@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, patch } from '@/lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import type { Notification } from '@flowtiq/shared-types';
 
 const TYPE_ICONS: Record<string, { icon: React.ElementType; color: string }> = {
@@ -72,6 +73,7 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
   const markAllReadMutation = useMutation({
     mutationFn: () => patch('/notifications/read-all', {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: () => toast.error('Failed to mark all notifications as read'),
   });
 
   const unreadCount = notifData?.unreadCount ?? 0;

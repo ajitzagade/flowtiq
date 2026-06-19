@@ -21,19 +21,22 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef, isOpen);
 
+  // Stable ref for onCancel so the Escape effect doesn't re-register on every render
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => { onCancelRef.current = onCancel; });
+
   useEffect(() => {
     if (!isOpen) return;
-    cancelRef.current?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape') onCancelRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onCancel]);
+  }, [isOpen]); // stable: onCancelRef identity never changes
+
 
   if (!isOpen) return null;
 
@@ -59,7 +62,7 @@ export function ConfirmModal({
         <div className="p-6 space-y-4">
           <p className="text-sm text-slate-600">{description}</p>
           <div className="flex gap-3 justify-end">
-            <button ref={cancelRef} onClick={onCancel} className="btn-secondary">
+            <button onClick={onCancel} className="btn-secondary">
               Cancel
             </button>
             <button onClick={onConfirm} className="btn-danger">

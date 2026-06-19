@@ -11,11 +11,14 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, isActive: boolea
   useEffect(() => {
     if (!isActive || !ref.current) return;
     previousFocus.current = document.activeElement as HTMLElement;
-    const focusable = Array.from(ref.current.querySelectorAll<HTMLElement>(FOCUSABLE));
-    focusable[0]?.focus();
+    // Focus the first focusable element in the trap
+    const initial = ref.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+    initial[0]?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
+      if (e.key !== 'Tab' || !ref.current) return;
+      // Re-query on every keydown so the list is never stale (dynamic modal content)
+      const focusable = Array.from(ref.current.querySelectorAll<HTMLElement>(FOCUSABLE));
       if (focusable.length === 0) { e.preventDefault(); return; }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -29,7 +32,11 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, isActive: boolea
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      previousFocus.current?.focus();
+      // Restore focus to the element that was active before the trap opened,
+      // but only if it's still in the DOM (avoids silent no-op on removed elements)
+      if (previousFocus.current && document.contains(previousFocus.current)) {
+        previousFocus.current.focus();
+      }
     };
   }, [isActive, ref]);
 }

@@ -495,17 +495,19 @@ model UserNotificationPreference {
 }
 
 model TenantPushCredentials {
-  id             String   @id @default(cuid())
-  tenantId       String   @unique
-  fcmServerKey   String?
-  fcmProjectId   String?
-  apnsKeyId      String?
-  apnsTeamId     String?
-  apnsPrivateKey String?
-  apnsBundleId   String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  // Firebase service account credentials (from the downloaded service account JSON)
+  serviceAccountEmail String?  // service_account client_email field
+  serviceAccountKey   String?  // service_account private_key field (PEM)
+  fcmProjectId        String?  // Firebase project ID
+  // APNs-specific fields (reserved for future direct APNs support)
+  apnsKeyId           String?
+  apnsTeamId          String?
+  apnsBundleId        String?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

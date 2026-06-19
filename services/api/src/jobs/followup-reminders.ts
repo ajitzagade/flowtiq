@@ -22,7 +22,10 @@ async function runFollowUpReminders(): Promise<void> {
     });
 
     for (const followUp of dueToday) {
-      if (!followUp.owner.tenantId) continue;
+      if (!followUp.owner.tenantId) {
+        console.warn(`Push: skipping follow-up ${followUp.id} — owner has no tenantId (super admin?)`);
+        continue;
+      }
       sendPushNotification(followUp.ownerId, followUp.owner.tenantId, {
         title: 'Follow-up Due Today',
         body: `Follow-up for ${followUp.project.name} is due today`,
@@ -46,7 +49,10 @@ async function runFollowUpReminders(): Promise<void> {
     });
 
     for (const followUp of overdue) {
-      if (!followUp.owner.tenantId) continue;
+      if (!followUp.owner.tenantId) {
+        console.warn(`Push: skipping follow-up ${followUp.id} — owner has no tenantId (super admin?)`);
+        continue;
+      }
       sendPushNotification(followUp.ownerId, followUp.owner.tenantId, {
         title: 'Follow-up Overdue',
         body: `Follow-up for ${followUp.project.name} is overdue`,
@@ -62,8 +68,16 @@ async function runFollowUpReminders(): Promise<void> {
 }
 
 export function startFollowUpReminderJob(): void {
+  // Guard: only run cron on the designated leader instance to prevent duplicate
+  // notifications when multiple API instances are deployed (set CRON_LEADER=true
+  // on exactly one Railway/container instance).
+  if (process.env.CRON_LEADER !== 'true') {
+    console.log('Follow-up reminder cron: CRON_LEADER not set — skipping registration on this instance');
+    return;
+  }
   // Run daily at 08:00 UTC
   cron.schedule('0 8 * * *', () => {
     runFollowUpReminders().catch((err) => console.error('Follow-up reminders job error:', err));
   });
+  console.log('Follow-up reminder cron registered (leader instance)');
 }

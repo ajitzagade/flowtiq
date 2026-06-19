@@ -7,7 +7,10 @@ function getFirebaseApp(tenantId: string, projectId: string, clientEmail: string
   const appName = `firebase-app-${tenantId}`;
   try {
     return getApp(appName);
-  } catch {
+  } catch (e: unknown) {
+    // Only swallow "app not found" — re-throw everything else
+    const code = (e as { errorInfo?: { code: string } })?.errorInfo?.code;
+    if (code !== 'app/no-app') throw e;
     return initializeApp(
       {
         credential: cert({ projectId, clientEmail, privateKey }),
@@ -48,12 +51,21 @@ export async function sendPushNotification(
       where: { tenantId },
     });
 
-    if (!creds || !creds.isActive || !creds.fcmProjectId || !creds.fcmServerKey || !creds.apnsPrivateKey) {
+    if (
+      !creds ||
+      !creds.isActive ||
+      !creds.fcmProjectId?.trim() ||
+      !creds.serviceAccountEmail?.trim() ||
+      !creds.serviceAccountKey?.trim()
+    ) {
       console.warn(`Push: no active FCM credentials for tenant ${tenantId}`);
       return;
     }
 
-    const app = getFirebaseApp(tenantId, creds.fcmProjectId, creds.fcmServerKey, creds.apnsPrivateKey);
+    // Normalize escaped newlines that may occur when credentials are copied from JSON/env
+    const normalizedKey = creds.serviceAccountKey.replace(/\\n/g, '\n');
+
+    const app = getFirebaseApp(tenantId, creds.fcmProjectId, creds.serviceAccountEmail, normalizedKey);
     const messaging = getMessaging(app);
 
     // Send to each token individually to enable per-token error handling

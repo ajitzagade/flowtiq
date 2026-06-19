@@ -173,7 +173,7 @@ followupsRouter.post('/', requirePermission('follow_ups:create'), async (req, re
     // AC-4: Push for follow-up assignment
     sendPushNotification(data.ownerId, tenantId as string, {
       title: 'Follow-up Assigned',
-      body: `You have a new follow-up: ${followUp.project.name}`,
+      body: `You have a new follow-up for ${followUp.project.name}`,
       eventType: 'followup_assigned',
       entityType: 'followup',
       entityId: followUp.id,
