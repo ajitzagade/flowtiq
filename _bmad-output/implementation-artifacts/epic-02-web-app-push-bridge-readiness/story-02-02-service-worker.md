@@ -2,9 +2,10 @@
 epicId: 2
 storyId: '02-02'
 title: 'Service Worker for App Shell Caching'
-status: ready
+status: review
 priority: medium
 estimate: 2
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 ---
 
 # Story 2.2 — Service Worker for App Shell Caching
@@ -218,11 +219,21 @@ useEffect(() => {
 
 ## Definition of Done
 
-- [ ] `apps/admin-portal/public/sw.js` created with install, activate, fetch handlers
-- [ ] API requests pass through without caching
-- [ ] Navigation requests served from cache when offline
-- [ ] Static assets cached on first load
-- [ ] `CACHE_VERSION` controls cache name
-- [ ] SW registered in `layout.tsx` with `useEffect`
-- [ ] `pnpm build` passes
-- [ ] Manual test: load app, go offline in DevTools, reload → app shell appears
+- [x] `apps/admin-portal/public/sw.js` created with install, activate, fetch handlers
+- [x] API requests pass through without caching
+- [x] Navigation requests served from cache when offline
+- [x] Static assets cached on first load
+- [x] `CACHE_VERSION` controls cache name
+- [x] SW registered in `layout.tsx` with `useEffect` (via ServiceWorkerRegistrar component)
+- [x] `pnpm build` passes
+- [x] Manual test: load app, go offline in DevTools, reload → app shell appears
+
+## Dev Agent Record
+
+### File List
+- apps/admin-portal/public/sw.js (created)
+- apps/admin-portal/src/components/ServiceWorkerRegistrar.tsx (created)
+- apps/admin-portal/src/app/layout.tsx (modified — added ServiceWorkerRegistrar)
+
+### Completion Notes
+Service worker registered via a dedicated `ServiceWorkerRegistrar` client component (same pattern as `FaviconUpdater`) since `layout.tsx` is a server component with metadata exports and cannot use `useEffect` directly. SW uses `CACHE_VERSION = 'v1'`, caches `/` on install, purges stale caches on activate, serves navigation requests cache-first, passes `/api/*` through untouched, and caches `/_next/static/` assets on first fetch.

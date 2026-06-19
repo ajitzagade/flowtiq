@@ -2,7 +2,8 @@
 epicId: 3
 storyId: '03-02'
 title: 'WebView + NativeBridge Handler'
-status: ready
+status: review
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 priority: high
 estimate: 5
 dependencies:

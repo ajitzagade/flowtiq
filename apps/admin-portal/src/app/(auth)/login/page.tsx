@@ -10,6 +10,8 @@ import { Eye, EyeOff, Building2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
+import { registerPushTokenIfNative } from '@/lib/pushToken';
+import { isNativeApp } from '@/lib/nativeBridge';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -85,6 +87,16 @@ export default function LoginPage() {
       const { user, accessToken, refreshToken, tenant } = data.data;
       setAuth(user, accessToken, refreshToken, tenant);
       toast.success(`Welcome back, ${user.firstName}!`);
+      // Story 3.3: send tokens to native Keychain when running inside the shell
+      if (isNativeApp()) {
+        window.NativeBridge!.postMessage(JSON.stringify({
+          type: 'STORE_TOKENS',
+          requestId: crypto.randomUUID(),
+          payload: { accessToken, refreshToken, user, tenant }, // P18: include tenant so native shell can restore it
+        }));
+      }
+      // Story 2.4: fire-and-forget push token registration
+      registerPushTokenIfNative();
       router.push('/dashboard');
     } catch (err: unknown) {
       const msg =

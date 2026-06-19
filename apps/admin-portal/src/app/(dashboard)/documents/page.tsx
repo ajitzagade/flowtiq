@@ -7,12 +7,13 @@ import { get } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import {
   Search, FileText, Upload, Download, Trash2, X, FolderOpen,
-  ChevronDown, GitBranch, Layers,
+  ChevronDown, GitBranch, Layers, Camera,
 } from 'lucide-react';
 import { formatDate, formatFileSize, cn, getErrorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import type { Document, Project } from '@flowtiq/shared-types';
+import { isNativeApp, requestFilePick, requestCameraCapture } from '@/lib/nativeBridge';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { SkeletonCard } from '@/components/Skeleton';
@@ -37,6 +38,8 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [nativePicking, setNativePicking] = useState(false);
+  const inNativeApp = isNativeApp();
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects', 'all'],
@@ -49,6 +52,35 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
     const dropped = e.dataTransfer.files[0];
     if (dropped) setFile(dropped);
   }, []);
+
+  const handleNativeFilePick = async () => {
+    setNativePicking(true);
+    try {
+      const files = await requestFilePick({ multiple: false, accept: '*/*' });
+      if (files[0]) setFile(files[0]);
+    } catch (err) {
+      // USER_CANCELLED is the exact sentinel from bridgeHandlers — any other error is unexpected
+      if (err instanceof Error && err.message !== 'USER_CANCELLED') {
+        toast.error('Could not open file picker');
+      }
+    } finally {
+      setNativePicking(false);
+    }
+  };
+
+  const handleNativeCameraCapture = async () => {
+    setNativePicking(true);
+    try {
+      const captured = await requestCameraCapture();
+      setFile(captured);
+    } catch (err) {
+      if (err instanceof Error && err.message !== 'USER_CANCELLED') {
+        toast.error('Could not open camera');
+      }
+    } finally {
+      setNativePicking(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file || !projectId) {
@@ -95,35 +127,77 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
 
           <div>
             <label className="form-label">File *</label>
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              className={cn(
-                'border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer',
-                dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
-              )}
-              onClick={() => document.getElementById('file-input')?.click()}
-            >
-              <Upload size={24} className={cn('mx-auto mb-2', dragOver ? 'text-blue-500' : 'text-slate-300')} />
-              {file ? (
-                <div>
-                  <p className="font-medium text-slate-800">{file.name}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{formatFileSize(file.size)}</p>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-slate-500">Drag & drop or click to browse</p>
-                  <p className="text-xs text-slate-400 mt-1">Max file size: 50MB</p>
-                </div>
-              )}
-              <input
-                id="file-input"
-                type="file"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-            </div>
+            {inNativeApp ? (
+              <div className="space-y-2">
+                {file ? (
+                  <div className="border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-slate-800 text-sm">{file.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{formatFileSize(file.size)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFile(null)}
+                      className="btn-ghost p-1.5"
+                      aria-label="Remove file"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleNativeFilePick}
+                      disabled={nativePicking}
+                      className="btn-secondary flex-1 flex items-center justify-center gap-2"
+                    >
+                      <Upload size={16} />
+                      {nativePicking ? 'Opening...' : 'Select File'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNativeCameraCapture}
+                      disabled={nativePicking}
+                      className="btn-secondary flex items-center justify-center gap-2 px-4"
+                    >
+                      <Camera size={16} />
+                      Take Photo
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                onDrop={handleDrop}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                className={cn(
+                  'border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer',
+                  dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
+                )}
+                onClick={() => document.getElementById('file-input')?.click()}
+              >
+                <Upload size={24} className={cn('mx-auto mb-2', dragOver ? 'text-blue-500' : 'text-slate-300')} />
+                {file ? (
+                  <div>
+                    <p className="font-medium text-slate-800">{file.name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{formatFileSize(file.size)}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm text-slate-500">Drag & drop or click to browse</p>
+                    <p className="text-xs text-slate-400 mt-1">Max file size: 50MB</p>
+                  </div>
+                )}
+                <input
+                  id="file-input"
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -139,7 +213,7 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
 
           <div className="flex justify-end gap-3">
             <button onClick={onClose} className="btn-secondary">Cancel</button>
-            <button onClick={handleUpload} disabled={uploading || !file || !projectId} className="btn-primary">
+            <button onClick={handleUpload} disabled={uploading || nativePicking || !file || !projectId} className="btn-primary">
               {uploading ? 'Uploading...' : 'Upload'}
             </button>
           </div>

@@ -9,8 +9,8 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const VASTUDEEP_BRANDING = {
-  primaryColor: '#1e3a5f',
-  secondaryColor: '#c9a84c',
+  primaryColor: '#3b82f6',
+  secondaryColor: '#0f172a',
   accentColor: '#e8f0fe',
   fontFamily: 'Inter',
   theme: 'light',

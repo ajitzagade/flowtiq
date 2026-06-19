@@ -1,0 +1,4 @@
+app_identifier("com.vastudeep.flowtiq") # overridden per tenant via apply-tenant-config.js
+
+itc_team_id(ENV["APPLE_TEAM_ID"])
+team_id(ENV["APPLE_TEAM_ID"])

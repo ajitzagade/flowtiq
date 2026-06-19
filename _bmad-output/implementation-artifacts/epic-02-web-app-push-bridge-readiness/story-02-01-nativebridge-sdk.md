@@ -2,9 +2,10 @@
 epicId: 2
 storyId: '02-01'
 title: 'NativeBridge SDK (Web Side)'
-status: ready
+status: review
 priority: high
 estimate: 3
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 ---
 
 # Story 2.1 — NativeBridge SDK (Web Side)
@@ -229,10 +230,18 @@ export interface FilePickOptions {
 
 ## Definition of Done
 
-- [ ] `apps/admin-portal/src/lib/nativeBridge.ts` created
-- [ ] All 7 exported functions implemented
-- [ ] `Window` interface extended for TypeScript
-- [ ] Graceful fallbacks when not in native app
-- [ ] 15-second timeout with cleanup on all async requests
-- [ ] `pnpm type-check` passes
-- [ ] Manual test in browser: `isNativeApp()` returns false, `getPushToken()` resolves null
+- [x] `apps/admin-portal/src/lib/nativeBridge.ts` created
+- [x] All 7 exported functions implemented
+- [x] `Window` interface extended for TypeScript
+- [x] Graceful fallbacks when not in native app
+- [x] 15-second timeout with cleanup on all async requests
+- [x] `pnpm type-check` passes
+- [x] Manual test in browser: `isNativeApp()` returns false, `getPushToken()` resolves null
+
+## Dev Agent Record
+
+### File List
+- apps/admin-portal/src/lib/nativeBridge.ts (created)
+
+### Completion Notes
+Implemented all 7 exported functions with full TypeScript types, Window interface declaration, graceful browser fallbacks (isNativeApp=false returns safe defaults), 15-second timeout with event listener cleanup, and base64→File reconstruction helper. `pnpm type-check` passes with zero errors.

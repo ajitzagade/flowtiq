@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { useSidebarStore } from '@/store/sidebar';
+import { deregisterPushTokenIfNative } from '@/lib/pushToken';
 
 // permission code required to see a nav item (null = always visible)
 const NAV_ITEMS: Array<{ key: string; label: string; href: string; icon: React.ElementType; requiredPermission: string | null }> = [
@@ -50,6 +51,8 @@ export function Sidebar() {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const handleLogout = () => {
+    // fire-and-forget: deregister push token before clearing auth state
+    deregisterPushTokenIfNative();
     logout();
     window.location.href = '/login';
   };

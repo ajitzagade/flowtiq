@@ -16,7 +16,8 @@
     "db:studio": "turbo run db:studio --filter=@flowtiq/database",
     "test:e2e": "pnpm --filter @flowtiq/admin-portal test:e2e",
     "test:e2e:prod": "pnpm --filter @flowtiq/admin-portal test:e2e:prod",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "config:tenant": "node scripts/apply-tenant-config.js"
   },
   "dependencies": {
     "next": "14.1.4"

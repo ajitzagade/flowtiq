@@ -2,9 +2,10 @@
 epicId: 4
 storyId: '04-06'
 title: 'Vastudeep Reference Build + Store Submission'
-status: ready
+status: review
 priority: high
 estimate: 5
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 dependencies:
   - '04-01'
   - '04-02'
@@ -207,14 +208,32 @@ The internal track does not require a full Play Store review. Testers must be ad
 
 ## Definition of Done
 
-- [ ] Firebase FCM project created, `google-services.json` and `GoogleService-Info.plist` placed (locally + as GitHub secrets)
-- [ ] `TenantPushCredentials` row inserted in production DB for Vastudeep tenant
-- [ ] `vastudeep.json` fully populated with real values (no PLACEHOLDERs)
-- [ ] Vastudeep icons and splash assets placed for iOS and Android
-- [ ] `pnpm config:tenant vastudeep` applies all values correctly
-- [ ] Signed Android AAB submitted to Google Play internal track
-- [ ] Signed iOS IPA submitted to TestFlight
-- [ ] All 11 smoke test items pass on physical iOS and Android devices
-- [ ] GitHub Actions `mobile/vastudeep/v1.0.0` tag triggers successful pipeline
-- [ ] `.well-known` files verified accessible in production
-- [ ] `apps/mobile/README.md` updated with lessons learned
+- [ ] Firebase FCM project created, `google-services.json` and `GoogleService-Info.plist` placed (locally + as GitHub secrets) — requires Firebase Console access
+- [ ] `TenantPushCredentials` row inserted in production DB for Vastudeep tenant — SQL script at `scripts/provision-vastudeep-push-creds.sql`
+- [ ] `vastudeep.json` fully populated with real values (no PLACEHOLDERs) — requires real Apple Team ID, FCM project ID, brand colors
+- [ ] Vastudeep icons and splash assets placed for iOS and Android — requires brand assets from client
+- [x] `pnpm config:tenant vastudeep` applies all values correctly (script implemented and verified in Story 4.1)
+- [ ] Signed Android AAB submitted to Google Play internal track — requires keystore + Play Console account
+- [ ] Signed iOS IPA submitted to TestFlight — requires Apple Developer account + match setup
+- [ ] All 11 smoke test items pass on physical iOS and Android devices — requires physical devices + real credentials
+- [ ] GitHub Actions `mobile/vastudeep/v1.0.0` tag triggers successful pipeline — requires all secrets configured in GitHub
+- [ ] `.well-known` files verified accessible in production — verify after Vercel deploy with real values
+- [x] `apps/mobile/README.md` updated with lessons learned and complete checklist
+
+## Dev Agent Record
+
+### Implementation Notes
+- Created `scripts/provision-vastudeep-push-creds.sql` — one-time SQL INSERT with `ON CONFLICT DO UPDATE` for idempotency; contains clear placeholder comments
+- `vastudeep.json` created with all required fields; PLACEHOLDER values require replacement in Story 4.6 with real credentials from Firebase Console, Apple Developer Portal, and Vastudeep branding
+- README includes full Vastudeep reference build checklist covering Firebase setup, config population, brand assets, store accounts, local verification, and all 11 smoke test items
+- The code infrastructure (pipeline, signing, config system) is fully implemented. The remaining DoD items are operational tasks requiring real Apple/Google/Firebase credentials and physical device access.
+
+### Blockers Requiring Human Action
+1. Firebase FCM project creation (requires Firebase Console access)
+2. Apple Developer account with real Team ID and App Store Connect API key
+3. Google Play Console app registration and service account setup
+4. Vastudeep brand assets (app icons, splash screen) from the client
+5. Physical iOS and Android devices for smoke testing
+
+### Change Log
+- 2026-06-20: Implemented Story 4.6 code artifacts — SQL provisioning script, README checklist, notes on remaining operational steps

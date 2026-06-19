@@ -8,7 +8,7 @@ import { Palette, Bell, Shield, Building2, Save, Upload, X, Image } from 'lucide
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import { cn, getErrorMessage } from '@/lib/utils';
-import type { Tenant } from '@flowtiq/shared-types';
+import type { Tenant, NotificationPreferences } from '@flowtiq/shared-types';
 
 const TABS = [
   { key: 'branding', label: 'Branding', icon: Palette },
@@ -28,6 +28,99 @@ type LocalSettings = {
     docs: boolean;
   };
 };
+
+const PUSH_PREFS = [
+  { field: 'assignments' as const, label: 'Assignments', desc: 'Project, stage, sub-task, and follow-up assignments' },
+  { field: 'statusUpdates' as const, label: 'Status Updates', desc: 'Stage and sub-task status changes on my projects' },
+  { field: 'documentUploads' as const, label: 'Document Uploads', desc: 'Documents uploaded to my projects' },
+  { field: 'followUpReminders' as const, label: 'Follow-up Reminders', desc: 'Due today and overdue follow-up alerts' },
+] as const;
+
+function PushNotificationPreferences({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
+  const { data: prefs, isLoading, isError } = useQuery<NotificationPreferences>({
+    queryKey: ['notification-preferences'],
+    queryFn: () => get<NotificationPreferences>('/users/notification-preferences'),
+  });
+
+  const [pendingField, setPendingField] = useState<keyof NotificationPreferences | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (update: Partial<NotificationPreferences>) =>
+      patch<NotificationPreferences>('/users/notification-preferences', update),
+    onMutate: async (update) => {
+      // P16: Cancel in-flight queries, take a snapshot, then apply optimistic update.
+      // Snapshot is restored on error to handle concurrent toggle reversions correctly.
+      await qc.cancelQueries({ queryKey: ['notification-preferences'] });
+      const previous = qc.getQueryData<NotificationPreferences>(['notification-preferences']);
+      qc.setQueryData<NotificationPreferences>(['notification-preferences'], (old) =>
+        old ? { ...old, ...update } : old
+      );
+      return { previous };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notification-preferences'] });
+    },
+    onError: (err, _update, context) => {
+      if (context?.previous) {
+        qc.setQueryData<NotificationPreferences>(['notification-preferences'], context.previous);
+      }
+      toast.error(getErrorMessage(err));
+    },
+    onSettled: () => setPendingField(null),
+  });
+
+  const handleToggle = (field: keyof NotificationPreferences, currentValue: boolean) => {
+    setPendingField(field);
+    mutation.mutate({ [field]: !currentValue });
+  };
+
+  return (
+    <div className="card">
+      <div className="card-header"><h3>Notification Preferences</h3></div>
+      <div className="card-body space-y-4">
+        {isLoading && (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl animate-pulse">
+                <div className="space-y-1.5">
+                  <div className="h-4 w-32 bg-slate-200 rounded" />
+                  <div className="h-3 w-48 bg-slate-100 rounded" />
+                </div>
+                <div className="w-11 h-6 bg-slate-200 rounded-full" />
+              </div>
+            ))}
+          </div>
+        )}
+        {isError && (
+          <p className="text-sm text-red-600 p-4 border border-red-100 rounded-xl bg-red-50">
+            Failed to load notification preferences. Please refresh to retry.
+          </p>
+        )}
+        {prefs && PUSH_PREFS.map(({ field, label, desc }) => (
+          <div key={field} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl">
+            <div>
+              <p className="font-medium text-slate-800">{label}</p>
+              <p className="text-sm text-slate-500">{desc}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={prefs[field]}
+                disabled={pendingField === field}
+                onChange={() => handleToggle(field, prefs[field])}
+                className="sr-only peer"
+              />
+              <div className={cn(
+                'w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600',
+                pendingField === field && 'opacity-50'
+              )} />
+            </label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { tenant, user, setTenant } = useAuthStore();
@@ -356,40 +449,46 @@ export default function SettingsPage() {
 
             {/* ── NOTIFICATIONS TAB ── */}
             {activeTab === 'notifications' && (
-              <div className="card">
-                <div className="card-header"><h3>Notification Settings</h3></div>
-                <div className="card-body space-y-4">
-                  {(
-                    [
-                      { label: 'In-app Notifications', desc: 'Show notifications inside the application', key: 'inApp' },
-                      { label: 'Email Notifications', desc: 'Send email for important updates', key: 'email' },
-                      { label: 'Follow-up Reminders', desc: 'Remind users of upcoming follow-ups', key: 'followUp' },
-                      { label: 'Overdue Alerts', desc: 'Alert for overdue tasks and follow-ups', key: 'overdue' },
-                      { label: 'Document Notifications', desc: 'Notify on document uploads and replacements', key: 'docs' },
-                    ] as const
-                  ).map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl">
-                      <div>
-                        <p className="font-medium text-slate-800">{item.label}</p>
-                        <p className="text-sm text-slate-500">{item.desc}</p>
+              <div className="space-y-4">
+                {/* Tenant-level notification settings */}
+                <div className="card">
+                  <div className="card-header"><h3>Notification Settings</h3></div>
+                  <div className="card-body space-y-4">
+                    {(
+                      [
+                        { label: 'In-app Notifications', desc: 'Show notifications inside the application', key: 'inApp' },
+                        { label: 'Email Notifications', desc: 'Send email for important updates', key: 'email' },
+                        { label: 'Follow-up Reminders', desc: 'Remind users of upcoming follow-ups', key: 'followUp' },
+                        { label: 'Overdue Alerts', desc: 'Alert for overdue tasks and follow-ups', key: 'overdue' },
+                        { label: 'Document Notifications', desc: 'Notify on document uploads and replacements', key: 'docs' },
+                      ] as const
+                    ).map((item) => (
+                      <div key={item.key} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl">
+                        <div>
+                          <p className="font-medium text-slate-800">{item.label}</p>
+                          <p className="text-sm text-slate-500">{item.desc}</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={notifSettings[item.key]}
+                            onChange={(e) => setNotifSettings((prev) => ({ ...prev, [item.key]: e.target.checked }))}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+                        </label>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={notifSettings[item.key]}
-                          onChange={(e) => setNotifSettings((prev) => ({ ...prev, [item.key]: e.target.checked }))}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-                      </label>
+                    ))}
+                    <div className="flex justify-end">
+                      <button onClick={() => saveNotifMutation.mutate()} disabled={saveNotifMutation.isPending} className="btn-primary">
+                        <Save size={16} />{saveNotifMutation.isPending ? 'Saving...' : 'Save'}
+                      </button>
                     </div>
-                  ))}
-                  <div className="flex justify-end">
-                    <button onClick={() => saveNotifMutation.mutate()} disabled={saveNotifMutation.isPending} className="btn-primary">
-                      <Save size={16} />{saveNotifMutation.isPending ? 'Saving...' : 'Save'}
-                    </button>
                   </div>
                 </div>
+
+                {/* User-level push notification preferences */}
+                <PushNotificationPreferences qc={qc} />
               </div>
             )}
 

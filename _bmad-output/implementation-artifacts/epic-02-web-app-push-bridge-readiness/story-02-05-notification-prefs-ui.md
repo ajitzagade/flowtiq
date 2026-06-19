@@ -2,11 +2,12 @@
 epicId: 2
 storyId: '02-05'
 title: 'Notification Preferences UI in Settings'
-status: ready
+status: review
 priority: medium
 estimate: 3
 dependencies:
   - '01-04'
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 ---
 
 # Story 2.5 — Notification Preferences UI in Settings
@@ -195,13 +196,21 @@ Import `NotificationPreferences` from `@flowtiq/shared-types` (added in Story 1.
 
 ## Definition of Done
 
-- [ ] Notifications section added to Settings page (matches existing tab/card pattern)
-- [ ] Four toggle switches rendered with labels and sub-text
-- [ ] `useQuery` fetches preferences on mount; loading/error states handled
-- [ ] `useMutation` used for PATCH on each toggle change
-- [ ] Optimistic update with revert on error
-- [ ] Toast shown on error
-- [ ] Each toggle updates independently (correct partial PATCH body)
-- [ ] Visible to all roles
-- [ ] `pnpm type-check` passes
-- [ ] Existing Settings E2E tests still pass
+- [x] Notifications section added to Settings page (matches existing tab/card pattern)
+- [x] Four toggle switches rendered with labels and sub-text
+- [x] `useQuery` fetches preferences on mount; loading/error states handled
+- [x] `useMutation` used for PATCH on each toggle change
+- [x] Optimistic update with revert on error
+- [x] Toast shown on error
+- [x] Each toggle updates independently (correct partial PATCH body)
+- [x] Visible to all roles
+- [x] `pnpm type-check` passes
+- [x] Existing Settings E2E tests still pass
+
+## Dev Agent Record
+
+### File List
+- apps/admin-portal/src/app/(dashboard)/settings/page.tsx (modified — PushNotificationPreferences component added)
+
+### Completion Notes
+Added `PushNotificationPreferences` sub-component within the existing Notifications tab (below the existing tenant-level notification settings card). Uses `useQuery` with key `['notification-preferences']`, `useMutation` for PATCH with optimistic updates that revert on error. Each toggle sends only its own field (`{ [field]: value }`) as partial PATCH body. `pendingField` state disables only the toggled switch while in-flight. `NotificationPreferences` type imported from `@flowtiq/shared-types`. `pnpm type-check` passes with zero errors.

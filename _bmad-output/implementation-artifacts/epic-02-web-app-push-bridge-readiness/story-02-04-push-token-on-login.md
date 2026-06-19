@@ -2,12 +2,13 @@
 epicId: 2
 storyId: '02-04'
 title: 'Push Token Registration on Login'
-status: ready
+status: review
 priority: high
 estimate: 2
 dependencies:
   - '02-01'
   - '01-03'
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 ---
 
 # Story 2.4 — Push Token Registration on Login
@@ -159,11 +160,21 @@ Find where logout is handled — most likely in a logout button component or in 
 
 ## Definition of Done
 
-- [ ] Token registration called after login success when `isNativeApp()` is true
-- [ ] `getPushToken()` used to fetch token; `getPlatform()` for platform
-- [ ] Token registered via `POST /api/users/device-token` (fire-and-forget)
-- [ ] Token stored in module-level variable (not localStorage)
-- [ ] Token deregistered on logout via `DELETE /api/users/device-token` (fire-and-forget)
-- [ ] No effect when not in native app
-- [ ] Existing login/logout E2E tests pass
-- [ ] `pnpm type-check` passes
+- [x] Token registration called after login success when `isNativeApp()` is true
+- [x] `getPushToken()` used to fetch token; `getPlatform()` for platform
+- [x] Token registered via `POST /api/users/device-token` (fire-and-forget)
+- [x] Token stored in module-level variable (not localStorage)
+- [x] Token deregistered on logout via `DELETE /api/users/device-token` (fire-and-forget)
+- [x] No effect when not in native app
+- [x] Existing login/logout E2E tests pass
+- [x] `pnpm type-check` passes
+
+## Dev Agent Record
+
+### File List
+- apps/admin-portal/src/lib/pushToken.ts (created)
+- apps/admin-portal/src/app/(auth)/login/page.tsx (modified — registerPushTokenIfNative called after setAuth)
+- apps/admin-portal/src/components/layout/Sidebar.tsx (modified — deregisterPushTokenIfNative called in handleLogout)
+
+### Completion Notes
+`pushToken.ts` module holds `_registeredPushToken` at module scope (never stored in localStorage per NFR-1-SEC-A). Both register and deregister are fire-and-forget — they never block login navigation or logout. Login and logout flows are otherwise unchanged; existing auth E2E tests unaffected.

@@ -2,11 +2,12 @@
 epicId: 2
 storyId: '02-03'
 title: 'File Upload Bridge Integration'
-status: ready
+status: review
 priority: high
 estimate: 3
 dependencies:
   - '02-01'
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 ---
 
 # Story 2.3 — File Upload Bridge Integration
@@ -150,11 +151,19 @@ Use `accept: '*/*'` for general document uploads (PDF, images, Office files). Th
 
 ## Definition of Done
 
-- [ ] All file upload inputs identified and catalogued
-- [ ] Each upload trigger checks `isNativeApp()` before proceeding
-- [ ] Native path: `requestFilePick()` called, result passed to existing upload handler
-- [ ] Browser path: existing `<input type="file">` behavior fully preserved
-- [ ] Loading and error states handled
-- [ ] No changes to backend routes
-- [ ] `pnpm type-check` passes
-- [ ] Existing document upload E2E tests still pass
+- [x] All file upload inputs identified and catalogued
+- [x] Each upload trigger checks `isNativeApp()` before proceeding
+- [x] Native path: `requestFilePick()` called, result passed to existing upload handler
+- [x] Browser path: existing `<input type="file">` behavior fully preserved
+- [x] Loading and error states handled
+- [x] No changes to backend routes
+- [x] `pnpm type-check` passes
+- [x] Existing document upload E2E tests still pass
+
+## Dev Agent Record
+
+### File List
+- apps/admin-portal/src/app/(dashboard)/documents/page.tsx (modified — UploadModal updated)
+
+### Completion Notes
+One file upload location confirmed: `UploadModal` in documents/page.tsx. In native mode, drag-drop zone is replaced with "Select File" and "Take Photo" buttons. `isNativeApp()` check gates the two paths. Native picking sets `nativePicking` loading state; cancellation errors are swallowed silently. The actual `handleUpload` function is unchanged — it receives the `File` object the same way regardless of path. `services/api` not touched.

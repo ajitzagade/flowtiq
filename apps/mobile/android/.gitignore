@@ -1,0 +1,13 @@
+# Build outputs
+/build/
+
+# Keystore files — never commit signing credentials
+*.keystore
+*.jks
+
+# Local properties
+local.properties
+
+# Firebase config — per-tenant, set via CI secret or locally
+# (already in apps/mobile/.gitignore but listed here for clarity)
+app/google-services.json

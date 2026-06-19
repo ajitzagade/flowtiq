@@ -1,0 +1,66 @@
+apply plugin: "com.android.application"
+apply plugin: "com.facebook.react"
+apply plugin: "kotlin-android"
+// Story 3.4: Apply Google Services plugin for Firebase
+apply plugin: "com.google.gms.google-services"
+
+react {
+    // Story 3.1: Enable Hermes engine
+    hermesEnabled = true
+}
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    namespace "com.flowtiq.mobile"
+
+    defaultConfig {
+        applicationId "com.flowtiq.mobile"
+        // Story 3.1: minimum Android API 26 (NFR-5-COMPAT-B)
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // Story 4.5: VERSION_CODE is set by CI (github.run_number) to guarantee monotonic increment.
+        // Play Store rejects uploads with a duplicate versionCode.
+        versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 1)
+        versionName "1.0"
+
+        // Story 3.1: react-native-config reads these from .env
+        resValue "string", "build_config_package", "com.flowtiq.mobile"
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        // Story 4.2: Release signing reads credentials from environment variables.
+        // Set these before running bundleRelease:
+        //   KEYSTORE_FILE   - path to the keystore file (relative to android/app/)
+        //   KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+        release {
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("KEY_ALIAS") ?: ""
+            keyPassword System.getenv("KEY_PASSWORD") ?: ""
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:hermes-android")
+}

@@ -1,0 +1,12 @@
+{
+  "_comment": "Deploy this file to the tenant Vercel domain at /.well-known/apple-app-site-association (no .json extension). See README for instructions.",
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.com.flowtiq.mobile",
+        "paths": ["*"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "name": "@flowtiq/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start",
+    "type-check": "tsc --noEmit",
+    "clean": "react-native clean",
+    "android:release": "cd android && ./gradlew bundleRelease",
+    "ios:release": "cd ios && bundle exec fastlane beta"
+  },
+  "dependencies": {
+    "@flowtiq/shared-types": "workspace:*",
+    "@notifee/react-native": "^9.1.1",
+    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-community/netinfo": "^11.3.1",
+    "@react-native-cookies/cookies": "^6.2.1",
+    "@react-native-firebase/app": "^20.3.0",
+    "@react-native-firebase/messaging": "^20.3.0",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.17",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-config": "^1.5.1",
+    "react-native-document-picker": "^9.1.1",
+    "react-native-fs": "^2.20.0",
+    "react-native-image-picker": "^7.1.2",
+    "react-native-keychain": "^8.2.0",
+    "react-native-safe-area-context": "^4.9.0",
+    "react-native-screens": "^3.29.0",
+    "react-native-splash-screen": "^3.3.0",
+    "react-native-webview": "^13.8.6"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@babel/preset-env": "^7.20.0",
+    "@babel/runtime": "^7.20.0",
+    "@react-native/babel-preset": "0.73.21",
+    "@react-native/eslint-config": "0.73.2",
+    "@react-native/metro-config": "0.73.5",
+    "@react-native/typescript-config": "0.73.1",
+    "@types/react": "^18.2.6",
+    "@types/react-native-fs": "^2.13.0",
+    "typescript": "5.0.4"
+  }
+}

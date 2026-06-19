@@ -2,7 +2,8 @@
 epicId: 3
 storyId: '03-07'
 title: 'Native UI: Splash Screen + Navigation Chrome'
-status: ready
+status: review
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 priority: medium
 estimate: 3
 dependencies:

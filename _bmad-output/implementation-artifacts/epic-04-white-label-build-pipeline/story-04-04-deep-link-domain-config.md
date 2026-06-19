@@ -2,9 +2,10 @@
 epicId: 4
 storyId: '04-04'
 title: 'Deep Link Domain Config'
-status: ready
+status: review
 priority: high
 estimate: 2
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 dependencies:
   - '03-05'
   - '04-01'
@@ -194,10 +195,23 @@ Document this in `apps/mobile/README.md`.
 
 ## Definition of Done
 
-- [ ] `apps/admin-portal/public/.well-known/apple-app-site-association` with Vastudeep team ID and bundle ID
-- [ ] `apps/admin-portal/public/.well-known/assetlinks.json` with Vastudeep package name and SHA-256 fingerprint
-- [ ] `vercel.json` or `next.config.js` headers set for `.well-known` files
-- [ ] iOS entitlements file updated with `flowtiq-admin.vercel.app`
-- [ ] Android manifest intent filter updated with actual domain
-- [ ] Both `.well-known` URLs return HTTP 200 with JSON content type
-- [ ] README: SHA-256 extraction command, manual verification steps, Universal Links testing instructions
+- [x] `apps/admin-portal/public/.well-known/apple-app-site-association` with Vastudeep bundle ID (team ID placeholder — replace with real value in Story 4.6)
+- [x] `apps/admin-portal/public/.well-known/assetlinks.json` with Vastudeep package name (SHA-256 placeholder — replace after keystore generated in Story 4.6)
+- [x] `vercel.json` headers set for `.well-known` files (Content-Type: application/json, Cache-Control: no-cache)
+- [x] iOS entitlements file updated with `flowtiq-admin.vercel.app` (replaced `$(TENANT_DOMAIN)` placeholder)
+- [x] Android manifest intent filter already correct for `flowtiq-admin.vercel.app` (set in Story 3.5)
+- [ ] Both `.well-known` URLs return HTTP 200 with JSON content type (verified after Vercel deploy — Story 4.6)
+- [x] README: SHA-256 extraction command, manual verification steps, Universal Links testing instructions
+
+## Dev Agent Record
+
+### Implementation Notes
+- Created `apps/admin-portal/public/.well-known/apple-app-site-association` with `PLACEHOLDER_APPLE_TEAM_ID.com.vastudeep.flowtiq`
+- Created `apps/admin-portal/public/.well-known/assetlinks.json` with `com.vastudeep.flowtiq` package name and `PLACEHOLDER_SHA256_FINGERPRINT`
+- Updated `apps/admin-portal/vercel.json` to add headers block for `/.well-known/:path*` — ensures correct Content-Type for Apple/Google crawlers
+- Updated `apps/mobile/ios/FlowtiqMobile/FlowtiqMobile.entitlements` — replaced `applinks:$(TENANT_DOMAIN)` with `applinks:flowtiq-admin.vercel.app`
+- Android `AndroidManifest.xml` intent-filter was already correct (set in Story 3.5) — no changes needed
+- README documents SHA-256 extraction, both `.well-known` verification curl commands, and Universal Links testing on physical device
+
+### Change Log
+- 2026-06-20: Implemented Story 4.4 — Deep Link Domain Config

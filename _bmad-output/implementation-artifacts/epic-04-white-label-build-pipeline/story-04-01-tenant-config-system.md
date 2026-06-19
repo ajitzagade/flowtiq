@@ -2,9 +2,10 @@
 epicId: 4
 storyId: '04-01'
 title: 'Tenant Config System'
-status: ready
+status: review
 priority: high
 estimate: 3
+baseline_commit: 528009ab878b0bc791797c1055c2a2c0d2e02673
 dependencies:
   - '03-01'
 ---
@@ -199,11 +200,36 @@ Use `.js` with CommonJS (`require`/`module.exports`) to keep it dependency-free.
 
 ## Definition of Done
 
-- [ ] `configs/build/tenant-configs/vastudeep.json` created with all required fields
-- [ ] `configs/build/tenant-configs/flowtiq.json` created as development default
-- [ ] `scripts/apply-tenant-config.js` created and executable
-- [ ] Script modifies: `.env`, `build.gradle`, `strings.xml`, `Info.plist`
-- [ ] Script validates config file exists and required fields present
-- [ ] `pnpm config:tenant vastudeep` runs without error
-- [ ] `.env` gitignored
-- [ ] `apps/mobile/README.md` updated with config system documentation
+- [x] `configs/build/tenant-configs/vastudeep.json` created with all required fields
+- [x] `configs/build/tenant-configs/flowtiq.json` created as development default
+- [x] `scripts/apply-tenant-config.js` created and executable
+- [x] Script modifies: `.env`, `build.gradle`, `strings.xml`, `Info.plist`
+- [x] Script validates config file exists and required fields present
+- [x] `pnpm config:tenant vastudeep` runs without error
+- [x] `.env` gitignored
+- [x] `apps/mobile/README.md` updated with config system documentation
+
+## Dev Agent Record
+
+### Implementation Notes
+- Created `configs/build/tenant-configs/vastudeep.json` with all required fields (PLACEHOLDER values where real credentials needed for Story 4.6)
+- Created `configs/build/tenant-configs/flowtiq.json` as development default using `com.flowtiq.mobile` bundle ID
+- Created `scripts/apply-tenant-config.js` using CommonJS string-replace approach (no external `plist` dependency required)
+- Created `apps/mobile/android/app/src/main/res/values/strings.xml` (required for script to update app_name)
+- Created `apps/mobile/ios/FlowtiqMobile/Info.plist` (required for script to update CFBundleDisplayName and CFBundleIdentifier)
+- Added `config:tenant` script to root `package.json`
+- `.env` was already in `apps/mobile/.gitignore` from Story 3.1
+- `apps/mobile/README.md` updated with full config system documentation
+
+### Review Findings
+
+- [x] [Review][Patch] XML injection — appName with `&`, `<`, `>` corrupts strings.xml and Info.plist [scripts/apply-tenant-config.js:101-133]
+- [x] [Review][Patch] JS `$`-pattern injection — regex replacement uses config values as replacement strings; `$1`/`$2` in appName/bundleId produces mangled output; use function form of replace() [scripts/apply-tenant-config.js:81-132]
+- [x] [Review][Patch] Slug path traversal — no sanitization on process.argv[2]; validate slug matches `[a-z0-9-]+` before path construction [scripts/apply-tenant-config.js:44]
+- [x] [Review][Patch] Info.plist update silently writes even when neither regex matches; add match detection like build.gradle/strings.xml [scripts/apply-tenant-config.js:120-134]
+- [x] [Review][Patch] `config.slug` field not validated against filename slug — mismatch produces inconsistent .env (TENANT_SLUG) vs native file values [scripts/apply-tenant-config.js:56-70]
+
+### Change Log
+- 2026-06-20: Implemented Story 4.1 — Tenant Config System
+- 2026-06-20: Code review findings added
+- 2026-06-20: Applied all review patches — slug path traversal validation, XML escape for appName, function-form replace to prevent $-pattern injection, config.slug mismatch validation, Info.plist match detection, Appfile/Matchfile rewriting, TENANT_BUNDLE_ID/TENANT_APPLICATION_ID added to .env
