@@ -37,6 +37,9 @@ interface DashboardStats {
     currentStage?: string;
     dueDate?: string;
     owner?: { firstName: string; lastName: string };
+    overallProgressPct?: number | null;
+    completedStages?: number;
+    totalStages?: number;
   }>;
   upcomingFollowUps?: Array<{
     id: string;
@@ -382,6 +385,9 @@ export default function DashboardPage() {
                     <ProjectProgress
                       currentStage={project.currentStage}
                       status={project.status}
+                      progressPct={project.overallProgressPct}
+                      completedStages={project.completedStages}
+                      totalStages={project.totalStages}
                     />
                   </div>
                 </Link>

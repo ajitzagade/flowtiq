@@ -124,11 +124,24 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       take: 20,
       include: {
         owner: { select: { id: true, firstName: true, lastName: true } },
+        projectWorkflows: {
+          select: {
+            stages: { select: { status: true } },
+          },
+        },
       },
     });
     const recentProjects = [...recentProjectsRaw]
       .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 5) - (PRIORITY_ORDER[b.priority] ?? 5))
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((p) => {
+        const allStages = p.projectWorkflows.flatMap((pw) => pw.stages);
+        const totalStages = allStages.length;
+        const completedStages = allStages.filter((s) => s.status === 'completed').length;
+        const overallProgressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : null;
+        const { projectWorkflows: _pw, ...rest } = p;
+        return { ...rest, overallProgressPct, completedStages, totalStages };
+      });
 
     // Workflow pipeline: use ProjectWorkflow + ProjectStage for accurate counts
     const workflowTemplates = await prisma.workflowTemplate.findMany({

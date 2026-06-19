@@ -27,6 +27,7 @@ interface StageColumn {
   order: number;
   color: string;
   isNoStage?: boolean;
+  isCompleted?: boolean;
 }
 
 const PALETTE = [
@@ -50,6 +51,48 @@ function KanbanCard({
 }) {
   const router = useRouter();
 
+  // Priority-based card theming
+  const cardTheme: Record<string, { bg: string; border: string; titleColor: string; clientColor: string; numColor: string; dueColor: string; editHover: string }> = {
+    urgent: {
+      bg: 'bg-rose-50',
+      border: 'border-rose-200',
+      titleColor: 'text-rose-950',
+      clientColor: 'text-rose-700',
+      numColor: 'text-rose-400',
+      dueColor: 'text-rose-600',
+      editHover: 'hover:text-rose-700',
+    },
+    high: {
+      bg: 'bg-amber-50',
+      border: 'border-amber-200',
+      titleColor: 'text-amber-950',
+      clientColor: 'text-amber-700',
+      numColor: 'text-amber-500',
+      dueColor: 'text-amber-600',
+      editHover: 'hover:text-amber-700',
+    },
+    medium: {
+      bg: 'bg-sky-50',
+      border: 'border-sky-200',
+      titleColor: 'text-sky-950',
+      clientColor: 'text-sky-700',
+      numColor: 'text-sky-500',
+      dueColor: 'text-sky-600',
+      editHover: 'hover:text-sky-700',
+    },
+    low: {
+      bg: 'bg-slate-50',
+      border: 'border-slate-200',
+      titleColor: 'text-slate-800',
+      clientColor: 'text-slate-600',
+      numColor: 'text-slate-500',
+      dueColor: 'text-slate-600',
+      editHover: 'hover:text-slate-700',
+    },
+  };
+
+  const theme = cardTheme[project.priority] ?? cardTheme.low;
+
   return (
     <div
       draggable
@@ -63,25 +106,26 @@ function KanbanCard({
       onDragEnd={onDragEnd}
       onClick={() => router.push(`/projects/${project.id}`)}
       className={cn(
-        'bg-white border rounded-xl p-3 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
+        'border rounded-xl p-3 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
+        theme.bg,
         isDragging
-          ? 'opacity-40 rotate-1 shadow-lg border-blue-300'
-          : 'border-slate-200 hover:border-blue-200 hover:shadow-md shadow-sm',
+          ? `opacity-40 rotate-1 shadow-lg border-blue-300`
+          : `${theme.border} hover:shadow-md shadow-sm hover:brightness-95`,
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
-        <p className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 flex-1">{project.name}</p>
+        <p className={cn('text-sm font-semibold leading-snug line-clamp-2 flex-1', theme.titleColor)}>{project.name}</p>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(project); }}
           aria-label={`Edit ${project.name}`}
-          className="p-1 text-slate-300 hover:text-slate-600 rounded opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
+          className={cn('p-1 rounded opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity text-slate-400', theme.editHover)}
         >
           <Edit size={13} />
         </button>
       </div>
-      <p className="text-xs text-slate-400 mb-2.5 truncate">{project.clientName}</p>
+      <p className={cn('text-xs font-medium mb-2.5 truncate', theme.clientColor)}>{project.clientName}</p>
       <div className="flex items-center gap-1 flex-wrap mb-2.5">
-        <span className="text-[10px] font-mono text-slate-300 flex-1 truncate">{project.projectNumber}</span>
+        <span className={cn('text-[10px] font-mono font-semibold flex-1 truncate', theme.numColor)}>{project.projectNumber}</span>
         <span className={cn('badge text-[10px] px-1.5 py-0', getPriorityBadgeClass(project.priority))}>
           {project.priority}
         </span>
@@ -91,7 +135,7 @@ function KanbanCard({
       </div>
       <ProjectProgress currentStage={project.currentStage} status={project.status} compact />
       {project.dueDate && (
-        <p className="text-[10px] text-slate-400 mt-2">Due {formatDate(project.dueDate)}</p>
+        <p className={cn('text-[10px] font-medium mt-2', theme.dueColor)}>Due {formatDate(project.dueDate)}</p>
       )}
     </div>
   );
@@ -129,16 +173,18 @@ function WorkflowKanban({
     : projects;
 
   const allStageKeys = new Set(stages.map((s) => s.key));
-  const buckets: Record<string, Project[]> = { __no_stage__: [] };
+  const buckets: Record<string, Project[]> = { __no_stage__: [], __completed__: [] };
   for (const s of stages) buckets[s.key] = [];
   for (const p of filtered) {
     // For multi-workflow projects: find the active stage key within THIS workflow section
-    const pws = p.projectWorkflows as Array<{ workflowTemplateId: string; currentStageKey?: string | null }> | undefined;
+    const pws = p.projectWorkflows as Array<{ workflowTemplateId: string; currentStageKey?: string | null; status?: string }> | undefined;
     const pw = pws?.find((w) => w.workflowTemplateId === sectionWorkflowId);
     // Prefer per-workflow active stage; fall back to Project.currentStage for legacy single-workflow projects
     const key = pw?.currentStageKey ?? (pws && pws.length > 0 ? null : (p.currentStage ?? '')) ?? '';
     if (key && allStageKeys.has(key)) {
       buckets[key].push(p);
+    } else if (pw?.status === 'completed') {
+      buckets['__completed__'].push(p);
     } else {
       buckets['__no_stage__'].push(p);
     }
@@ -218,8 +264,12 @@ function WorkflowKanban({
   }, []);
 
   const noStageProjects = buckets['__no_stage__'] ?? [];
+  const completedProjects = buckets['__completed__'] ?? [];
   const columns: StageColumn[] = [
     ...stages,
+    ...(completedProjects.length > 0
+      ? [{ key: '__completed__', name: 'Completed', order: 998, color: '#10b981', isCompleted: true }]
+      : []),
     ...(noStageProjects.length > 0
       ? [{ key: '__no_stage__', name: 'No Stage', order: 999, color: '#94a3b8', isNoStage: true }]
       : []),
@@ -250,13 +300,14 @@ function WorkflowKanban({
                 'flex flex-col w-64 flex-shrink-0 rounded-xl border bg-white transition-all duration-150 overflow-hidden',
                 isOver ? 'border-blue-300 shadow-lg' : isHighlighted ? 'border-blue-400 shadow-xl ring-2 ring-blue-300 ring-offset-1' : 'border-slate-200 shadow-sm',
                 col.isNoStage && 'opacity-75',
+                col.isCompleted && 'bg-emerald-50/30',
                 isHighlighted && 'bg-blue-50/40',
               )}
               style={{ borderTopColor: col.color, borderTopWidth: isHighlighted ? 4 : 3 }}
-              onDragOver={handleDragOver}
-              onDragEnter={(e) => handleDragEnter(e, col.key)}
-              onDragLeave={(e) => handleDragLeave(e, col.key)}
-              onDrop={(e) => handleDrop(e, col.key)}
+              onDragOver={col.isCompleted ? undefined : handleDragOver}
+              onDragEnter={col.isCompleted ? undefined : (e) => handleDragEnter(e, col.key)}
+              onDragLeave={col.isCompleted ? undefined : (e) => handleDragLeave(e, col.key)}
+              onDrop={col.isCompleted ? undefined : (e) => handleDrop(e, col.key)}
             >
               {/* Column header */}
               <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0">
@@ -265,13 +316,16 @@ function WorkflowKanban({
                     className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: col.color }}
                   />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate">
+                  <span className={cn(
+                    'text-[11px] font-bold uppercase tracking-wider truncate',
+                    col.isCompleted ? 'text-emerald-700' : 'text-slate-600',
+                  )}>
                     {col.name}
                   </span>
                 </div>
                 <span className={cn(
                   'text-[11px] font-semibold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 flex-shrink-0 ml-2',
-                  isMoving ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500',
+                  isMoving ? 'bg-blue-100 text-blue-600' : col.isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500',
                 )}>
                   {colProjects.length}
                 </span>

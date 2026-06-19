@@ -677,6 +677,201 @@ async function main() {
     });
   }
 
+  // ── NEW: 2 Additional Workflows + 1 Multi-Workflow Project ──────────────────
+  console.log('Creating additional workflows...');
+
+  const zoningWorkflow = await prisma.workflowTemplate.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Zoning & Land Use Approval' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      name: 'Zoning & Land Use Approval',
+      description: 'Workflow for obtaining zoning clearance and land-use approval from the planning authority',
+      isDefault: false,
+      stages: [
+        { stageKey: 'zone_filing', stageName: 'Application Filing', order: 1, color: '#6366f1',
+          description: 'Submit zoning application with property details', requiresApproval: false, canSkip: false },
+        { stageKey: 'zone_inspection', stageName: 'Site Inspection', order: 2, color: '#f59e0b',
+          description: 'Physical inspection of the site by planning authority', requiresApproval: false, canSkip: false },
+        { stageKey: 'zone_report', stageName: 'Zoning Report', order: 3, color: '#8b5cf6',
+          description: 'Preparation and submission of zoning compliance report', requiresApproval: false, canSkip: false },
+        { stageKey: 'zone_review', stageName: 'Authority Review', order: 4, color: '#06b6d4',
+          description: 'Review by planning committee', requiresApproval: true, canSkip: false },
+        { stageKey: 'zone_certificate', stageName: 'Zoning Certificate', order: 5, color: '#10b981',
+          description: 'Issuance of zoning clearance certificate', requiresApproval: false, canSkip: false },
+      ],
+    },
+  });
+
+  const envNocWorkflow = await prisma.workflowTemplate.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Environmental NOC' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      name: 'Environmental NOC',
+      description: 'Workflow for obtaining Environmental No Objection Certificate from the State Pollution Control Board',
+      isDefault: false,
+      stages: [
+        { stageKey: 'env_assessment', stageName: 'Environmental Assessment', order: 1, color: '#10b981',
+          description: 'Initial environmental impact assessment', requiresApproval: false, canSkip: false },
+        { stageKey: 'env_impact_study', stageName: 'Impact Study', order: 2, color: '#f59e0b',
+          description: 'Detailed EIA study by certified agency', requiresApproval: false, canSkip: false },
+        { stageKey: 'env_noc_application', stageName: 'NOC Application', order: 3, color: '#6366f1',
+          description: 'Submit NOC application to SPCB with EIA report', requiresApproval: false, canSkip: false },
+        { stageKey: 'env_dept_review', stageName: 'Department Review', order: 4, color: '#8b5cf6',
+          description: 'Review and public hearing by SPCB', requiresApproval: true, canSkip: false },
+        { stageKey: 'env_noc_issued', stageName: 'NOC Issued', order: 5, color: '#14b8a6',
+          description: 'Final NOC issued by SPCB', requiresApproval: false, canSkip: false },
+      ],
+    },
+  });
+
+  // ── New project that uses BOTH new workflows ─────────────────────────────
+  console.log('Creating multi-workflow test project...');
+  const newProjectNumber = 'VDA-2024-009';
+  const existingNewProject = await prisma.project.findFirst({
+    where: { tenantId: tenant.id, projectNumber: newProjectNumber },
+  });
+
+  if (!existingNewProject) {
+    const projStart = new Date(now);
+    projStart.setDate(projStart.getDate() - 35);
+    const projDue = new Date(projStart);
+    projDue.setDate(projDue.getDate() + 120);
+
+    const newProject = await prisma.project.create({
+      data: {
+        tenantId: tenant.id,
+        projectNumber: newProjectNumber,
+        name: 'Emerald Township - Zoning & Environment Clearance',
+        description: 'Large-scale integrated township project requiring zoning clearance and environmental NOC before building plan submission. Site area: 12 acres, Navi Mumbai.',
+        clientName: 'Emerald Realty Pvt. Ltd.',
+        location: 'Kharghar, Navi Mumbai',
+        status: 'active',
+        priority: 'urgent',
+        startDate: projStart,
+        dueDate: projDue,
+        workflowId: zoningWorkflow.id,
+        currentStage: null,
+        ownerId: pm1.id,
+        teamMembers: [fe1.id, fe2.id, tenantAdmin.id],
+        followUpOwnerId: followUpExec.id,
+        reportingOwnerId: tenantAdmin.id,
+      },
+    });
+
+    // ── ProjectWorkflow 1: Zoning (all stages completed) ──────────────────
+    const zoningPW = await prisma.projectWorkflow.create({
+      data: {
+        projectId: newProject.id,
+        workflowTemplateId: zoningWorkflow.id,
+        name: 'Zoning & Land Use Approval',
+        status: 'completed',
+        order: 1,
+        startedAt: projStart,
+        completedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const zoningStages = [
+      { stageKey: 'zone_filing',      stageName: 'Application Filing', order: 1, status: 'completed', daysOffset: 0 },
+      { stageKey: 'zone_inspection',  stageName: 'Site Inspection',    order: 2, status: 'completed', daysOffset: 6 },
+      { stageKey: 'zone_report',      stageName: 'Zoning Report',      order: 3, status: 'completed', daysOffset: 13 },
+      { stageKey: 'zone_review',      stageName: 'Authority Review',   order: 4, status: 'completed', daysOffset: 20 },
+      { stageKey: 'zone_certificate', stageName: 'Zoning Certificate', order: 5, status: 'completed', daysOffset: 29 },
+    ];
+
+    for (const s of zoningStages) {
+      const stageStart = new Date(projStart);
+      stageStart.setDate(stageStart.getDate() + s.daysOffset);
+      const stageEnd = new Date(stageStart);
+      stageEnd.setDate(stageEnd.getDate() + 5);
+
+      await prisma.projectStage.create({
+        data: {
+          projectId: newProject.id,
+          projectWorkflowId: zoningPW.id,
+          stageName: s.stageName,
+          stageKey: s.stageKey,
+          stageOrder: s.order,
+          status: s.status,
+          assignedTo: [fe1, fe2, pm1, tenantAdmin, fe1][s.order - 1].id,
+          assignedToIds: [[fe1.id], [fe2.id], [pm1.id], [tenantAdmin.id], [fe1.id]][s.order - 1],
+          startDate: stageStart,
+          completionDate: stageEnd,
+          notes: `${s.stageName} completed successfully.`,
+        },
+      });
+    }
+
+    // ── ProjectWorkflow 2: Environmental NOC (in progress at stage 3) ────
+    const envPW = await prisma.projectWorkflow.create({
+      data: {
+        projectId: newProject.id,
+        workflowTemplateId: envNocWorkflow.id,
+        name: 'Environmental NOC',
+        status: 'in_progress',
+        order: 2,
+        startedAt: new Date(projStart.getTime() + 10 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const envStages = [
+      { stageKey: 'env_assessment',    stageName: 'Environmental Assessment', order: 1, status: 'completed',   daysOffset: 10 },
+      { stageKey: 'env_impact_study',  stageName: 'Impact Study',             order: 2, status: 'completed',   daysOffset: 17 },
+      { stageKey: 'env_noc_application', stageName: 'NOC Application',        order: 3, status: 'in_progress', daysOffset: 26 },
+      { stageKey: 'env_dept_review',   stageName: 'Department Review',        order: 4, status: 'pending',     daysOffset: 0 },
+      { stageKey: 'env_noc_issued',    stageName: 'NOC Issued',               order: 5, status: 'pending',     daysOffset: 0 },
+    ];
+
+    for (const s of envStages) {
+      const isCompleted = s.status === 'completed';
+      const isInProgress = s.status === 'in_progress';
+      const stageStart = (isCompleted || isInProgress)
+        ? new Date(projStart.getTime() + s.daysOffset * 24 * 60 * 60 * 1000)
+        : null;
+      const stageEnd = isCompleted
+        ? new Date(stageStart!.getTime() + 6 * 24 * 60 * 60 * 1000)
+        : null;
+
+      await prisma.projectStage.create({
+        data: {
+          projectId: newProject.id,
+          projectWorkflowId: envPW.id,
+          stageName: s.stageName,
+          stageKey: s.stageKey,
+          stageOrder: s.order,
+          status: s.status,
+          assignedTo: [fe2, pm1, fe1, tenantAdmin, fe2][s.order - 1].id,
+          assignedToIds: [[fe2.id], [pm1.id], [fe1.id], [tenantAdmin.id], [fe2.id]][s.order - 1],
+          startDate: stageStart,
+          completionDate: stageEnd,
+          notes: isCompleted ? `${s.stageName} completed.` : isInProgress ? 'Under review by SPCB officer.' : null,
+        },
+      });
+    }
+
+    // Follow-up for the new project
+    const fuDate = new Date(now);
+    fuDate.setDate(fuDate.getDate() + 4);
+    await prisma.followUp.create({
+      data: {
+        tenantId: tenant.id,
+        projectId: newProject.id,
+        ownerId: followUpExec.id,
+        createdById: pm1.id,
+        status: 'pending',
+        lastFollowUp: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+        nextFollowUp: fuDate,
+        notes: 'Follow up with SPCB office regarding Environmental NOC application status (stage 3 in progress).',
+      },
+    });
+
+    console.log(`Created project ${newProjectNumber} with Zoning (completed) + Environmental NOC (in progress) workflows`);
+  } else {
+    console.log(`Project ${newProjectNumber} already exists, skipping...`);
+  }
+
   console.log('\nSeed completed successfully!');
   console.log('================================');
   console.log('Demo credentials:');

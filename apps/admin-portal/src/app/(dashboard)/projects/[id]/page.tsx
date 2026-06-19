@@ -9,7 +9,7 @@ import {
   FileText, Upload, History, ChevronDown, ChevronUp, X,
   User, Calendar, GitBranch, AlertTriangle, Plus, Paperclip,
   ChevronRight, ListChecks, Eye, Download, RefreshCw,
-  Lock, Unlock, GripVertical,
+  Lock, Unlock, GripVertical, Search, MessageSquare, StickyNote,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -268,6 +268,7 @@ function StageCard({
   const [assignedToIds, setAssignedToIds] = useState<string[]>(
     (stage as ProjectStage & { assignedToIds?: string[] }).assignedToIds || [],
   );
+  const [memberSearch, setMemberSearch] = useState('');
   const [subTaskName, setSubTaskName] = useState('');
   const [subTaskRequired, setSubTaskRequired] = useState(false);
   const [subTaskAssignee, setSubTaskAssignee] = useState('');
@@ -333,34 +334,47 @@ function StageCard({
     changedBy?: { firstName: string; lastName: string };
   }> | undefined;
 
+  const stageBadge: Record<string, string> = {
+    pending:     'bg-slate-100 text-slate-500 border border-slate-200',
+    in_progress: 'bg-blue-100 text-blue-700 border border-blue-200',
+    completed:   'bg-emerald-100 text-emerald-700 border border-emerald-200',
+    on_hold:     'bg-amber-100 text-amber-700 border border-amber-200',
+    skipped:     'bg-slate-100 text-slate-400 border border-slate-200 line-through',
+  };
+
   return (
     <div className={cn('card border-l-4 overflow-hidden', borderColor[stage.status] || 'border-l-slate-200')}>
-      {/* Header row */}
-      <button
-        type="button"
-        aria-expanded={expanded}
-        className="w-full px-5 py-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50 text-left"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <StageStatusIcon status={stage.status} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-medium text-slate-400">Stage {stage.stageOrder}</span>
-            {stage.isRequired
-              ? <span className="flex items-center gap-0.5 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded"><Lock size={9} /> Required</span>
-              : <span className="flex items-center gap-0.5 text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded"><Unlock size={9} /> Optional</span>
-            }
-          </div>
-          <p className="font-semibold text-slate-900 truncate">{stage.stageName}</p>
-          {allAssignedUsers.length > 0 && (
-            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-              <User size={11} className="text-slate-400 flex-shrink-0" />
-              <span className="text-xs text-slate-500">
-                {allAssignedUsers.map((u) => `${u.firstName} ${u.lastName}`).join(', ')}
-              </span>
+      {/* Header row — always visible */}
+      <div className="px-5 py-4 flex items-center gap-3">
+        {/* Expand toggle — left side */}
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <StageStatusIcon status={stage.status} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-medium text-slate-400">Stage {stage.stageOrder}</span>
+              {stage.isRequired
+                ? <span className="flex items-center gap-0.5 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded"><Lock size={9} /> Required</span>
+                : <span className="flex items-center gap-0.5 text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded"><Unlock size={9} /> Optional</span>
+              }
             </div>
-          )}
-        </div>
+            <p className="font-semibold text-slate-900 truncate">{stage.stageName}</p>
+            {allAssignedUsers.length > 0 && (
+              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                <User size={11} className="text-slate-400 flex-shrink-0" />
+                <span className="text-xs text-slate-500">
+                  {allAssignedUsers.map((u) => `${u.firstName} ${u.lastName}`).join(', ')}
+                </span>
+              </div>
+            )}
+          </div>
+        </button>
+
+        {/* Right actions — always visible */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {stage.documents && stage.documents.length > 0 && (
             <div className="flex items-center gap-1 text-xs text-slate-400">
@@ -368,306 +382,444 @@ function StageCard({
               {stage.documents.length}
             </div>
           )}
-          <span className={getStatusBadgeClass(stage.status)}>{stage.status.replace('_', ' ')}</span>
-          {expanded
-            ? <ChevronUp size={16} className="text-slate-400" />
-            : <ChevronDown size={16} className="text-slate-400" />}
+          {/* Colored status badge */}
+          <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize', stageBadge[stage.status] || 'bg-slate-100 text-slate-500')}>
+            {stage.status.replace('_', ' ')}
+          </span>
+          {/* Update Stage button — also expands the card */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const opening = !showUpdateForm;
+              setShowUpdateForm(opening);
+              if (opening) setExpanded(true);
+            }}
+            className={cn(
+              'flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border-2 transition-all duration-150 flex-shrink-0 shadow-sm',
+              showUpdateForm
+                ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+                : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 hover:shadow-md',
+            )}
+          >
+            {showUpdateForm
+              ? <><X size={12} /> Cancel</>
+              : <><Edit size={12} /> Update Stage</>
+            }
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
         </div>
-      </button>
+      </div>
 
       {expanded && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-4">
-          {/* Dates */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">Started</p>
-              <p className="text-slate-700">{formatDate(stage.startDate) || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-0.5">Completed</p>
-              <p className="text-slate-700">{formatDate(stage.completionDate) || '—'}</p>
-            </div>
-            {stage.assignedAt && (
+        <div className="px-5 pb-5 border-t border-slate-100 pt-4 flex gap-5 items-start">
+
+          {/* ── Left: existing stage content ───────────────────────────── */}
+          <div className={cn('min-w-0 space-y-4', showUpdateForm ? 'w-1/2' : 'flex-1')}>
+            {/* Dates */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <div>
-                <p className="text-xs text-slate-400 mb-0.5">Assigned On</p>
-                <p className="text-slate-700">{formatDate(stage.assignedAt)}</p>
+                <p className="text-xs text-slate-400 mb-0.5">Started</p>
+                <p className="text-slate-700">{formatDate(stage.startDate) || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Completed</p>
+                <p className="text-slate-700">{formatDate(stage.completionDate) || '—'}</p>
+              </div>
+              {stage.assignedAt && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Assigned On</p>
+                  <p className="text-slate-700">{formatDate(stage.assignedAt)}</p>
+                </div>
+              )}
+            </div>
+
+            {stage.notes && (
+              <div className="bg-slate-50 rounded-lg p-3">
+                <p className="text-xs font-medium text-slate-500 mb-1">Notes</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{stage.notes}</p>
+              </div>
+            )}
+
+            {/* Sub-tasks */}
+            {((stage.subTasks && stage.subTasks.length > 0) || showSubTaskForm) && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                    <ListChecks size={13} /> Sub-tasks
+                  </p>
+                  <button
+                    onClick={() => setShowSubTaskForm(!showSubTaskForm)}
+                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <Plus size={12} /> Add
+                  </button>
+                </div>
+                {showSubTaskForm && (
+                  <div className="bg-slate-50 rounded-lg p-3 mb-2 space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        className="form-input text-xs py-1 flex-1"
+                        value={subTaskName}
+                        onChange={(e) => setSubTaskName(e.target.value)}
+                        placeholder="Sub-task name..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && subTaskName.trim()) {
+                            addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired, assignedTo: subTaskAssignee || undefined });
+                          }
+                        }}
+                      />
+                      <label className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
+                        <input type="checkbox" checked={subTaskRequired} onChange={(e) => setSubTaskRequired(e.target.checked)} className="rounded" />
+                        Required
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        className="form-select text-xs py-1 flex-1"
+                        value={subTaskAssignee}
+                        onChange={(e) => setSubTaskAssignee(e.target.value)}
+                      >
+                        <option value="">— Assign member (optional) —</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          if (subTaskName.trim()) {
+                            addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired, assignedTo: subTaskAssignee || undefined });
+                            setSubTaskAssignee('');
+                          }
+                        }}
+                        disabled={!subTaskName.trim() || addSubTaskMutation.isPending}
+                        className="btn-primary text-xs py-1 px-2"
+                      >Add</button>
+                      <button onClick={() => { setShowSubTaskForm(false); setSubTaskAssignee(''); }} className="btn-ghost text-xs py-1"><X size={14} /></button>
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {stage.subTasks?.map((st) => {
+                    const stAssignee = users.find((u) => u.id === (st as StageSubTask & { assignedTo?: string }).assignedTo);
+                    return (
+                      <div key={st.id} className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={st.status === 'completed'}
+                          onChange={() => updateSubTaskMutation.mutate({
+                            subTaskId: st.id,
+                            data: { status: st.status === 'completed' ? 'pending' : 'completed' },
+                          })}
+                          className="rounded flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className={cn('text-sm', st.status === 'completed' && 'line-through text-slate-400')}>
+                            {st.name}
+                          </span>
+                          {stAssignee && (
+                            <span className="text-[10px] text-slate-400 ml-2 select-text">
+                              {stAssignee.firstName} {stAssignee.lastName}
+                            </span>
+                          )}
+                        </div>
+                        {!st.isRequired && (
+                          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">optional</span>
+                        )}
+                        {st.status === 'completed' && (
+                          <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {(!stage.subTasks || stage.subTasks.length === 0) && !showSubTaskForm && (
+              <button
+                onClick={() => setShowSubTaskForm(true)}
+                className="text-xs text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
+              >
+                <Plus size={12} /> Add sub-tasks
+              </button>
+            )}
+
+            {/* Documents */}
+            <div>
+              <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
+                <Paperclip size={13} /> Documents
+              </p>
+              <StageDocuments
+                stageId={stage.id}
+                projectId={projectId}
+                projectWorkflowId={projectWorkflowId}
+                documents={stage.documents || []}
+                onRefresh={onRefresh}
+              />
+            </div>
+
+            {/* History */}
+            {history && history.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
+                  <History size={13} /> History
+                </p>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {history.map((h) => {
+                    const changeLabel = h.changeType === 'status'
+                      ? `changed status from "${h.previousStatus?.replace('_', ' ')}" to "${h.newStatus?.replace('_', ' ')}"`
+                      : h.changeType === 'assignment'
+                        ? `updated assignment`
+                        : h.changeType === 'notes'
+                          ? 'updated notes'
+                          : h.changeType === 'sub_task'
+                            ? h.comment
+                            : h.changeType === 'checklist'
+                              ? 'updated checklist'
+                              : `updated ${h.fieldChanged || 'stage'}`;
+                    return (
+                      <div key={h.id} className="flex gap-2.5 text-sm">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-slate-700">
+                            {h.changedBy?.firstName} {h.changedBy?.lastName}
+                          </span>{' '}
+                          <span className="text-slate-500">{changeLabel}</span>
+                          {h.comment && h.changeType !== 'sub_task' && (
+                            <p className="text-slate-400 text-xs mt-0.5 italic">{h.comment}</p>
+                          )}
+                          <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.createdAt)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
-          {stage.notes && (
-            <div className="bg-slate-50 rounded-lg p-3">
-              <p className="text-xs font-medium text-slate-500 mb-1">Notes</p>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">{stage.notes}</p>
-            </div>
-          )}
+          {/* ── Right: Update form — 50% beside content ─────────────────── */}
+          {showUpdateForm && (() => {
+            const statusOptions: { value: string; label: string; color: string; bg: string; ring: string }[] = [
+              { value: 'pending',     label: 'Pending',     color: 'text-slate-600', bg: 'bg-slate-100',   ring: 'ring-slate-400' },
+              { value: 'in_progress', label: 'In Progress', color: 'text-blue-700',  bg: 'bg-blue-100',    ring: 'ring-blue-500' },
+              { value: 'completed',   label: 'Completed',   color: 'text-emerald-700', bg: 'bg-emerald-100', ring: 'ring-emerald-500' },
+              { value: 'on_hold',     label: 'On Hold',     color: 'text-amber-700', bg: 'bg-amber-100',   ring: 'ring-amber-500' },
+              { value: 'skipped',     label: 'Skipped',     color: 'text-slate-400', bg: 'bg-slate-50',    ring: 'ring-slate-300' },
+            ];
 
-          {/* Sub-tasks */}
-          {((stage.subTasks && stage.subTasks.length > 0) || showSubTaskForm) && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                  <ListChecks size={13} /> Sub-tasks
-                </p>
-                <button
-                  onClick={() => setShowSubTaskForm(!showSubTaskForm)}
-                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                >
-                  <Plus size={12} /> Add
-                </button>
-              </div>
-              {showSubTaskForm && (
-                <div className="bg-slate-50 rounded-lg p-3 mb-2 space-y-2">
-                  <div className="flex gap-2">
-                    <input
-                      className="form-input text-xs py-1 flex-1"
-                      value={subTaskName}
-                      onChange={(e) => setSubTaskName(e.target.value)}
-                      placeholder="Sub-task name..."
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && subTaskName.trim()) {
-                          addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired, assignedTo: subTaskAssignee || undefined });
-                        }
-                      }}
-                    />
-                    <label className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
-                      <input type="checkbox" checked={subTaskRequired} onChange={(e) => setSubTaskRequired(e.target.checked)} className="rounded" />
-                      Required
-                    </label>
+            const filteredUsers = memberSearch.trim()
+              ? users.filter((u) =>
+                  `${u.firstName} ${u.lastName}`.toLowerCase().includes(memberSearch.toLowerCase()) ||
+                  (u.email || '').toLowerCase().includes(memberSearch.toLowerCase())
+                )
+              : users;
+
+            const selectedUsers = users.filter((u) => assignedToIds.includes(u.id) || assignedTo === u.id);
+
+            const toggleMember = (uid: string) => {
+              const isChecked = assignedToIds.includes(uid) || assignedTo === uid;
+              if (isChecked) {
+                const newIds = assignedToIds.filter((id) => id !== uid);
+                setAssignedToIds(newIds);
+                if (assignedTo === uid) setAssignedTo(newIds[0] || '');
+              } else {
+                const newIds = [...assignedToIds, uid];
+                setAssignedToIds(newIds);
+                if (!assignedTo) setAssignedTo(uid);
+              }
+            };
+
+            const initials = (u: { firstName: string; lastName: string }) =>
+              `${u.firstName[0] ?? ''}${u.lastName[0] ?? ''}`.toUpperCase();
+
+            const avatarColors = [
+              'bg-violet-500', 'bg-blue-500', 'bg-emerald-500',
+              'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500',
+            ];
+
+            return (
+              <div className="w-1/2 flex-shrink-0 border-l border-slate-100 pl-5">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Update Stage</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{stage.stageName}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <select
-                      className="form-select text-xs py-1 flex-1"
-                      value={subTaskAssignee}
-                      onChange={(e) => setSubTaskAssignee(e.target.value)}
-                    >
-                      <option value="">— Assign member (optional) —</option>
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => {
-                        if (subTaskName.trim()) {
-                          addSubTaskMutation.mutate({ name: subTaskName.trim(), isRequired: subTaskRequired, assignedTo: subTaskAssignee || undefined });
-                          setSubTaskAssignee('');
-                        }
-                      }}
-                      disabled={!subTaskName.trim() || addSubTaskMutation.isPending}
-                      className="btn-primary text-xs py-1 px-2"
-                    >Add</button>
-                    <button onClick={() => { setShowSubTaskForm(false); setSubTaskAssignee(''); }} className="btn-ghost text-xs py-1"><X size={14} /></button>
-                  </div>
-                </div>
-              )}
-              <div className="space-y-1">
-                {stage.subTasks?.map((st) => {
-                  const stAssignee = users.find((u) => u.id === (st as StageSubTask & { assignedTo?: string }).assignedTo);
-                  return (
-                    <div key={st.id} className="flex items-center gap-2 py-1">
-                      <input
-                        type="checkbox"
-                        checked={st.status === 'completed'}
-                        onChange={() => updateSubTaskMutation.mutate({
-                          subTaskId: st.id,
-                          data: { status: st.status === 'completed' ? 'pending' : 'completed' },
-                        })}
-                        className="rounded flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className={cn('text-sm', st.status === 'completed' && 'line-through text-slate-400')}>
-                          {st.name}
-                        </span>
-                        {stAssignee && (
-                          <span className="text-[10px] text-slate-400 ml-2 select-text">
-                            {stAssignee.firstName} {stAssignee.lastName}
-                          </span>
-                        )}
-                      </div>
-                      {!st.isRequired && (
-                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">optional</span>
-                      )}
-                      {st.status === 'completed' && (
-                        <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {(!stage.subTasks || stage.subTasks.length === 0) && !showSubTaskForm && (
-            <button
-              onClick={() => setShowSubTaskForm(true)}
-              className="text-xs text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
-            >
-              <Plus size={12} /> Add sub-tasks
-            </button>
-          )}
-
-          {/* Documents */}
-          <div>
-            <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
-              <Paperclip size={13} /> Documents
-            </p>
-            <StageDocuments
-              stageId={stage.id}
-              projectId={projectId}
-              projectWorkflowId={projectWorkflowId}
-              documents={stage.documents || []}
-              onRefresh={onRefresh}
-            />
-          </div>
-
-          {/* History */}
-          {history && history.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
-                <History size={13} /> History
-              </p>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {history.map((h) => {
-                  const changeLabel = h.changeType === 'status'
-                    ? `changed status from "${h.previousStatus?.replace('_', ' ')}" to "${h.newStatus?.replace('_', ' ')}"`
-                    : h.changeType === 'assignment'
-                      ? `updated assignment`
-                      : h.changeType === 'notes'
-                        ? 'updated notes'
-                        : h.changeType === 'sub_task'
-                          ? h.comment
-                          : h.changeType === 'checklist'
-                            ? 'updated checklist'
-                            : `updated ${h.fieldChanged || 'stage'}`;
-                  return (
-                    <div key={h.id} className="flex gap-2.5 text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-slate-700">
-                          {h.changedBy?.firstName} {h.changedBy?.lastName}
-                        </span>{' '}
-                        <span className="text-slate-500">{changeLabel}</span>
-                        {h.comment && h.changeType !== 'sub_task' && (
-                          <p className="text-slate-400 text-xs mt-0.5 italic">{h.comment}</p>
-                        )}
-                        <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.createdAt)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Update form */}
-          {!showUpdateForm ? (
-            <div className="flex gap-2">
-              <button onClick={() => setShowUpdateForm(true)} className="btn-secondary text-xs py-1.5">
-                Update Stage
-              </button>
-            </div>
-          ) : (
-            <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-700">Update Stage</p>
-                <button onClick={() => setShowUpdateForm(false)}><X size={16} className="text-slate-400" /></button>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="form-label text-xs">Status</label>
-                  <select
-                    className="form-select"
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as typeof stage.status)}
+                  <button
+                    onClick={() => { setShowUpdateForm(false); setComment(''); setMemberSearch(''); }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                   >
-                    {STAGE_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s.replace('_', ' ')}</option>
-                    ))}
-                  </select>
+                    <X size={15} />
+                  </button>
                 </div>
-                <div>
-                  <label className="form-label text-xs">Assign Members</label>
-                  <div className="mt-1 max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-                    {users.map((u) => {
-                      const isChecked = assignedToIds.includes(u.id) || assignedTo === u.id;
+
+                {/* ── Status Picker ── */}
+                <div className="mb-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Status</p>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    {statusOptions.map((opt) => {
+                      const isSelected = newStatus === opt.value;
                       return (
-                        <label
-                          key={u.id}
-                          className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50 select-none"
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setNewStatus(opt.value as typeof stage.status)}
+                          className={cn(
+                            'flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-xs font-semibold transition-all duration-150 select-none',
+                            isSelected
+                              ? `${opt.bg} ${opt.color} border-current ring-2 ${opt.ring} ring-offset-1 shadow-sm`
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+                          )}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              if (isChecked) {
-                                const newIds = assignedToIds.filter((id) => id !== u.id);
-                                setAssignedToIds(newIds);
-                                if (assignedTo === u.id) {
-                                  setAssignedTo(newIds[0] || '');
-                                }
-                              } else {
-                                const newIds = [...assignedToIds, u.id];
-                                setAssignedToIds(newIds);
-                                if (!assignedTo) setAssignedTo(u.id);
-                              }
-                            }}
-                            className="accent-blue-600 flex-shrink-0"
-                          />
-                          <span className="text-sm text-slate-700 select-text">{u.firstName} {u.lastName}</span>
-                          <span className="text-xs text-slate-400 ml-auto select-text">{u.email}</span>
-                        </label>
+                          <span className={cn('w-2 h-2 rounded-full flex-shrink-0', isSelected ? opt.ring.replace('ring-', 'bg-') : 'bg-slate-300')} />
+                          {opt.label}
+                        </button>
                       );
                     })}
-                    {users.length === 0 && (
-                      <p className="text-xs text-slate-400 px-3 py-2">No active users available</p>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-100 mb-4" />
+
+                {/* ── Assign Members ── */}
+                <div className="mb-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                    Assign Members
+                  </p>
+
+                  {/* Selected chips */}
+                  {selectedUsers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {selectedUsers.map((u, i) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => toggleMember(u.id)}
+                          className="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors group"
+                          title="Click to remove"
+                        >
+                          <span className={cn('w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0', avatarColors[i % avatarColors.length])}>
+                            {initials(u)}
+                          </span>
+                          {u.firstName}
+                          <X size={10} className="opacity-50 group-hover:opacity-100" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Search input */}
+                  <div className="relative mb-1.5">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search by name or email..."
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                    />
+                    {memberSearch && (
+                      <button onClick={() => setMemberSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        <X size={12} />
+                      </button>
                     )}
                   </div>
-                  {assignedToIds.length > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      {assignedToIds.length} member{assignedToIds.length !== 1 ? 's' : ''} assigned
-                      {assignedTo && ` • Primary: ${users.find((u) => u.id === assignedTo)?.firstName || ''} ${users.find((u) => u.id === assignedTo)?.lastName || ''}`}
-                    </p>
-                  )}
+
+                  {/* User list */}
+                  <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
+                    {filteredUsers.length === 0 && (
+                      <p className="text-xs text-slate-400 px-3 py-3 text-center">No users found</p>
+                    )}
+                    {filteredUsers.map((u, i) => {
+                      const isChecked = assignedToIds.includes(u.id) || assignedTo === u.id;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => toggleMember(u.id)}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
+                            isChecked ? 'bg-blue-50' : 'hover:bg-slate-50',
+                          )}
+                        >
+                          <span className={cn('w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0', avatarColors[i % avatarColors.length])}>
+                            {initials(u)}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-xs font-semibold text-slate-800 truncate">{u.firstName} {u.lastName}</span>
+                            {u.email && <span className="block text-[10px] text-slate-400 truncate">{u.email}</span>}
+                          </span>
+                          <span className={cn(
+                            'w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 transition-all',
+                            isChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-300',
+                          )}>
+                            {isChecked && <CheckCircle2 size={10} className="text-white" />}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-100 mb-4" />
+
+                {/* ── Notes ── */}
+                <div className="mb-3">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <StickyNote size={11} /> Notes
+                  </p>
+                  <textarea
+                    rows={2}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none resize-none transition-all placeholder:text-slate-400"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add notes about this stage..."
+                  />
+                </div>
+
+                {/* ── Comment ── */}
+                <div className="mb-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <MessageSquare size={11} /> Comment / Reason
+                  </p>
+                  <input
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Reason for this update..."
+                  />
+                </div>
+
+                {/* ── Actions ── */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateMutation.mutate({ status: newStatus, notes, assignedTo: assignedTo || null, assignedToIds, comment })}
+                    disabled={updateMutation.isPending}
+                    className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {updateMutation.isPending
+                      ? <><RefreshCw size={13} className="animate-spin" /> Saving...</>
+                      : <><CheckCircle2 size={13} /> Save Changes</>
+                    }
+                  </button>
+                  <button
+                    onClick={() => { setShowUpdateForm(false); setComment(''); setMemberSearch(''); }}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <div>
-                <label className="form-label text-xs">Notes</label>
-                <textarea
-                  rows={2}
-                  className="form-input resize-none text-xs"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add notes about this stage..."
-                />
-              </div>
-              <div>
-                <label className="form-label text-xs">Comment / Reason</label>
-                <input
-                  className="form-input text-xs"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Reason for this update..."
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    updateMutation.mutate({
-                      status: newStatus,
-                      notes,
-                      assignedTo: assignedTo || null,
-                      assignedToIds,
-                      comment,
-                    })
-                  }
-                  disabled={updateMutation.isPending}
-                  className="btn-primary text-xs py-1.5"
-                >
-                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button onClick={() => setShowUpdateForm(false)} className="btn-ghost text-xs py-1.5">Cancel</button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
+
         </div>
       )}
     </div>
