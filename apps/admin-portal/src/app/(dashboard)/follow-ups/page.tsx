@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { formatDate, formatFollowUpDate, getStatusBadgeClass, cn, getErrorMessage } from '@/lib/utils';
 import type { FollowUp, Project, User } from '@flowtiq/shared-types';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonTable } from '@/components/Skeleton';
 
 // Re-export isPast-like logic inline
 function isOverdue(date: string) {
@@ -38,6 +40,8 @@ type UpdateForm = z.infer<typeof updateSchema>;
 
 function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -70,7 +74,7 @@ function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title-create">
+      <div ref={modalRef} className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title-create">
         <div className="card-header">
           <h3 id="modal-title-create">New Follow-up</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
@@ -135,6 +139,8 @@ function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
 
 function UpdateFollowUpModal({ followUp, onClose }: { followUp: FollowUp; onClose: () => void }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -159,7 +165,7 @@ function UpdateFollowUpModal({ followUp, onClose }: { followUp: FollowUp; onClos
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title-update">
+      <div ref={modalRef} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title-update">
         <div className="card-header">
           <h3 id="modal-title-update">Update Follow-up</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
@@ -297,14 +303,7 @@ export default function FollowUpsPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr><td colSpan={8} className="text-center py-10">
-                  <svg className="animate-spin w-6 h-6 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                </td></tr>
-              )}
+              {isLoading && <SkeletonTable rows={8} cols={8} />}
               {!isLoading && followUps.length === 0 && (
                 <tr><td colSpan={8}>
                   <div className="empty-state">
@@ -340,15 +339,15 @@ export default function FollowUpsPage() {
                         {overdue ? 'overdue' : fu.status}
                       </span>
                     </td>
-                    <td>
+                    <td className="text-right font-mono text-sm">
                       <span className={cn(
-                        'font-medium text-sm',
+                        'font-medium',
                         overdue ? 'text-red-600' : 'text-slate-700'
                       )}>
                         {formatFollowUpDate(fu.nextFollowUp)}
                       </span>
                     </td>
-                    <td>{fu.lastFollowUp ? formatDate(fu.lastFollowUp) : <span className="text-slate-300">—</span>}</td>
+                    <td className="text-right font-mono text-sm text-slate-500">{fu.lastFollowUp ? formatDate(fu.lastFollowUp) : <span className="text-slate-300">—</span>}</td>
                     <td>
                       {(fu.owner as { firstName: string; lastName: string } | undefined)?.firstName}{' '}
                       {(fu.owner as { firstName: string; lastName: string } | undefined)?.lastName}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -12,6 +12,9 @@ import { Plus, Search, Users, Edit, Trash2, X, UserCheck, UserX, ChevronLeft, Ch
 import { formatDate, formatRelative, getInitials, getAvatarColor, cn, getErrorMessage } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import type { User, Role } from '@flowtiq/shared-types';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonTable } from '@/components/Skeleton';
 
 const createSchema = z.object({
   email: z.string().email('Valid email required'),
@@ -30,6 +33,8 @@ function UserModal({ user, roles, onClose }: {
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -72,7 +77,7 @@ function UserModal({ user, roles, onClose }: {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div ref={modalRef} className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">{user ? 'Edit User' : 'New User'}</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
@@ -148,6 +153,7 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const { user: authUser } = useAuthStore();
   const userPermissions = (authUser?.permissions as string[] | undefined) ?? [];
   const canCreate = authUser?.isSuperAdmin || userPermissions.includes('users:create');
@@ -187,8 +193,7 @@ export default function UsersPage() {
   });
 
   const handleHardDelete = (user: User) => {
-    if (!confirm(`Permanently delete ${user.firstName} ${user.lastName}?\n\nThis cannot be undone. All their account data will be removed.`)) return;
-    hardDeleteMutation.mutate(user.id);
+    setDeleteTarget(user);
   };
 
   const users = data?.items || [];
@@ -198,6 +203,14 @@ export default function UsersPage() {
   return (
     <>
       <Header title="Users" subtitle="Manage team members and their access" />
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title={`Delete ${deleteTarget?.firstName} ${deleteTarget?.lastName}?`}
+        description="This cannot be undone. All their account data will be permanently removed."
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteTarget) hardDeleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
+        onCancel={() => setDeleteTarget(null)}
+      />
       {(showModal || editUser) && (
         <UserModal
           user={editUser}
@@ -249,14 +262,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr><td colSpan={7} className="text-center py-10">
-                  <svg className="animate-spin w-6 h-6 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                </td></tr>
-              )}
+              {isLoading && <SkeletonTable rows={8} cols={7} />}
               {!isLoading && users.length === 0 && (
                 <tr><td colSpan={7}>
                   <div className="empty-state">
@@ -305,10 +311,10 @@ export default function UsersPage() {
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="text-sm text-slate-500">
+                    <td className="text-right font-mono text-sm text-slate-500">
                       {user.lastLoginAt ? formatRelative(user.lastLoginAt) : 'Never'}
                     </td>
-                    <td className="text-sm text-slate-500">{formatDate(user.createdAt)}</td>
+                    <td className="text-right font-mono text-sm text-slate-500">{formatDate(user.createdAt)}</td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
                         {canEdit && (

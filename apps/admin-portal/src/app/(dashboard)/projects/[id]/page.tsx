@@ -5,7 +5,7 @@ import { get, patch, post, uploadFile } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft, CheckCircle2, Clock, AlertCircle, Circle,
+  CheckCircle2, Clock, AlertCircle, Circle,
   FileText, Upload, History, ChevronDown, ChevronUp, X,
   User, Calendar, GitBranch, AlertTriangle, Plus, Paperclip,
   ChevronRight, ListChecks, Eye, Download, RefreshCw,
@@ -15,9 +15,11 @@ import Link from 'next/link';
 import {
   formatDate, formatDateTime, getStatusBadgeClass, getPriorityBadgeClass, cn, getErrorMessage,
 } from '@/lib/utils';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import type { Project, ProjectWorkflow, ProjectStage, FollowUp, StageSubTask } from '@flowtiq/shared-types';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonLine, SkeletonCard } from '@/components/Skeleton';
 
 type ProjectDetail = Project & { followUps?: FollowUp[]; projectWorkflows?: ProjectWorkflow[] };
 
@@ -125,13 +127,20 @@ function DocThumbnail({ doc, onClick }: { doc: DocType; onClick: (doc: DocType) 
 
 function DocPreviewModal({ doc, onClose }: { doc: DocType; onClose: () => void }) {
   const kind = getFileIcon(doc.fileType, doc.mimeType);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-4xl w-full max-h-[90vh] flex flex-col" role="dialog" aria-modal="true">
+      <div ref={modalRef} className="modal-content max-w-4xl w-full max-h-[90vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="doc-preview-title">
         <div className="card-header flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <FileText size={16} className="text-slate-400 flex-shrink-0" />
-            <span className="font-medium text-slate-900 truncate">{doc.originalName}</span>
+            <span id="doc-preview-title" className="font-medium text-slate-900 truncate">{doc.originalName}</span>
           </div>
           <div className="flex items-center gap-2">
             <a href={doc.filePath} target="_blank" rel="noreferrer" className="btn-secondary text-xs py-1.5">
@@ -248,16 +257,17 @@ function StageDocuments({
 // =============================================
 
 function StageCard({
-  stage, projectId, projectWorkflowId, users, onRefresh,
+  stage, projectId, projectWorkflowId, users, onRefresh, defaultExpanded,
 }: {
   stage: ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] };
   projectId: string;
   projectWorkflowId: string;
   users: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
   onRefresh: () => void;
+  defaultExpanded?: boolean;
 }) {
   const qc = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [showSubTaskForm, setShowSubTaskForm] = useState(false);
   const [newStatus, setNewStatus] = useState(stage.status);
@@ -645,11 +655,11 @@ function StageCard({
             ];
 
             return (
-              <div className="w-1/2 flex-shrink-0 border-l border-slate-100 pl-5">
+              <div className="w-1/2 flex-shrink-0 border-2 border-blue-500 rounded-xl bg-blue-50/30 p-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-sm font-bold text-slate-800">Update Stage</p>
+                    <p className="text-sm font-semibold text-blue-600">Updating this stage</p>
                     <p className="text-xs text-slate-400 mt-0.5">{stage.stageName}</p>
                   </div>
                   <button
@@ -845,6 +855,9 @@ function WorkflowCard({
   const stages = workflow.stages || [];
   const completed = stages.filter((s) => s.status === 'completed').length;
   const inProgress = stages.filter((s) => s.status === 'in_progress').length;
+
+  // First in-progress stage gets expanded by default; fallback to first stage
+  const firstActiveId = stages.find((s) => s.status === 'in_progress')?.id ?? stages[0]?.id;
   const total = stages.length;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -946,6 +959,7 @@ function WorkflowCard({
                   projectWorkflowId={workflow.id}
                   users={users}
                   onRefresh={onRefresh}
+                  defaultExpanded={stage.id === firstActiveId}
                 />
               ))}
             </div>
@@ -967,6 +981,13 @@ function AddWorkflowModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const [selectedId, setSelectedId] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -992,9 +1013,9 @@ function AddWorkflowModal({
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-md w-full" role="dialog" aria-modal="true">
+      <div ref={modalRef} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="add-workflow-title">
         <div className="card-header">
-          <h3>Add Workflow to Project</h3>
+          <h3 id="add-workflow-title">Add Workflow to Project</h3>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
         </div>
         <div className="card-body space-y-4">
@@ -1195,11 +1216,18 @@ export default function ProjectDetailPage() {
     return (
       <>
         <Header title="Project Details" />
-        <div className="p-6 flex justify-center py-20">
-          <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+        <div className="p-4 sm:p-6 space-y-4">
+          <div className="space-y-1">
+            <SkeletonLine width="50%" height="24px" />
+            <SkeletonLine width="30%" height="14px" />
+            <SkeletonLine width="20%" height="14px" />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} rows={1} />)}
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} rows={2} />)}
+          </div>
         </div>
       </>
     );
@@ -1245,12 +1273,19 @@ export default function ProjectDetailPage() {
       {showAddWorkflow && <AddWorkflowModal projectId={project.id} onClose={() => setShowAddWorkflow(false)} />}
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-slide-in">
-        {/* Back + badges */}
-        <div className="flex items-start justify-between">
-          <Link href="/projects" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-            <ArrowLeft size={16} /> Back to Projects
-          </Link>
-          <div className="flex items-center gap-2">
+        {/* Breadcrumb + badges */}
+        <div className="flex items-center justify-between gap-2">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 min-w-0">
+            <Link href="/projects" className="text-sm text-blue-600 hover:underline flex-shrink-0">Projects</Link>
+            <span className="text-slate-400 text-sm flex-shrink-0">/</span>
+            <span
+              className="text-sm text-slate-600 truncate"
+              title={project.name}
+            >
+              {project.name.length > 40 ? project.name.slice(0, 40) + '…' : project.name}
+            </span>
+          </nav>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <span className={getStatusBadgeClass(project.status)}>{project.status.replace('_', ' ')}</span>
             <span className={getPriorityBadgeClass(project.priority)}>{project.priority}</span>
           </div>

@@ -4,7 +4,10 @@ import { Providers } from './providers';
 import { FaviconUpdater } from '@/components/FaviconUpdater';
 
 export const metadata: Metadata = {
-  title: 'Flowtiq | Workflow Management',
+  title: {
+    default: 'Flowtiq | Workflow Management',
+    template: '%s | Workflow Management',
+  },
   description: 'Enterprise workflow and project management platform for modern teams',
 };
 

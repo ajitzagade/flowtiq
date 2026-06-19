@@ -13,6 +13,7 @@ import {
   Clock, AlertTriangle, FolderOpen, XCircle, RefreshCw,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
+import { SkeletonCard } from '@/components/Skeleton';
 import toast from 'react-hot-toast';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -144,8 +145,8 @@ function KpiCard({
 // ── Stage color palette (matches backend stage names) ─────────────────────────
 
 const STAGE_COLORS = [
-  '#6366f1', '#3b82f6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
+  '#3b82f6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#64748b',
+  '#1d4ed8', '#0284c7', '#059669', '#d97706',
 ];
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -346,11 +347,14 @@ export default function ReportsPage() {
         </div>
 
         {isLoading && (
-          <div className="flex justify-center py-16">
-            <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <SkeletonCard key={i} rows={1} />)}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SkeletonCard rows={8} />
+              <SkeletonCard rows={8} />
+            </div>
           </div>
         )}
 
@@ -360,7 +364,7 @@ export default function ReportsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <KpiCard label="Total Projects" value={kpi!.totalProjects} icon={FolderOpen} color="bg-blue-500" />
               <KpiCard label="Completed" value={kpi!.completedProjects} icon={CheckCircle} color="bg-emerald-500" />
-              <KpiCard label="Active" value={kpi!.activeProjects} icon={TrendingUp} color="bg-violet-500" />
+              <KpiCard label="Active" value={kpi!.activeProjects} icon={TrendingUp} color="bg-blue-600" />
               <KpiCard label="Overdue" value={kpi!.overdueProjects} icon={AlertTriangle} color="bg-red-500" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -368,14 +372,14 @@ export default function ReportsPage() {
                 label="Started in Period"
                 value={kpi!.startedInPeriod}
                 icon={Calendar}
-                color="bg-sky-500"
+                color="bg-blue-400"
                 sub={`${formatDate(data.period.start)} – ${formatDate(data.period.end)}`}
               />
               <KpiCard
                 label="Completed in Period"
                 value={kpi!.completedInPeriod}
                 icon={CheckCircle}
-                color="bg-teal-500"
+                color="bg-emerald-600"
                 sub={`${formatDate(data.period.start)} – ${formatDate(data.period.end)}`}
               />
               <KpiCard label="On Hold" value={kpi!.onHoldProjects} icon={Clock} color="bg-amber-500" />
@@ -414,7 +418,7 @@ export default function ReportsPage() {
               {/* Status pie chart */}
               <div className="card p-4">
                 <div className="flex items-center gap-2 mb-4">
-                  <BarChart2 size={16} className="text-violet-500" />
+                  <BarChart2 size={16} className="text-blue-500" />
                   <h3 className="font-semibold text-slate-800 text-sm">Status Breakdown</h3>
                 </div>
                 {data.statusDistribution.length === 0 ? (
@@ -460,7 +464,7 @@ export default function ReportsPage() {
             {/* Stage distribution bar chart */}
             <div className="card p-4">
               <div className="flex items-center gap-2 mb-4">
-                <BarChart2 size={16} className="text-indigo-500" />
+                <BarChart2 size={16} className="text-blue-500" />
                 <h3 className="font-semibold text-slate-800 text-sm">Stage Distribution</h3>
               </div>
               {data.stageDistribution.length === 0 ? (

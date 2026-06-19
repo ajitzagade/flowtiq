@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
 import { ProjectProgress } from '@/components/ProjectProgress';
+import { SkeletonCard, SkeletonTable } from '@/components/Skeleton';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -287,15 +288,18 @@ export default function DashboardPage() {
     return (
       <>
         <Header title="Dashboard" subtitle={`Welcome back, ${user?.firstName}`} />
-        <div className="p-6">
+        <div className="p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="card p-6 animate-pulse">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl mb-4" />
-                <div className="h-8 bg-slate-100 rounded w-1/2 mb-2" />
-                <div className="h-4 bg-slate-100 rounded w-3/4" />
-              </div>
-            ))}
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} rows={2} />)}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 card overflow-hidden">
+              <table className="table">
+                <thead><tr><th>Project</th><th>Stage</th><th>Status</th><th>Priority</th><th>Progress</th></tr></thead>
+                <tbody><SkeletonTable rows={5} cols={5} /></tbody>
+              </table>
+            </div>
+            <SkeletonCard rows={4} />
           </div>
         </div>
       </>
@@ -350,12 +354,8 @@ export default function DashboardPage() {
               {stats?.recentProjects?.map((project, idx) => (
                 <Link key={project.id} href={`/projects/${project.id}`}>
                   <div
-                    className={cn(
-                      'px-6 py-4 transition-colors cursor-pointer',
-                      idx % 2 === 1
-                        ? 'bg-violet-50 hover:bg-violet-100'
-                        : 'bg-white hover:bg-indigo-50',
-                    )}
+                    className="px-6 py-4 transition-colors cursor-pointer hover:bg-[#e6edff]"
+                    style={{ backgroundColor: idx % 2 === 1 ? '#f2f5ff' : '#ffffff' }}
                   >
                     <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div className="flex-1 min-w-0">
@@ -411,14 +411,14 @@ export default function DashboardPage() {
                   </div>
                 )}
                 {stats?.upcomingFollowUps?.map((fu) => (
-                  <div key={fu.id} className="px-4 py-3">
+                  <Link key={fu.id} href={`/follow-ups?id=${fu.id}`} className="block px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
                     <p className="text-sm font-medium text-slate-800 truncate">{fu.project.name}</p>
                     <p className="text-xs text-slate-500">{fu.project.clientName}</p>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-slate-400">{fu.owner.firstName} {fu.owner.lastName}</span>
                       <span className="text-xs font-medium text-blue-600">{formatDate(fu.nextFollowUp)}</span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -467,35 +467,51 @@ export default function DashboardPage() {
           <WorkflowPipelineSection pipeline={stats.workflowPipeline} />
         )}
 
-        {/* Summary row */}
+        {/* Actionable summary row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="card p-5 flex items-center gap-4">
-            <div className="stat-icon bg-blue-50">
-              <FolderKanban size={22} className="text-blue-600" />
+          <Link href="/follow-ups?status=overdue" className="card p-5 flex items-center gap-4 group hover:shadow-md transition-shadow">
+            <div className="stat-icon bg-red-50">
+              <AlertTriangle size={22} className="text-red-500" />
             </div>
-            <div>
-              <p className="text-xl font-bold text-slate-900">{stats?.completedProjects || 0}</p>
-              <p className="text-sm text-slate-500">Completed Projects</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-xl font-bold text-slate-900">
+                {/* TODO: wire backend — overdueFollowUpsCount not yet returned by /dashboard/stats */}
+                {typeof stats?.overdueFollowUps === 'number'
+                  ? stats.overdueFollowUps
+                  : Array.isArray(stats?.overdueFollowUps)
+                  ? stats.overdueFollowUps.length
+                  : 0}
+              </p>
+              <p className="text-sm text-slate-500">Overdue Follow-ups</p>
             </div>
-          </div>
-          <div className="card p-5 flex items-center gap-4">
+            <ArrowRight size={16} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+          </Link>
+          <Link href="/projects" className="card p-5 flex items-center gap-4 group hover:shadow-md transition-shadow">
             <div className="stat-icon bg-amber-50">
               <TrendingUp size={22} className="text-amber-600" />
             </div>
-            <div>
-              <p className="text-xl font-bold text-slate-900">{stats?.onHoldProjects || 0}</p>
-              <p className="text-sm text-slate-500">Projects On Hold</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-xl font-bold text-slate-900">
+                {/* TODO: wire backend — stagesOverdueCount not yet returned by /dashboard/stats */}
+                0
+              </p>
+              <p className="text-sm text-slate-500">Stages Overdue</p>
             </div>
-          </div>
-          <div className="card p-5 flex items-center gap-4">
+            <ArrowRight size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+          </Link>
+          <Link href="/documents" className="card p-5 flex items-center gap-4 group hover:shadow-md transition-shadow">
             <div className="stat-icon bg-emerald-50">
-              <CheckCircle2 size={22} className="text-emerald-600" />
+              <FileText size={22} className="text-emerald-600" />
             </div>
-            <div>
-              <p className="text-xl font-bold text-slate-900">{stats?.totalFollowUps || 0}</p>
-              <p className="text-sm text-slate-500">Total Follow-ups</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-xl font-bold text-slate-900">
+                {/* TODO: wire backend — documentsThisWeekCount not yet returned by /dashboard/stats */}
+                0
+              </p>
+              <p className="text-sm text-slate-500">Documents This Week</p>
             </div>
-          </div>
+            <ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+          </Link>
         </div>
       </div>
     </>
