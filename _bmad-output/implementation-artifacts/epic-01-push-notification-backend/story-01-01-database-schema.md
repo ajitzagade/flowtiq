@@ -2,9 +2,10 @@
 epicId: 1
 storyId: '01-01'
 title: 'Push Infrastructure Database Schema'
-status: ready
+status: review
 priority: high
 estimate: 3
+baseline_commit: 4d03756822cdca1b35c65b704fea0e3a65361ee1
 ---
 
 # Story 1.1 — Push Infrastructure Database Schema
@@ -203,10 +204,10 @@ export interface PushNotificationPayload {
 
 ## Definition of Done
 
-- [ ] All three Prisma models added to schema.prisma
-- [ ] Tenant and User models have correct reverse relations
-- [ ] `pnpm db:generate` passes
-- [ ] `pnpm db:push` passes
-- [ ] `pnpm type-check` passes
-- [ ] Four new interfaces exported from `packages/shared-types/src/index.ts`
-- [ ] No existing tests broken
+- [x] All three Prisma models added to schema.prisma
+- [x] Tenant and User models have correct reverse relations
+- [x] `pnpm db:generate` passes
+- [x] `pnpm db:push` passes
+- [x] `pnpm type-check` passes
+- [x] Four new interfaces exported from `packages/shared-types/src/index.ts`
+- [x] No existing tests broken

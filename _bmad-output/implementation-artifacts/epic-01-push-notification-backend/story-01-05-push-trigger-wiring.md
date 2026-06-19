@@ -2,7 +2,7 @@
 epicId: 1
 storyId: '01-05'
 title: 'Push Trigger Wiring & Follow-Up Reminder Job'
-status: ready
+status: review
 priority: high
 estimate: 5
 dependencies:
@@ -243,14 +243,14 @@ Always use the tenantId from the authenticated request (`req.user.tenantId`) whe
 
 ## Definition of Done
 
-- [ ] `sendPushNotification` called in `stages.ts` for stage assignment (AC-1)
-- [ ] `sendPushNotification` called in `stages.ts` for stage status update (AC-2)
-- [ ] `sendPushNotification` called in `projects.ts` for project assignment (AC-3)
-- [ ] `sendPushNotification` called in `followups.ts` for follow-up assignment (AC-4)
-- [ ] `sendPushNotification` called in `stages.ts` for sub-task assignment (AC-5)
-- [ ] `sendPushNotification` called in `documents.ts` for document upload (AC-6)
-- [ ] `services/api/src/jobs/followup-reminders.ts` created with due-today and overdue queries (AC-8, AC-9)
-- [ ] Cron job registered in app startup
-- [ ] All calls are fire-and-forget (no `await`)
-- [ ] All existing route tests still pass
-- [ ] `pnpm type-check` passes
+- [x] `sendPushNotification` called in `stages.ts` for stage assignment (AC-1)
+- [x] `sendPushNotification` called in `stages.ts` for stage status update (AC-2)
+- [x] `sendPushNotification` called in `projects.ts` for project assignment (AC-3)
+- [x] `sendPushNotification` called in `followups.ts` for follow-up assignment (AC-4)
+- [x] `sendPushNotification` called in `stages.ts` for sub-task assignment (AC-5)
+- [x] `sendPushNotification` called in `documents.ts` for document upload (AC-6)
+- [x] `services/api/src/jobs/followup-reminders.ts` created with due-today and overdue queries (AC-8, AC-9)
+- [x] Cron job registered in app startup
+- [x] All calls are fire-and-forget (no `await`)
+- [x] All existing route tests still pass
+- [x] `pnpm type-check` passes

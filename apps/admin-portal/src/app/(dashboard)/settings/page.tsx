@@ -17,7 +17,7 @@ const TABS = [
   { key: 'security', label: 'Security', icon: Shield },
 ] as const;
 
-type TenantSettings = {
+type LocalSettings = {
   timezone?: string;
   dateFormat?: string;
   notificationSettings?: {
@@ -45,7 +45,7 @@ export default function SettingsPage() {
 
   const currentTenant = tenantData || tenant;
   const branding = currentTenant?.branding as { primaryColor?: string; secondaryColor?: string; logoUrl?: string } | undefined;
-  const tenantSettings = (currentTenant?.settings as TenantSettings) ?? {};
+  const tenantSettings = (currentTenant?.settings as unknown as LocalSettings) ?? {};
 
   // Branding state
   const [primaryColor, setPrimaryColor] = useState(branding?.primaryColor || '#3b82f6');
@@ -66,7 +66,7 @@ export default function SettingsPage() {
       if (b?.primaryColor) setPrimaryColor(b.primaryColor);
       if (b?.secondaryColor) setSecondaryColor(b.secondaryColor);
       if (tenantData.name) setTenantName(tenantData.name);
-      const s = (tenantData.settings as TenantSettings) ?? {};
+      const s = (tenantData.settings as unknown as LocalSettings) ?? {};
       if (s.timezone) setTimezone(s.timezone);
       if (s.dateFormat) setDateFormat(s.dateFormat);
       if (s.notificationSettings) setNotifSettings(s.notificationSettings);

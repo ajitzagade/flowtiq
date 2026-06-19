@@ -9,7 +9,7 @@ import {
   FileText, Upload, History, ChevronDown, ChevronUp, X,
   User, Calendar, GitBranch, AlertTriangle, Plus, Paperclip,
   ChevronRight, ListChecks, Eye, Download, RefreshCw,
-  Lock, Unlock, GripVertical, Search, MessageSquare, StickyNote,
+  Lock, Unlock, GripVertical, Search, MessageSquare, StickyNote, Edit,
 } from 'lucide-react';
 import Link from 'next/link';
 import {

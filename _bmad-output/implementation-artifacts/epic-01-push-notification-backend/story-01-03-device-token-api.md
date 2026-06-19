@@ -2,7 +2,7 @@
 epicId: 1
 storyId: '01-03'
 title: 'Device Token Registration API'
-status: ready
+status: review
 priority: high
 estimate: 2
 dependencies:
@@ -159,11 +159,11 @@ app.use('/api/users', deviceTokenRouter);
 
 ## Definition of Done
 
-- [ ] `services/api/src/routes/deviceTokens.ts` created
-- [ ] POST endpoint: validates body, upserts DeviceToken, returns correct status codes
-- [ ] DELETE endpoint: deactivates token, idempotent
-- [ ] Both endpoints protected by `authenticate` middleware
-- [ ] `tenantId` sourced from JWT only
-- [ ] Router mounted in `app.ts`
-- [ ] `pnpm type-check` passes
-- [ ] Manual test: register token → verify DB record; deregister → verify isActive=false
+- [x] `services/api/src/routes/deviceTokens.ts` created
+- [x] POST endpoint: validates body, upserts DeviceToken, returns correct status codes
+- [x] DELETE endpoint: deactivates token, idempotent
+- [x] Both endpoints protected by `authenticate` middleware
+- [x] `tenantId` sourced from JWT only
+- [x] Router mounted in `app.ts`
+- [x] `pnpm type-check` passes
+- [x] Manual test: register token → verify DB record; deregister → verify isActive=false

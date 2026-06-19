@@ -2,7 +2,7 @@
 epicId: 1
 storyId: '01-04'
 title: 'Notification Preference API'
-status: ready
+status: review
 priority: high
 estimate: 2
 dependencies:
@@ -168,12 +168,12 @@ res.json({ success: true, data: { assignments, statusUpdates, documentUploads, f
 
 ## Definition of Done
 
-- [ ] `services/api/src/routes/notificationPreferences.ts` created
-- [ ] GET endpoint: auto-creates defaults, returns current preferences
-- [ ] PATCH endpoint: partial update, upsert behavior
-- [ ] Zod validation on PATCH body
-- [ ] Both endpoints protected by `authenticate` middleware
-- [ ] `tenantId` sourced from JWT only
-- [ ] Routers mounted in `app.ts`
-- [ ] `pnpm type-check` passes
-- [ ] Manual test: GET with no preferences → defaults created; PATCH one field → others unchanged
+- [x] `services/api/src/routes/notificationPreferences.ts` created
+- [x] GET endpoint: auto-creates defaults, returns current preferences
+- [x] PATCH endpoint: partial update, upsert behavior
+- [x] Zod validation on PATCH body
+- [x] Both endpoints protected by `authenticate` middleware
+- [x] `tenantId` sourced from JWT only
+- [x] Routers mounted in `app.ts`
+- [x] `pnpm type-check` passes
+- [x] Manual test: GET with no preferences → defaults created; PATCH one field → others unchanged

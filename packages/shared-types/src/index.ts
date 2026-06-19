@@ -709,3 +709,36 @@ export interface NotificationFilters extends PaginationParams {
   isRead?: boolean;
   type?: NotificationType;
 }
+
+// =============================================
+// PUSH NOTIFICATIONS
+// =============================================
+
+export type DevicePlatform = 'ios' | 'android';
+
+export interface DeviceToken {
+  id: string;
+  userId: string;
+  tenantId: string;
+  token: string;
+  platform: DevicePlatform;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationPreferences {
+  assignments: boolean;
+  statusUpdates: boolean;
+  documentUploads: boolean;
+  followUpReminders: boolean;
+}
+
+export interface PushNotificationPayload {
+  title: string;
+  body: string;
+  eventType: string;
+  entityType: string;
+  entityId: string;
+  deepLinkUrl: string;
+}

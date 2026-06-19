@@ -28,13 +28,16 @@ model Tenant {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  users         User[]
-  roles         Role[]
-  projects      Project[]
-  workflows     WorkflowTemplate[]
-  documents     Document[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
+  users                   User[]
+  roles                   Role[]
+  projects                Project[]
+  workflows               WorkflowTemplate[]
+  documents               Document[]
+  auditLogs               AuditLog[]
+  notifications           Notification[]
+  deviceTokens            DeviceToken[]
+  notificationPreferences UserNotificationPreference[]
+  pushCredentials         TenantPushCredentials?
 
   @@map("tenants")
 }
@@ -58,16 +61,18 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  tenant            Tenant?           @relation(fields: [tenantId], references: [id])
-  userRoles         UserRole[]
-  ownedProjects     Project[]         @relation("ProjectOwner")
-  ownedFollowUps    FollowUp[]        @relation("FollowUpOwner")
-  createdFollowUps  FollowUp[]        @relation("FollowUpCreator")
-  uploadedDocuments Document[]
-  notifications     Notification[]
-  stageHistories    StageHistory[]
-  followUpHistories FollowUpHistory[]
-  refreshTokens     RefreshToken[]
+  tenant                  Tenant?                      @relation(fields: [tenantId], references: [id])
+  userRoles               UserRole[]
+  ownedProjects           Project[]                    @relation("ProjectOwner")
+  ownedFollowUps          FollowUp[]                   @relation("FollowUpOwner")
+  createdFollowUps        FollowUp[]                   @relation("FollowUpCreator")
+  uploadedDocuments       Document[]
+  notifications           Notification[]
+  stageHistories          StageHistory[]
+  followUpHistories       FollowUpHistory[]
+  refreshTokens           RefreshToken[]
+  deviceTokens            DeviceToken[]
+  notificationPreferences UserNotificationPreference[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -448,4 +453,61 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// =============================================
+// PUSH NOTIFICATION INFRASTRUCTURE
+// =============================================
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  token     String
+  platform  String   // 'ios' | 'android'
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("device_tokens")
+}
+
+model UserNotificationPreference {
+  id                String  @id @default(cuid())
+  userId            String
+  tenantId          String
+  assignments       Boolean @default(true)
+  statusUpdates     Boolean @default(true)
+  documentUploads   Boolean @default(true)
+  followUpReminders Boolean @default(true)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@map("user_notification_preferences")
+}
+
+model TenantPushCredentials {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  fcmServerKey   String?
+  fcmProjectId   String?
+  apnsKeyId      String?
+  apnsTeamId     String?
+  apnsPrivateKey String?
+  apnsBundleId   String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_push_credentials")
 }

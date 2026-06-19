@@ -2,7 +2,7 @@
 epicId: 1
 storyId: '01-02'
 title: 'Firebase Push Send Service'
-status: ready
+status: review
 priority: high
 estimate: 3
 dependencies:
@@ -187,12 +187,12 @@ const message: admin.messaging.Message = {
 
 ## Definition of Done
 
-- [ ] `firebase-admin` package added to `services/api`
-- [ ] `services/api/src/lib/push.ts` created with `sendPushNotification` export
-- [ ] Preference check implemented (early return if disabled)
-- [ ] Active token fetch implemented
-- [ ] Tenant credential fetch and Firebase SDK initialization implemented
-- [ ] Per-token send with invalid-token cleanup implemented
-- [ ] All errors caught — function never throws
-- [ ] `pnpm type-check` passes
-- [ ] Manual test: calling `sendPushNotification` with a non-existent userId returns without error
+- [x] `firebase-admin` package added to `services/api`
+- [x] `services/api/src/lib/push.ts` created with `sendPushNotification` export
+- [x] Preference check implemented (early return if disabled)
+- [x] Active token fetch implemented
+- [x] Tenant credential fetch and Firebase SDK initialization implemented
+- [x] Per-token send with invalid-token cleanup implemented
+- [x] All errors caught — function never throws
+- [x] `pnpm type-check` passes
+- [x] Manual test: calling `sendPushNotification` with a non-existent userId returns without error
