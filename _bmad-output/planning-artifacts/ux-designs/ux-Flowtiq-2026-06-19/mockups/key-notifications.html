@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flowtiq — Notifications Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
+
+  /* Layout */
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 240px; background: #0d1b2e; display: flex; flex-direction: column; flex-shrink: 0; z-index: 50; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .header { height: 64px; background: #fff; border-bottom: 1px solid #dde3f8; display: flex; align-items: center; padding: 0 24px; flex-shrink: 0; z-index: 20; gap: 16px; }
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* Sidebar */
+  .sidebar-brand { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .sidebar-brand-name { color: #fff; font-size: 15px; font-weight: 600; }
+  .sidebar-brand-sub { color: #8ba3be; font-size: 11px; margin-top: 1px; }
+  .sidebar-nav { flex: 1; padding: 12px 0; }
+  .nav-section-label { color: #8ba3be; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 12px 16px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; color: #8ba3be; font-size: 13px; font-weight: 500; cursor: pointer; border-left: 3px solid transparent; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #c9d8ea; }
+  .nav-item.active { color: #60a5fa; background: rgba(59,130,246,0.18); border-left-color: #3b82f6; }
+  .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; background: #ef4444; color: #fff; font-size: 10px; font-weight: 600; border-radius: 9999px; padding: 1px 6px; }
+
+  /* Header */
+  .header-title { font-size: 17px; font-weight: 700; color: #0f172a; }
+  .header-spacer { flex: 1; }
+  .bell-btn { position: relative; width: 36px; height: 36px; border-radius: 8px; background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; }
+  .bell-btn:hover { background: #f1f5f9; }
+  .avatar-btn { width: 32px; height: 32px; border-radius: 9999px; background: #3b82f6; color: #fff; font-size: 12px; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  /* Badge */
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-blue { background: #eff6ff; color: #3b82f6; }
+  .badge-green { background: #ecfdf5; color: #10b981; }
+  .badge-yellow { background: #fffbeb; color: #f59e0b; }
+  .badge-red { background: #fef2f2; color: #ef4444; }
+  .badge-gray { background: #f1f5f9; color: #64748b; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+  .btn-secondary { background: #fff; color: #475569; border: 1px solid #dde3f8; }
+  .btn-secondary:hover { background: #f8fafc; }
+  .btn-ghost { background: transparent; color: #3b82f6; }
+  .btn-ghost:hover { background: #eff6ff; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* Page header */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .page-title { font-size: 22px; font-weight: 700; color: #0f172a; }
+  .page-title-count { font-size: 13px; font-weight: 500; color: #64748b; margin-left: 8px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid #eef0f8; margin-bottom: 20px; }
+  .tab { padding: 10px 20px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab:hover { color: #3b82f6; }
+  .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+  .tab-count { display: inline-flex; align-items: center; justify-content: center; background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; border-radius: 9999px; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; }
+
+  /* Notification list container */
+  .notif-list-card { background: #fff; border: 1px solid #dde3f8; border-radius: 16px; overflow: hidden; }
+
+  /* Notification item (F-14 fix: each item has entity link) */
+  .notif-item { display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; border-bottom: 1px solid #eef0f8; transition: background 0.1s; position: relative; }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item:hover { background: #fafbff; }
+  .notif-item.unread { background: #f0f5ff; }
+  .notif-item.unread:hover { background: #e8f0fe; }
+
+  /* Unread indicator */
+  .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; margin-top: 6px; }
+  .unread-dot.invisible { opacity: 0; }
+
+  /* Type icon */
+  .type-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icon-assignment { background: #eff6ff; color: #3b82f6; }
+  .icon-stage { background: #ecfdf5; color: #10b981; }
+  .icon-followup { background: #fffbeb; color: #f59e0b; }
+  .icon-document { background: #f5f3ff; color: #8b5cf6; }
+  .icon-overdue { background: #fef2f2; color: #ef4444; }
+
+  /* Notification content */
+  .notif-content { flex: 1; min-width: 0; }
+  .notif-message { font-size: 13px; color: #0f172a; line-height: 1.5; margin-bottom: 4px; }
+  .notif-message strong { font-weight: 600; }
+  .notif-meta { display: flex; align-items: center; gap: 12px; }
+  .notif-time { font-size: 12px; color: #94a3b8; }
+
+  /* Entity link (F-14 fix — the core revamp) */
+  .notif-entity-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #3b82f6; font-weight: 500; text-decoration: none; padding: 2px 8px; background: #eff6ff; border-radius: 6px; transition: background 0.1s; cursor: pointer; }
+  .notif-entity-link:hover { background: #dbeafe; }
+  .notif-entity-link svg { opacity: 0.7; }
+
+  /* Action area */
+  .notif-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+  .mark-read-btn { font-size: 11px; color: #94a3b8; background: none; border: none; cursor: pointer; padding: 2px; }
+  .mark-read-btn:hover { color: #3b82f6; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 48px 24px; }
+  .empty-icon { width: 48px; height: 48px; background: #f1f5f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; color: #94a3b8; }
+  .empty-title { font-size: 15px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+  .empty-sub { font-size: 13px; color: #94a3b8; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 16px; }
+  .annotation strong { color: #78350f; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-name">Vastudeep Associates</div>
+      <div class="sidebar-brand-sub">Admin Portal</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+        Projects
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Follow-Ups
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Documents
+      </div>
+      <div class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Notifications
+        <span class="nav-badge">4</span>
+      </div>
+      <div class="nav-section-label">Administration</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        Users
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Roles
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Workflows
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="header">
+      <div class="header-title">Notifications</div>
+      <div class="header-spacer"></div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn btn-secondary" style="font-size:12px; padding:6px 12px;">Mark all read</button>
+        <button class="bell-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </button>
+        <button class="avatar-btn">AK</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-header">
+        <div>
+          <span class="page-title">Notifications</span>
+          <span class="page-title-count">12 total · 4 unread</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active">All <span class="tab-count">4</span></div>
+        <div class="tab">Assignments</div>
+        <div class="tab">Status Updates</div>
+        <div class="tab">Follow-Ups</div>
+        <div class="tab">Documents</div>
+      </div>
+
+      <div class="annotation">
+        <strong>Revamp note (F-14):</strong> Each notification now has a tinted "entity link" pill (e.g. "View stage →", "View project →"). Previously notifications showed type + message + time with no way to navigate to the referenced entity. Clicking the link marks the notification read and navigates to the entity.
+      </div>
+
+      <!-- Notification list -->
+      <div class="notif-list-card">
+
+        <!-- Unread 1: Stage assignment -->
+        <div class="notif-item unread">
+          <div class="unread-dot"></div>
+          <div class="type-icon icon-assignment">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message">You were assigned to <strong>Application Submission</strong> stage in <strong>Building 4B — Zoning Clearance</strong></div>
+            <div class="notif-meta">
+              <span class="notif-time">Today, 11:20 AM</span>
+              <a class="notif-entity-link">
+                View stage
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <button class="mark-read-btn" title="Mark as read">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Unread 2: Follow-up due today -->
+        <div class="notif-item unread">
+          <div class="unread-dot"></div>
+          <div class="type-icon icon-followup">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message">Follow-up due today: <strong>Submit revised elevation drawings to MMRDA</strong></div>
+            <div class="notif-meta">
+              <span class="notif-time">Today, 9:00 AM</span>
+              <a class="notif-entity-link">
+                View follow-up
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <button class="mark-read-btn" title="Mark as read">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Unread 3: Stage status updated -->
+        <div class="notif-item unread">
+          <div class="unread-dot"></div>
+          <div class="type-icon icon-stage">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message">Stage <strong>Document Preparation</strong> was marked <strong>Completed</strong> by Rajesh Nair in <strong>Lotus Valley Residential Complex</strong></div>
+            <div class="notif-meta">
+              <span class="notif-time">Yesterday, 4:47 PM</span>
+              <a class="notif-entity-link">
+                View project
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <button class="mark-read-btn" title="Mark as read">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Unread 4: Overdue follow-up -->
+        <div class="notif-item unread">
+          <div class="unread-dot"></div>
+          <div class="type-icon icon-overdue">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message">Follow-up overdue by 3 days: <strong>Follow-up with MCGM inspector regarding NOC</strong></div>
+            <div class="notif-meta">
+              <span class="notif-time">Yesterday, 9:00 AM</span>
+              <a class="notif-entity-link" style="background:#fef2f2; color:#ef4444;">
+                View follow-up
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <button class="mark-read-btn" title="Mark as read">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Read: Document upload -->
+        <div class="notif-item">
+          <div class="unread-dot invisible"></div>
+          <div class="type-icon icon-document">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message" style="color:#64748b;">Sunita Rao uploaded <strong>Structural_Drawings_Rev3.pdf</strong> to <strong>Horizon Heights Phase 2</strong></div>
+            <div class="notif-meta">
+              <span class="notif-time">2 days ago</span>
+              <a class="notif-entity-link" style="color:#64748b; background:#f1f5f9;">
+                View document
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <span style="font-size:11px; color:#94a3b8;">Read</span>
+          </div>
+        </div>
+
+        <!-- Read: Project assignment -->
+        <div class="notif-item">
+          <div class="unread-dot invisible"></div>
+          <div class="type-icon icon-assignment">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message" style="color:#64748b;">You were added to project <strong>Sunrise Commercial Tower</strong> as Project Manager</div>
+            <div class="notif-meta">
+              <span class="notif-time">3 days ago</span>
+              <a class="notif-entity-link" style="color:#64748b; background:#f1f5f9;">
+                View project
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <span style="font-size:11px; color:#94a3b8;">Read</span>
+          </div>
+        </div>
+
+        <!-- Read: Stage update -->
+        <div class="notif-item">
+          <div class="unread-dot invisible"></div>
+          <div class="type-icon icon-stage">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          </div>
+          <div class="notif-content">
+            <div class="notif-message" style="color:#64748b;">Stage <strong>Municipal Review</strong> changed to <strong>On Hold</strong> in <strong>Green Meadows Society</strong></div>
+            <div class="notif-meta">
+              <span class="notif-time">5 days ago</span>
+              <a class="notif-entity-link" style="color:#64748b; background:#f1f5f9;">
+                View project
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+          </div>
+          <div class="notif-actions">
+            <span style="font-size:11px; color:#94a3b8;">Read</span>
+          </div>
+        </div>
+
+      </div><!-- /notif-list-card -->
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+</body>
+</html>

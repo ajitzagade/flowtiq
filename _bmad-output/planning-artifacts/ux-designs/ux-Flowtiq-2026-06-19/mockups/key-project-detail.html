@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flowtiq — Project Detail Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
+
+  /* Layout */
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 240px; background: #0d1b2e; display: flex; flex-direction: column; flex-shrink: 0; z-index: 50; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .header { height: 64px; background: #fff; border-bottom: 1px solid #dde3f8; display: flex; align-items: center; padding: 0 24px; flex-shrink: 0; z-index: 20; gap: 16px; }
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* Sidebar */
+  .sidebar-brand { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .sidebar-brand-name { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .sidebar-brand-sub { color: #8ba3be; font-size: 11px; margin-top: 1px; }
+  .sidebar-nav { flex: 1; padding: 12px 0; }
+  .nav-section-label { color: #8ba3be; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 12px 16px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; color: #8ba3be; font-size: 13px; font-weight: 500; cursor: pointer; border-left: 3px solid transparent; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #c9d8ea; }
+  .nav-item.active { color: #60a5fa; background: rgba(59,130,246,0.18); border-left-color: #3b82f6; }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.8; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; background: #ef4444; color: #fff; font-size: 10px; font-weight: 600; border-radius: 9999px; padding: 1px 6px; }
+
+  /* Header */
+  .header-back { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; padding: 6px 10px; border-radius: 8px; }
+  .header-back:hover { background: #f1f5f9; }
+  .header-sep { color: #cbd5e1; font-size: 16px; }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; }
+  .breadcrumb-link { color: #3b82f6; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .breadcrumb-link:hover { text-decoration: underline; }
+  .breadcrumb-sep { color: #94a3b8; font-size: 13px; }
+  .breadcrumb-current { color: #475569; font-size: 13px; }
+  .header-spacer { flex: 1; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: background 0.15s; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-secondary { background: #fff; color: #475569; border: 1px solid #dde3f8; }
+  .btn-secondary:hover { background: #f8fafc; }
+  .btn-ghost { background: transparent; color: #475569; }
+  .btn-ghost:hover { background: #f1f5f9; }
+  .bell-btn { position: relative; width: 36px; height: 36px; border-radius: 8px; background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; }
+  .bell-btn:hover { background: #f1f5f9; }
+  .avatar-btn { width: 32px; height: 32px; border-radius: 9999px; background: #3b82f6; color: #fff; font-size: 12px; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  /* Page content */
+  .page-header { margin-bottom: 20px; }
+  .page-title-row { display: flex; align-items: flex-start; gap: 12px; }
+  .page-title { font-size: 22px; font-weight: 700; color: #0f172a; }
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-blue { background: #eff6ff; color: #3b82f6; }
+  .badge-green { background: #ecfdf5; color: #10b981; }
+  .badge-yellow { background: #fffbeb; color: #f59e0b; }
+  .badge-red { background: #fef2f2; color: #ef4444; }
+  .badge-gray { background: #f1f5f9; color: #64748b; }
+  .badge-orange { background: #fff7ed; color: #f97316; }
+  .page-meta { display: flex; align-items: center; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+  .meta-item { display: flex; align-items: center; gap: 5px; color: #64748b; font-size: 12px; }
+  .meta-label { color: #94a3b8; }
+
+  /* Project info grid */
+  .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .info-card { background: #fff; border: 1px solid #dde3f8; border-radius: 12px; padding: 16px; }
+  .info-card-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .info-card-value { font-size: 14px; font-weight: 600; color: #0f172a; }
+  .info-card-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .progress-bar-track { height: 6px; background: #e2e8f0; border-radius: 9999px; margin-top: 8px; }
+  .progress-bar-fill { height: 100%; background: #3b82f6; border-radius: 9999px; }
+
+  /* Workflow section */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 16px; font-weight: 600; color: #0f172a; }
+  .section-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+
+  /* Stage cards */
+  .stage-card { background: #fff; border: 1px solid #dde3f8; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+  .stage-card-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; cursor: pointer; user-select: none; }
+  .stage-card-header:hover { background: #fafbff; }
+  .stage-status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-completed { background: #10b981; }
+  .dot-in-progress { background: #3b82f6; }
+  .dot-pending { background: #e2e8f0; }
+  .dot-overdue { background: #ef4444; }
+  .stage-num { font-size: 11px; font-weight: 700; color: #94a3b8; font-family: 'Courier New', monospace; min-width: 28px; }
+  .stage-name { font-size: 14px; font-weight: 600; color: #0f172a; flex: 1; }
+  .stage-assignees { display: flex; gap: -4px; }
+  .avatar-sm { width: 24px; height: 24px; border-radius: 50%; background: #3b82f6; color: #fff; font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; margin-left: -4px; }
+  .avatar-sm:first-child { margin-left: 0; }
+  .avatar-sm.green { background: #10b981; }
+  .avatar-sm.purple { background: #8b5cf6; }
+  .stage-due { font-size: 12px; color: #64748b; white-space: nowrap; }
+  .stage-due.overdue { color: #ef4444; font-weight: 500; }
+  .chevron { width: 16px; height: 16px; color: #94a3b8; transition: transform 0.2s; }
+  .chevron.open { transform: rotate(180deg); }
+
+  /* Stage card body — EXPANDED (D-04: first card expanded) */
+  .stage-body { border-top: 1px solid #eef0f8; padding: 20px; }
+  .stage-body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* View mode */
+  .view-section { }
+  .view-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .view-value { font-size: 13px; color: #0f172a; }
+  .subtask-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .subtask-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+  .subtask-check { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid #cbd5e1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .subtask-check.done { background: #10b981; border-color: #10b981; }
+  .subtask-check.done::after { content: ''; display: block; width: 8px; height: 5px; border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff; transform: rotate(-45deg) translateY(-1px); }
+  .stage-notes { font-size: 13px; color: #475569; line-height: 1.6; background: #f8fafc; border: 1px solid #eef0f8; border-radius: 8px; padding: 10px 12px; }
+  .stage-actions-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eef0f8; }
+
+  /* Edit mode — visually distinct panel (D-04/F-13 fix) */
+  .edit-panel { background: #f8fafc; border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; margin-top: 0; }
+  .edit-panel-title { font-size: 13px; font-weight: 600; color: #3b82f6; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+  .edit-panel-title::before { content: ''; display: block; width: 3px; height: 14px; background: #3b82f6; border-radius: 9999px; }
+  .form-row { margin-bottom: 14px; }
+  .form-label { font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 4px; display: block; }
+  .form-select { width: 100%; padding: 8px 12px; border: 1px solid #dde3f8; border-radius: 8px; font-size: 13px; color: #0f172a; background: #fff; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  .form-select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+  .form-textarea { width: 100%; padding: 8px 12px; border: 1px solid #dde3f8; border-radius: 8px; font-size: 13px; color: #0f172a; font-family: inherit; resize: vertical; min-height: 72px; }
+  .form-textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+  .edit-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-danger-ghost { background: transparent; color: #ef4444; border: 1px solid #fecaca; }
+  .btn-danger-ghost:hover { background: #fef2f2; }
+
+  /* Collapsed stage cards */
+  .stage-card.collapsed .stage-card-header { }
+
+  /* History timeline */
+  .history-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eef0f8; }
+  .history-title { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-item { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #64748b; }
+  .history-dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; margin-top: 5px; }
+  .history-dot.blue { background: #3b82f6; }
+  .history-dot.green { background: #10b981; }
+  .history-text { flex: 1; }
+  .history-time { color: #94a3b8; white-space: nowrap; }
+
+  /* Annotation box */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 16px; }
+  .annotation strong { color: #78350f; }
+
+  /* SVG icons as inline strings */
+  .icon { display: inline-block; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-name">Vastudeep Associates</div>
+      <div class="sidebar-brand-sub">Admin Portal</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+        Projects
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Follow-Ups
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Documents
+      </div>
+      <div class="nav-section-label">Administration</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Users
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Roles
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Workflows
+      </div>
+      <div class="nav-section-label">Reports</div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Audit Logs
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Header with breadcrumb (D-07: breadcrumb navigation) -->
+    <header class="header">
+      <div class="breadcrumb">
+        <span class="breadcrumb-link">Projects</span>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current">Building 4B — Zoning Clearance</span>
+      </div>
+      <div class="header-spacer"></div>
+      <div class="header-actions">
+        <button class="btn btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload Document
+        </button>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Add Follow-Up
+        </button>
+        <button class="bell-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </button>
+        <button class="avatar-btn">AK</button>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <div class="page-title-row" style="align-items:center; gap:12px;">
+          <h1 class="page-title">Building 4B — Zoning Clearance</h1>
+          <span class="badge badge-blue">In Progress</span>
+          <span class="badge badge-orange" style="font-size:11px;">High Priority</span>
+        </div>
+        <div class="page-meta">
+          <span class="meta-item"><span class="meta-label">ID</span> <span style="font-family:monospace; font-size:12px; font-weight:600; color:#475569;">PRJ-007</span></span>
+          <span class="meta-item"><span class="meta-label">Client</span> Vastudeep Associates</span>
+          <span class="meta-item"><span class="meta-label">Started</span> 12 Mar 2026</span>
+          <span class="meta-item"><span class="meta-label">Target</span> 30 Jun 2026</span>
+          <span class="meta-item"><span class="meta-label">Team</span>
+            <div class="stage-assignees" style="margin-left:4px;">
+              <div class="avatar-sm" title="Priya Mehta">PM</div>
+              <div class="avatar-sm green" title="Rajesh Nair">RN</div>
+              <div class="avatar-sm purple" title="Sunita Rao">SR</div>
+            </div>
+          </span>
+        </div>
+      </div>
+
+      <!-- Info cards -->
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-card-label">Workflow</div>
+          <div class="info-card-value">Standard Zoning</div>
+          <div class="info-card-sub">6 stages</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-label">Progress</div>
+          <div class="info-card-value">2 / 6 stages complete</div>
+          <div class="progress-bar-track"><div class="progress-bar-fill" style="width:33%"></div></div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-label">Open Follow-Ups</div>
+          <div class="info-card-value">3 pending</div>
+          <div class="info-card-sub" style="color:#f59e0b;">1 due today</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-label">Documents</div>
+          <div class="info-card-value">14 uploaded</div>
+          <div class="info-card-sub">Last: 2 days ago</div>
+        </div>
+      </div>
+
+      <!-- Workflow stages -->
+      <div class="section-header">
+        <div>
+          <div class="section-title">Workflow Stages</div>
+          <div class="section-sub">Standard Zoning — click any stage to expand</div>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <strong>Revamp note (D-04 / F-11):</strong> First stage is expanded by default. Previously all stages started collapsed — users saw a wall of accordions with no status visible.
+      </div>
+
+      <!-- Stage 1 — COMPLETED + COLLAPSED -->
+      <div class="stage-card collapsed">
+        <div class="stage-card-header">
+          <div class="stage-status-dot dot-completed"></div>
+          <span class="stage-num">01</span>
+          <span class="stage-name">Pre-Application Consultation</span>
+          <span class="badge badge-green" style="font-size:11px;">Completed</span>
+          <div class="stage-assignees">
+            <div class="avatar-sm" title="Priya Mehta">PM</div>
+          </div>
+          <span class="stage-due">Completed 18 Mar</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+
+      <!-- Stage 2 — COMPLETED + COLLAPSED -->
+      <div class="stage-card collapsed">
+        <div class="stage-card-header">
+          <div class="stage-status-dot dot-completed"></div>
+          <span class="stage-num">02</span>
+          <span class="stage-name">Document Preparation</span>
+          <span class="badge badge-green" style="font-size:11px;">Completed</span>
+          <div class="stage-assignees">
+            <div class="avatar-sm green" title="Rajesh Nair">RN</div>
+            <div class="avatar-sm purple" title="Sunita Rao">SR</div>
+          </div>
+          <span class="stage-due">Completed 28 Mar</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+
+      <!-- Stage 3 — IN PROGRESS + EXPANDED (D-04: first active stage expanded) -->
+      <div class="stage-card">
+        <div class="stage-card-header">
+          <div class="stage-status-dot dot-in-progress"></div>
+          <span class="stage-num">03</span>
+          <span class="stage-name">Application Submission</span>
+          <span class="badge badge-blue" style="font-size:11px;">In Progress</span>
+          <div class="stage-assignees">
+            <div class="avatar-sm" title="Priya Mehta">PM</div>
+            <div class="avatar-sm green" title="Rajesh Nair">RN</div>
+          </div>
+          <span class="stage-due">Due 15 Apr 2026</span>
+          <svg class="chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+
+        <div class="stage-body">
+          <div class="stage-body-grid">
+
+            <!-- Left: View mode info -->
+            <div class="view-section">
+              <div class="view-label">Sub-tasks</div>
+              <ul class="subtask-list">
+                <li class="subtask-item">
+                  <div class="subtask-check done"></div>
+                  Compile building drawings
+                </li>
+                <li class="subtask-item">
+                  <div class="subtask-check done"></div>
+                  Notarise ownership documents
+                </li>
+                <li class="subtask-item">
+                  <div class="subtask-check"></div>
+                  Submit online portal form
+                </li>
+                <li class="subtask-item">
+                  <div class="subtask-check"></div>
+                  Pay application fee ₹12,500
+                </li>
+              </ul>
+
+              <div class="view-label" style="margin-top:16px;">Notes</div>
+              <div class="stage-notes">Online portal currently showing maintenance window — retry submission after 10 PM tonight. Fee challan already generated.</div>
+
+              <!-- History (collapsed) -->
+              <div class="history-section">
+                <div class="history-title">Stage History</div>
+                <div class="history-list">
+                  <div class="history-item">
+                    <div class="history-dot blue"></div>
+                    <span class="history-text">Status changed to <strong>In Progress</strong> by Priya Mehta</span>
+                    <span class="history-time">2 Apr, 11:20 AM</span>
+                  </div>
+                  <div class="history-item">
+                    <div class="history-dot"></div>
+                    <span class="history-text">Stage assigned to Priya Mehta, Rajesh Nair</span>
+                    <span class="history-time">1 Apr, 9:05 AM</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- View mode CTAs -->
+              <div class="stage-actions-row">
+                <button class="btn btn-secondary btn-sm" id="showEditBtn" onclick="showEdit()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Update Stage
+                </button>
+                <button class="btn btn-ghost btn-sm">View Documents (4)</button>
+              </div>
+            </div>
+
+            <!-- Right: Edit panel — visually distinct (F-13 fix) -->
+            <div>
+              <div class="annotation" style="margin-bottom:14px;">
+                <strong>Revamp note (F-13):</strong> The edit panel is a clearly-bounded blue-bordered section. Previously the form was injected inline in the same flow, blurring read/edit modes.
+              </div>
+              <div class="edit-panel">
+                <div class="edit-panel-title">Update this stage</div>
+                <div class="form-row">
+                  <label class="form-label">New status</label>
+                  <select class="form-select">
+                    <option>In Progress</option>
+                    <option>Completed</option>
+                    <option>On Hold</option>
+                    <option>Pending</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label class="form-label">Assigned members</label>
+                  <select class="form-select">
+                    <option>Priya Mehta, Rajesh Nair ▾</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label class="form-label">Update notes (optional)</label>
+                  <textarea class="form-textarea" placeholder="What happened? What is the next step?"></textarea>
+                </div>
+                <div class="edit-actions">
+                  <button class="btn btn-primary btn-sm">Save Update</button>
+                  <button class="btn btn-secondary btn-sm">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 4 — PENDING + COLLAPSED -->
+      <div class="stage-card collapsed">
+        <div class="stage-card-header">
+          <div class="stage-status-dot dot-pending"></div>
+          <span class="stage-num">04</span>
+          <span class="stage-name">Municipal Review</span>
+          <span class="badge badge-gray" style="font-size:11px;">Pending</span>
+          <div class="stage-assignees">
+            <div class="avatar-sm" style="background:#94a3b8;">?</div>
+          </div>
+          <span class="stage-due">Est. start: 20 Apr</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+
+      <!-- Stage 5 — OVERDUE + COLLAPSED -->
+      <div class="stage-card collapsed">
+        <div class="stage-card-header">
+          <div class="stage-status-dot dot-overdue"></div>
+          <span class="stage-num">05</span>
+          <span class="stage-name">Site Inspection</span>
+          <span class="badge badge-red" style="font-size:11px;">Overdue</span>
+          <div class="stage-assignees">
+            <div class="avatar-sm purple" title="Sunita Rao">SR</div>
+          </div>
+          <span class="stage-due overdue">Was due 1 Apr</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+
+      <!-- Stage 6 — PENDING + COLLAPSED -->
+      <div class="stage-card collapsed">
+        <div class="stage-card-header">
+          <div class="stage-status-dot dot-pending"></div>
+          <span class="stage-num">06</span>
+          <span class="stage-name">Certificate Issuance</span>
+          <span class="badge badge-gray" style="font-size:11px;">Pending</span>
+          <div class="stage-assignees">
+            <div class="avatar-sm" style="background:#94a3b8;">?</div>
+          </div>
+          <span class="stage-due">Awaiting prior stages</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+</body>
+</html>

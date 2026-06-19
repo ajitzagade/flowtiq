@@ -1,5 +1,6 @@
 ---
 stepsCompleted: [1, 2, 3, 4]
+epics: [0, 1, 2, 3, 4]
 inputDocuments:
   - '_bmad-output/planning-artifacts/prds/prd-Flowtiq-2026-06-19/prd.md'
   - '_bmad-output/planning-artifacts/architecture.md'
@@ -122,6 +123,14 @@ No UX design document provided. Mobile UI uses existing responsive web app via W
 ---
 
 ## Epic List
+
+### Epic 0: UX Revamp & Design System Compliance
+Address all UX audit findings before the Phase 2 mobile app ships — the web app is the WebView content, so revamp quality directly affects the mobile experience.
+**Findings covered:** F-01 through F-34 (34 total findings from full codebase audit — see `.decision-log.md`)
+**Stories:** 0.1 Header revamp · 0.2 Dashboard fixes · 0.3 Project detail revamp · 0.4 Notifications entity links · 0.5 Login tenant branding + forgot password · 0.6 Settings wire tabs + secondaryColor + raw fetch fix · 0.7 Design system compliance · 0.8 Accessibility focus trap · 0.9 Skeleton loaders
+
+**Dependency:** E0 must complete before E3 (React Native mobile app ships the web app in WebView).
+E0 stories 0.1–0.7 are the pre-launch sprint. Stories 0.8–0.9 can follow in a polish sprint.
 
 ### Epic 1: Real-Time Push Notification Backend
 Users and the system can reliably send real-time push alerts to any Flowtiq user's registered devices when project events, assignments, and follow-ups occur — scoped to what each user cares about.
