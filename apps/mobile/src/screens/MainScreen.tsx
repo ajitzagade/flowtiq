@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
   Platform,
   StyleSheet,
   Alert,
@@ -45,7 +43,6 @@ export function MainScreen() {
 
   const [isOffline, setIsOffline] = useState(false);
   const [isWebViewLoaded, setIsWebViewLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'notifications'>('home');
   const [isOnLoginPage, setIsOnLoginPage] = useState(true);
 
   // Keep module-level webViewRef in sync with local ref
@@ -260,12 +257,6 @@ export function MainScreen() {
         Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE }).catch(() => {});
       } else {
         setIsOnLoginPage(false);
-        try {
-          const path = new URL(navState.url).pathname;
-          setActiveTab(path.startsWith('/notifications') ? 'notifications' : 'home');
-        } catch {
-          setActiveTab(navState.url.includes('/notifications') ? 'notifications' : 'home');
-        }
       }
     },
     []
@@ -281,7 +272,7 @@ export function MainScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <WebView
         ref={localRef}
         source={{ uri: WEBVIEW_URL }}
@@ -300,36 +291,6 @@ export function MainScreen() {
 
       {isOffline && <OfflineOverlay onRetry={handleRetry} />}
 
-      {!isOnLoginPage && (
-        <SafeAreaView style={styles.tabBar} edges={['bottom']}>
-          <View style={styles.tabBarInner}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'home' && styles.tabActive]}
-              onPress={() => { setActiveTab('home'); navigateWebView('/dashboard'); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabIcon, activeTab === 'home' && styles.tabIconActive]}>
-                {'\uD83C\uDFE0'}
-              </Text>
-              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
-                Home
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'notifications' && styles.tabActive]}
-              onPress={() => { setActiveTab('notifications'); navigateWebView('/notifications'); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabIcon, activeTab === 'notifications' && styles.tabIconActive]}>
-                {'\uD83D\uDD14'}
-              </Text>
-              <Text style={[styles.tabLabel, activeTab === 'notifications' && styles.tabLabelActive]}>
-                Notifications
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      )}
     </SafeAreaView>
   );
 }
@@ -337,25 +298,4 @@ export function MainScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   webview: { flex: 1 },
-  tabBar: { backgroundColor: '#000000' },
-  tabBarInner: {
-    flexDirection: 'row',
-    height: 56,
-    borderTopWidth: 1,
-    borderTopColor: '#1a1a1a',
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  tabActive: {
-    borderTopWidth: 2,
-    borderTopColor: '#ffffff',
-  },
-  tabIcon: { fontSize: 20, opacity: 0.5 },
-  tabIconActive: { opacity: 1 },
-  tabLabel: { fontSize: 10, color: '#71717a', marginTop: 2 },
-  tabLabelActive: { color: '#ffffff', fontWeight: '600' },
 });
