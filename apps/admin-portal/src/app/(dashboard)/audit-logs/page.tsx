@@ -8,6 +8,7 @@ import { Search, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import type { AuditLog } from '@flowtiq/shared-types';
 import Link from 'next/link';
+import { SkeletonTable } from '@/components/Skeleton';
 
 const ACTION_COLORS: Record<string, string> = {
   CREATED: 'badge-green',
@@ -104,14 +105,7 @@ export default function AuditLogsPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr><td colSpan={6} className="text-center py-10">
-                  <svg className="animate-spin w-6 h-6 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                </td></tr>
-              )}
+              {isLoading && <SkeletonTable rows={8} cols={6} />}
               {!isLoading && logs.length === 0 && (
                 <tr><td colSpan={6}>
                   <div className="empty-state py-12">
@@ -125,7 +119,7 @@ export default function AuditLogsPage() {
                 const metaProjectId = log.metadata?.projectId ? String(log.metadata.projectId) : null;
                 return (
                 <tr key={log.id}>
-                  <td className="text-sm text-slate-600 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
+                  <td className="text-right font-mono text-sm text-slate-500 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
                   <td>
                     <p className="font-medium text-slate-800 text-sm">{log.userEmail || '—'}</p>
                     {log.userRole && (

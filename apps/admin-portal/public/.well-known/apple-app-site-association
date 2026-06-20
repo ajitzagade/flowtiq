@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "PLACEHOLDER_APPLE_TEAM_ID.com.vastudeep.flowtiq",
+        "paths": ["*"]
+      }
+    ]
+  }
+}

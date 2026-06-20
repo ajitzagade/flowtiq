@@ -18,6 +18,8 @@ import { dashboardRouter } from './routes/dashboard';
 import { reportsRouter } from './routes/reports';
 import { seedRouter } from './routes/seed';
 import { projectWorkflowsRouter } from './routes/project-workflows';
+import { deviceTokenRouter } from './routes/deviceTokens';
+import { notificationPreferencesRouter } from './routes/notificationPreferences';
 
 export const app = express();
 
@@ -71,6 +73,8 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/project-workflows', projectWorkflowsRouter);
 app.use('/api/seed', seedRouter);
+app.use('/api/users', deviceTokenRouter);
+app.use('/api/users', notificationPreferencesRouter);
 
 // 404 handler
 app.use((_req, res) => {

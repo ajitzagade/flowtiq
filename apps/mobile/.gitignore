@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Env files
+.env
+.env.local
+.env.production
+
+# Build outputs
+android/app/build/
+android/.gradle/
+ios/build/
+ios/Pods/
+ios/FlowtiqMobile.xcworkspace/
+
+# Generated
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+DerivedData/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Firebase credentials (per-tenant — do not commit)
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
+# Metro bundler cache
+.metro-health-check-*

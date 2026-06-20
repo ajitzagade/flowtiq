@@ -2,6 +2,9 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
   "tasks": {
+    "@flowtiq/mobile#android": { "cache": false },
+    "@flowtiq/mobile#ios": { "cache": false },
+    "@flowtiq/mobile#type-check": { "dependsOn": ["^build"] },
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],

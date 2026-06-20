@@ -8,6 +8,28 @@ import type { AuthRequest } from '../middleware/auth';
 
 export const tenantsRouter = Router();
 
+// GET /api/tenants/public?slug={slug} — unauthenticated, returns safe public branding fields only
+tenantsRouter.get('/public', async (req, res, next) => {
+  try {
+    const slug = typeof req.query.slug === 'string' ? req.query.slug : null;
+    if (!slug) {
+      res.status(400).json({ success: false, error: 'slug is required' });
+      return;
+    }
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug },
+      select: { id: true, name: true, slug: true, branding: true },
+    });
+    if (!tenant) {
+      res.status(404).json({ success: false, error: 'Tenant not found' });
+      return;
+    }
+    res.json({ success: true, data: { name: tenant.name, slug: tenant.slug, branding: tenant.branding } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // BigInt fields (maxStorageBytes, usedStorageBytes) can't be JSON.stringify'd natively
 function serializeTenant(t: Record<string, unknown>) {
   return {

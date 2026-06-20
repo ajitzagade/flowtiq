@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -8,6 +8,9 @@ import { Plus, Shield, Edit, Trash2, X, Users, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, getErrorMessage } from '@/lib/utils';
 import type { Role, Permission } from '@flowtiq/shared-types';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonCard } from '@/components/Skeleton';
 
 const MODULE_LABELS: Record<string, string> = {
   projects: 'Projects', stages: 'Stages', documents: 'Documents',
@@ -21,6 +24,8 @@ function RoleModal({ role, permissions, onClose }: {
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -76,7 +81,7 @@ function RoleModal({ role, permissions, onClose }: {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div ref={modalRef} className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">{role ? 'Edit Role' : 'New Role'}</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
@@ -152,6 +157,7 @@ export default function RolesPage() {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [editRole, setEditRole] = useState<Role | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
 
   const { data: roles, isLoading } = useQuery<Role[]>({
     queryKey: ['roles'],
@@ -175,6 +181,14 @@ export default function RolesPage() {
   return (
     <>
       <Header title="Roles & Permissions" subtitle="Define roles and configure access control" />
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title={`Delete role "${deleteTarget?.name}"?`}
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
+        onCancel={() => setDeleteTarget(null)}
+      />
       {(showModal || editRole) && (
         <RoleModal
           role={editRole}
@@ -191,11 +205,8 @@ export default function RolesPage() {
         </div>
 
         {isLoading && (
-          <div className="flex justify-center py-12">
-            <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} rows={3} />)}
           </div>
         )}
 
@@ -223,7 +234,7 @@ export default function RolesPage() {
                   </button>
                   {!role.isSystem && (
                     <button
-                      onClick={() => { if (confirm('Delete this role?')) deleteMutation.mutate(role.id); }}
+                      onClick={() => setDeleteTarget(role)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                     >
                       <Trash2 size={15} />

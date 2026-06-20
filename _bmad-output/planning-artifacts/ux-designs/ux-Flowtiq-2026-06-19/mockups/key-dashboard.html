@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flowtiq — Dashboard (Revamp Mockup)</title>
+<!--
+  SPINE REFERENCES:
+  - DESIGN.md: colors, typography, spacing, components.stat-card, components.card
+  - EXPERIENCE.md: Dashboard layout, notification popover, user menu dropdown
+  - Findings addressed: F-02 (bottom row removed), F-03 (follow-ups clickable), F-05 (row colors aligned),
+    F-06 (bell → popover), F-07 (avatar → user menu), F-08 (search hint)
+-->
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; color: inherit; }
+
+  /* ── Layout ── */
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 240px; background: #0d1b2e; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.08); }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .header { height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; position: sticky; top: 0; z-index: 20; gap: 12px; }
+  .content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Sidebar ── */
+  .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 64px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+  .sidebar-logo-icon { width: 32px; height: 32px; border-radius: 8px; background: #3b82f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-logo-icon svg { width: 18px; height: 18px; }
+  .sidebar-brand { font-weight: 700; font-size: 14px; color: #fff; }
+  .sidebar-powered { font-size: 11px; color: #64748b; }
+  .sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #8ba3be; cursor: pointer; transition: all 0.15s; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #cbd5e1; }
+  .nav-item.active { background: rgba(59,130,246,0.18); color: #60a5fa; font-weight: 600; box-shadow: inset 3px 0 0 #3b82f6; }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sidebar-footer { padding: 8px; border-top: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+  .sidebar-user { padding: 8px 12px 4px; }
+  .sidebar-user-name { font-size: 13px; font-weight: 500; color: #fff; }
+  .sidebar-user-email { font-size: 11px; color: #64748b; }
+
+  /* ── Header ── */
+  .header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .header-title { font-size: 16px; font-weight: 600; color: #0f172a; }
+  .header-subtitle { font-size: 12px; color: #94a3b8; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+  /* Search box in header (new) */
+  .header-search { display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; cursor: text; }
+  .header-search span { font-size: 13px; color: #94a3b8; }
+  .header-search kbd { font-size: 11px; color: #cbd5e1; background: #e2e8f0; border-radius: 4px; padding: 1px 5px; font-family: monospace; }
+
+  /* Bell with badge */
+  .bell-btn { position: relative; width: 36px; height: 36px; border-radius: 8px; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
+  .bell-btn:hover { background: #f1f5f9; color: #0f172a; }
+  .bell-badge { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; background: #ef4444; border-radius: 50%; font-size: 10px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  /* Notification popover (open state) */
+  .notif-popover { position: absolute; top: 56px; right: 68px; width: 380px; background: #fff; border: 1px solid #dde3f8; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.12); z-index: 40; overflow: hidden; }
+  .notif-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; }
+  .notif-header-title { font-size: 14px; font-weight: 600; color: #0f172a; }
+  .notif-mark-all { font-size: 12px; color: #3b82f6; cursor: pointer; font-weight: 500; border: none; background: none; }
+  .notif-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f8fafc; cursor: pointer; transition: background 0.15s; }
+  .notif-item:hover { background: #f8fafc; }
+  .notif-item:last-of-type { border-bottom: none; }
+  .notif-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .notif-icon.blue { background: #eff6ff; color: #3b82f6; }
+  .notif-icon.amber { background: #fffbeb; color: #f59e0b; }
+  .notif-icon.red { background: #fef2f2; color: #ef4444; }
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-msg { font-size: 13px; color: #0f172a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .notif-time { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+  .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; margin-top: 6px; }
+  .notif-footer { padding: 10px 16px; text-align: center; border-top: 1px solid #f1f5f9; }
+  .notif-footer a { font-size: 13px; color: #3b82f6; font-weight: 500; }
+
+  /* Avatar / user menu */
+  .avatar-btn { width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; }
+
+  /* ── Stats grid ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .stat-card { background: #fff; border: 1px solid #dde3f8; border-radius: 16px; box-shadow: 0 2px 12px rgba(99,102,241,0.07); padding: 20px 24px; display: flex; align-items: flex-start; gap: 16px; cursor: pointer; transition: box-shadow 0.15s; }
+  .stat-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+  .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stat-icon svg { width: 22px; height: 22px; }
+  .stat-meta { flex: 1; min-width: 0; }
+  .stat-value { font-size: 24px; font-weight: 700; color: #0f172a; line-height: 1; }
+  .stat-label { font-size: 13px; color: #64748b; margin-top: 3px; }
+  .stat-trend { font-size: 11px; margin-top: 6px; }
+  .trend-up { color: #10b981; }
+  .trend-down { color: #ef4444; }
+  .stat-arrow { margin-left: auto; color: #cbd5e1; }
+
+  /* ── Main content grid ── */
+  .content-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+
+  /* ── Card ── */
+  .card { background: #fff; border: 1px solid #dde3f8; border-radius: 16px; box-shadow: 0 2px 12px rgba(99,102,241,0.07); }
+  .card-header { padding: 16px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+  .card-header-title { font-size: 14px; font-weight: 600; color: #0f172a; }
+  .card-header-sub { font-size: 12px; color: #94a3b8; }
+  .card-view-all { font-size: 13px; color: #3b82f6; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+
+  /* ── Project rows ── */
+  .project-list { overflow: hidden; border-radius: 0 0 16px 16px; }
+  .project-row { padding: 14px 24px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #eef0f8; cursor: pointer; transition: background 0.1s; }
+  .project-row:nth-child(even) { background: #f2f5ff; }
+  .project-row:hover { background: #e6edff !important; }
+  .project-row:last-child { border-bottom: none; }
+  .project-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .project-row-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .project-num { font-family: monospace; font-size: 11px; color: #94a3b8; }
+  .project-name { font-size: 14px; font-weight: 500; color: #0f172a; }
+  .project-client { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .project-due { text-align: right; flex-shrink: 0; }
+  .project-due-label { font-size: 11px; color: #94a3b8; }
+  .project-due-date { font-size: 13px; font-weight: 500; color: #334155; }
+  .progress-bar-wrap { height: 4px; background: #f1f5f9; border-radius: 4px; overflow: hidden; width: 100%; }
+  .progress-bar-fill { height: 100%; border-radius: 4px; background: #3b82f6; }
+  .progress-info { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+  .progress-label { font-size: 11px; color: #94a3b8; }
+  .progress-pct { font-size: 11px; font-weight: 600; color: #475569; }
+
+  /* ── Right column ── */
+  .right-col { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Follow-up items (now clickable) ── */
+  .fu-item { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.1s; display: block; }
+  .fu-item:hover { background: #f8fafc; }
+  .fu-item:last-child { border-bottom: none; }
+  .fu-project-name { font-size: 13px; font-weight: 500; color: #0f172a; }
+  .fu-client { font-size: 12px; color: #64748b; }
+  .fu-row2 { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+  .fu-owner { font-size: 11px; color: #94a3b8; }
+  .fu-date { font-size: 12px; font-weight: 600; color: #3b82f6; }
+
+  /* ── Activity feed ── */
+  .activity-item { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-text { font-size: 13px; color: #334155; }
+  .activity-text strong { font-weight: 600; }
+  .activity-time { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .activity-view-all { padding: 10px 16px; text-align: center; border-top: 1px solid #f1f5f9; }
+  .activity-view-all a { font-size: 12px; color: #3b82f6; font-weight: 500; }
+
+  /* ── Badges ── */
+  .badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: #ecfdf5; color: #059669; }
+  .badge-blue { background: #eff6ff; color: #2563eb; }
+  .badge-yellow { background: #fffbeb; color: #d97706; }
+  .badge-gray { background: #f1f5f9; color: #64748b; }
+  .badge-red { background: #fef2f2; color: #dc2626; }
+  .badge-orange { background: #fff7ed; color: #ea580c; }
+
+  /* SVG icons inline */
+  svg { fill: currentColor; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar-brand">Vastudeep Associates</div>
+        <div class="sidebar-powered">Powered by Flowtiq</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        Projects
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Follow-ups
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Documents
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Users
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        Reports
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Notifications
+      </a>
+      <a href="#" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M12 2v2M4.93 4.93l1.41 1.41M2 12h2M4.93 19.07l1.41-1.41M12 20v2M19.07 19.07l-1.41-1.41M20 12h2"/></svg>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-user-name">Priya Sharma</div>
+        <div class="sidebar-user-email">pm@vastudeep.com</div>
+      </div>
+      <a href="#" class="nav-item" style="margin-top:4px; color:#94a3b8;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </a>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════ MAIN ═══════════════════ -->
+  <div class="main">
+
+    <!-- Header -->
+    <header class="header" style="position:relative;">
+      <div class="header-left">
+        <div>
+          <div class="header-title">Dashboard</div>
+          <div class="header-subtitle">Welcome back, Priya. Here is what is happening.</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <!-- Search hint (global search — future P3) -->
+        <div class="header-search">
+          <svg style="width:14px;height:14px;color:#94a3b8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>Search…</span>
+          <kbd>⌘K</kbd>
+        </div>
+
+        <!-- Bell — popover open state shown -->
+        <button class="bell-btn" aria-label="Notifications, 3 unread">
+          <svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span class="bell-badge">3</span>
+        </button>
+
+        <!-- Avatar -->
+        <button class="avatar-btn" aria-label="User menu: Priya Sharma">PS</button>
+      </div>
+
+      <!-- Notification Popover (shown open for mockup) -->
+      <div class="notif-popover">
+        <div class="notif-header">
+          <span class="notif-header-title">Notifications</span>
+          <button class="notif-mark-all">Mark all read</button>
+        </div>
+
+        <a href="#" class="notif-item">
+          <div class="notif-icon blue">
+            <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="notif-body">
+            <div class="notif-msg">Stage "File Creation" assigned to you on Building 4B — Zoning Clearance</div>
+            <div class="notif-time">2 hours ago</div>
+          </div>
+          <div class="notif-dot"></div>
+        </a>
+        <a href="#" class="notif-item">
+          <div class="notif-icon amber">
+            <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="notif-body">
+            <div class="notif-msg">Follow-up reminder: Client callback for Gupta Residence — due today</div>
+            <div class="notif-time">4 hours ago</div>
+          </div>
+          <div class="notif-dot"></div>
+        </a>
+        <a href="#" class="notif-item">
+          <div class="notif-icon red">
+            <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="notif-body">
+            <div class="notif-msg">Follow-up overdue: Site inspection for Tower A — 1 day past due</div>
+            <div class="notif-time">Yesterday</div>
+          </div>
+          <div class="notif-dot"></div>
+        </a>
+
+        <div class="notif-footer">
+          <a href="#">View all notifications →</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- ── Stat Cards ── -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#eff6ff;">
+            <svg style="color:#3b82f6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+          </div>
+          <div class="stat-meta">
+            <div class="stat-value">12</div>
+            <div class="stat-label">Active Projects</div>
+            <div class="stat-trend trend-up">↑ 2 this month</div>
+          </div>
+          <svg class="stat-arrow" style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fffbeb;">
+            <svg style="color:#f59e0b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-meta">
+            <div class="stat-value">7</div>
+            <div class="stat-label">Pending Follow-ups</div>
+            <div class="stat-trend trend-down">↓ 3 from last week</div>
+          </div>
+          <svg class="stat-arrow" style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fef2f2;">
+            <svg style="color:#ef4444" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="stat-meta">
+            <div class="stat-value">2</div>
+            <div class="stat-label">Overdue</div>
+            <div class="stat-trend" style="color:#94a3b8;">Needs attention</div>
+          </div>
+          <svg class="stat-arrow" style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#ecfdf5;">
+            <svg style="color:#10b981" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="stat-meta">
+            <div class="stat-value">48</div>
+            <div class="stat-label">Documents</div>
+            <div class="stat-trend trend-up">↑ 5 this week</div>
+          </div>
+          <svg class="stat-arrow" style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <!-- ── Main content grid ── -->
+      <div class="content-grid">
+
+        <!-- Active Projects -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-header-title">Active Projects</div>
+              <div class="card-header-sub">Sorted by priority — urgent first</div>
+            </div>
+            <a href="#" class="card-view-all">
+              View all
+              <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+          </div>
+          <div class="project-list">
+            <!-- Row 1 — urgent -->
+            <a href="#" class="project-row" style="display:block;">
+              <div class="project-row-top">
+                <div>
+                  <div class="project-row-meta">
+                    <div class="priority-dot" style="background:#ef4444;" title="Urgent"></div>
+                    <span class="project-num">PRJ-008</span>
+                    <span class="badge badge-blue">In Progress</span>
+                    <span class="badge badge-red">Urgent</span>
+                  </div>
+                  <div class="project-name">Tower A — Scrutiny & Approval</div>
+                  <div class="project-client">Mehta Developers Pvt. Ltd.</div>
+                </div>
+                <div class="project-due">
+                  <div class="project-due-label">Due</div>
+                  <div class="project-due-date">25 Jun 2026</div>
+                </div>
+              </div>
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:65%;background:#ef4444;"></div></div>
+              <div class="progress-info"><span class="progress-label">Stage 4 of 6 — Scrutiny</span><span class="progress-pct">65%</span></div>
+            </a>
+            <!-- Row 2 — high -->
+            <a href="#" class="project-row" style="display:block;">
+              <div class="project-row-top">
+                <div>
+                  <div class="project-row-meta">
+                    <div class="priority-dot" style="background:#f97316;"></div>
+                    <span class="project-num">PRJ-005</span>
+                    <span class="badge badge-blue">In Progress</span>
+                    <span class="badge badge-orange">High</span>
+                  </div>
+                  <div class="project-name">Building 4B — Zoning Clearance</div>
+                  <div class="project-client">Vastudeep Associates</div>
+                </div>
+                <div class="project-due">
+                  <div class="project-due-label">Due</div>
+                  <div class="project-due-date">10 Jul 2026</div>
+                </div>
+              </div>
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:42%;"></div></div>
+              <div class="progress-info"><span class="progress-label">Stage 3 of 6 — File Creation</span><span class="progress-pct">42%</span></div>
+            </a>
+            <!-- Row 3 — medium -->
+            <a href="#" class="project-row" style="display:block;">
+              <div class="project-row-top">
+                <div>
+                  <div class="project-row-meta">
+                    <div class="priority-dot" style="background:#f59e0b;"></div>
+                    <span class="project-num">PRJ-003</span>
+                    <span class="badge badge-blue">In Progress</span>
+                    <span class="badge badge-yellow">Medium</span>
+                  </div>
+                  <div class="project-name">Gupta Residence — NOC Application</div>
+                  <div class="project-client">Gupta & Sons Construction</div>
+                </div>
+                <div class="project-due">
+                  <div class="project-due-label">Due</div>
+                  <div class="project-due-date">15 Jul 2026</div>
+                </div>
+              </div>
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:28%;background:#f59e0b;"></div></div>
+              <div class="progress-info"><span class="progress-label">Stage 2 of 6 — Documentation</span><span class="progress-pct">28%</span></div>
+            </a>
+            <!-- Row 4 -->
+            <a href="#" class="project-row" style="display:block;">
+              <div class="project-row-top">
+                <div>
+                  <div class="project-row-meta">
+                    <div class="priority-dot" style="background:#94a3b8;"></div>
+                    <span class="project-num">PRJ-001</span>
+                    <span class="badge badge-yellow">On Hold</span>
+                    <span class="badge badge-gray">Low</span>
+                  </div>
+                  <div class="project-name">Sharma Commercial Complex</div>
+                  <div class="project-client">Sharma Realty</div>
+                </div>
+                <div class="project-due">
+                  <div class="project-due-label">Due</div>
+                  <div class="project-due-date">30 Aug 2026</div>
+                </div>
+              </div>
+              <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:15%;background:#94a3b8;"></div></div>
+              <div class="progress-info"><span class="progress-label">Stage 1 of 6 — Initiation</span><span class="progress-pct">15%</span></div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div class="right-col">
+          <!-- Upcoming Follow-ups — now clickable (fix F-03) -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-title">Upcoming Follow-ups</div>
+              <a href="#" class="card-view-all" style="font-size:12px;">View all</a>
+            </div>
+            <a href="#" class="fu-item" style="display:block;">
+              <div class="fu-project-name">Tower A — Scrutiny</div>
+              <div class="fu-client">Mehta Developers</div>
+              <div class="fu-row2">
+                <span class="fu-owner">Rajesh Kumar</span>
+                <span class="fu-date">Today</span>
+              </div>
+            </a>
+            <a href="#" class="fu-item" style="display:block;">
+              <div class="fu-project-name">Gupta Residence — NOC</div>
+              <div class="fu-client">Gupta & Sons Construction</div>
+              <div class="fu-row2">
+                <span class="fu-owner">Priya Sharma</span>
+                <span class="fu-date">21 Jun 2026</span>
+              </div>
+            </a>
+            <a href="#" class="fu-item" style="display:block;">
+              <div class="fu-project-name">Building 4B — Zoning</div>
+              <div class="fu-client">Vastudeep Associates</div>
+              <div class="fu-row2">
+                <span class="fu-owner">Arjun Mehta</span>
+                <span class="fu-date">24 Jun 2026</span>
+              </div>
+            </a>
+          </div>
+
+          <!-- Recent Activity — now has View all link (fix F-04) -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-title">Recent Activity</div>
+              <a href="/audit-logs" class="card-view-all" style="font-size:12px;">View all</a>
+            </div>
+            <div class="activity-item">
+              <div class="activity-text"><strong>Priya</strong> updated "File Creation" to In Progress</div>
+              <div class="activity-time">2 hours ago</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-text"><strong>Rajesh</strong> uploaded "NOC_Application_v2.pdf"</div>
+              <div class="activity-time">4 hours ago</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-text"><strong>Arjun</strong> created project "Building 4B — Zoning"</div>
+              <div class="activity-time">Yesterday</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-text"><strong>Priya</strong> marked follow-up as completed</div>
+              <div class="activity-time">Yesterday</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Note annotation for the bottom row removal -->
+      <div style="background:#eff6ff;border:1px dashed #3b82f6;border-radius:12px;padding:16px 20px;font-size:13px;color:#1d4ed8;">
+        <strong>Revamp note (F-02):</strong> The original "Summary Row" (Completed Projects, On Hold, Total Follow-ups) has been removed here. That data is redundant with the top stat cards. Replace with the Workflow Pipeline section (already exists) expanded by default.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

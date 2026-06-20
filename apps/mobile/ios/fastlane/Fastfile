@@ -1,0 +1,46 @@
+# Flowtiq Mobile — iOS Fastlane configuration
+# Requires: Ruby, Bundler (`bundle install` in apps/mobile/ios/)
+#
+# Environment variables required:
+#   APPLE_TEAM_ID                     — Apple Developer Team ID
+#   APP_STORE_CONNECT_API_KEY_ID      — ASC API Key ID
+#   APP_STORE_CONNECT_API_ISSUER_ID   — ASC API Issuer ID
+#   APP_STORE_CONNECT_API_KEY_CONTENT — ASC API Key .p8 content, base64 encoded
+#   MATCH_PASSWORD                    — fastlane match repo encryption password
+#   MATCH_GIT_URL                     — private match certificates repo URL
+#   BUILD_NUMBER                      — build number (use GitHub run number in CI)
+
+default_platform(:ios)
+
+platform :ios do
+  # ── beta lane — build and upload to TestFlight ──────────────────────────────
+  lane :beta do
+    # Authenticate with App Store Connect API key (no Apple ID / 2FA needed)
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_API_KEY_CONTENT"],
+      is_key_content_base64: true
+    )
+
+    # Sync certificates and provisioning profiles via match
+    # readonly: true — CI must never write back to the certificates repo
+    match(type: "appstore", readonly: true)
+
+    # Increment build number — use BUILD_NUMBER from CI (GitHub run number)
+    # Falls back to current Unix timestamp for local runs
+    increment_build_number(
+      build_number: ENV["BUILD_NUMBER"] || Time.now.to_i.to_s
+    )
+
+    # Build the signed IPA
+    gym(
+      scheme: "FlowtiqMobile",
+      export_method: "app-store",
+      configuration: "Release"
+    )
+
+    # Upload to TestFlight (skip waiting for Apple to process the build)
+    pilot(skip_waiting_for_build_processing: true)
+  end
+end

@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
 import { upload, uploadToCloudinary, deleteFromCloudinary } from '../lib/storage';
+import { sendPushNotification } from '../lib/push';
 
 export const documentsRouter = Router();
 documentsRouter.use(authenticate);
@@ -147,6 +148,25 @@ documentsRouter.post(
         entityName: req.file.originalname,
         newData: { fileName: req.file.originalname, fileSize: req.file.size, projectId },
       });
+
+      // AC-6: Push for document upload — notify all project team members
+      const projectMembers = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { ownerId: true, teamMembers: true, tenantId: true, name: true },
+      });
+      if (projectMembers) {
+        const recipients = Array.from(new Set([projectMembers.ownerId, ...projectMembers.teamMembers]));
+        for (const uid of recipients) {
+          sendPushNotification(uid, projectMembers.tenantId, {
+            title: 'Document Uploaded',
+            body: `A new document was uploaded to ${projectMembers.name}`,
+            eventType: 'document_uploaded',
+            entityType: 'document',
+            entityId: document.id,
+            deepLinkUrl: '/documents',
+          }, 'documentUploads');
+        }
+      }
 
       res.status(201).json({
         success: true,

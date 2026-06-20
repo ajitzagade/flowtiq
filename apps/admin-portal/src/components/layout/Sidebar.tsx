@@ -10,12 +10,13 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { useSidebarStore } from '@/store/sidebar';
+import { deregisterPushTokenIfNative } from '@/lib/pushToken';
 
 // permission code required to see a nav item (null = always visible)
 const NAV_ITEMS: Array<{ key: string; label: string; href: string; icon: React.ElementType; requiredPermission: string | null }> = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, requiredPermission: null },
   { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban, requiredPermission: 'projects:view' },
-  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2, requiredPermission: 'roles:manage' },
+  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2, requiredPermission: 'reports:view' },
   { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock, requiredPermission: 'follow_ups:create' },
   { key: 'documents', label: 'Documents', href: '/documents', icon: FileText, requiredPermission: 'documents:download' },
   { key: 'users', label: 'Users', href: '/users', icon: Users, requiredPermission: 'users:view' },
@@ -50,6 +51,8 @@ export function Sidebar() {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const handleLogout = () => {
+    // fire-and-forget: deregister push token before clearing auth state
+    deregisterPushTokenIfNative();
     logout();
     window.location.href = '/login';
   };

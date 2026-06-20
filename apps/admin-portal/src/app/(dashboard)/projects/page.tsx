@@ -17,6 +17,9 @@ import { useAuthStore } from '@/store/auth';
 import { ProjectProgress } from '@/components/ProjectProgress';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDate, getStatusBadgeClass, getPriorityBadgeClass, cn, truncate, getErrorMessage } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonCard, SkeletonTable } from '@/components/Skeleton';
 import Link from 'next/link';
 import type { Project, User, WorkflowTemplate } from '@flowtiq/shared-types';
 
@@ -31,8 +34,8 @@ interface StageColumn {
 }
 
 const PALETTE = [
-  '#6366f1', '#0ea5e9', '#8b5cf6', '#f59e0b',
-  '#10b981', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#94a3b8',
+  '#3b82f6', '#0ea5e9', '#10b981', '#f59e0b',
+  '#ef4444', '#64748b', '#1d4ed8', '#0ea5e9', '#f97316', '#94a3b8',
 ];
 
 // ── KanbanCard ─────────────────────────────────────────────────────────────────
@@ -414,7 +417,7 @@ function WorkflowSection({
     <div
       ref={sectionRef}
       className={cn('overflow-hidden transition-all duration-300 rounded-xl border bg-white', isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : '')}
-      style={{ borderColor: '#dde3f8', boxShadow: '0 4px 16px rgba(99,102,241,0.08), 0 1px 4px rgba(0,0,0,0.06)' }}
+      style={{ borderColor: '#dde3f8', boxShadow: '0 4px 16px rgba(59,130,246,0.08), 0 1px 4px rgba(0,0,0,0.06)' }}
     >
       <button
         type="button"
@@ -423,7 +426,7 @@ function WorkflowSection({
         className={cn('w-full px-5 py-4 flex items-center justify-between transition-colors text-left', isHighlighted ? 'bg-blue-50/60' : 'bg-gradient-to-r from-slate-50 to-white hover:from-indigo-50/60 hover:to-white')}
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
             <GitBranch size={15} className="text-white" />
           </div>
           <span className="font-semibold text-slate-800 text-sm">
@@ -437,7 +440,7 @@ function WorkflowSection({
           <span
             className="text-xs font-bold rounded-full px-3 py-1 flex-shrink-0"
             style={projects.length > 0
-              ? { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }
+              ? { background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', boxShadow: '0 2px 8px rgba(59,130,246,0.25)' }
               : { background: '#f1f5f9', color: '#94a3b8' }}
           >
             {projects.length} project{projects.length !== 1 ? 's' : ''}
@@ -546,11 +549,8 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-40">
-        <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
+      <div className="space-y-3 p-4">
+        {[1, 2, 3].map((i) => <SkeletonCard key={i} rows={3} />)}
       </div>
     );
   }
@@ -672,6 +672,8 @@ function ProjectModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   const [selectedWorkflowIds, setSelectedWorkflowIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -753,7 +755,7 @@ function ProjectModal({
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div ref={modalRef} className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">{project ? 'Edit Project' : 'New Project'}</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5 rounded-lg">
@@ -900,6 +902,7 @@ function ProjectsPageInner() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<'list' | 'kanban'>(() =>
@@ -951,6 +954,14 @@ function ProjectsPageInner() {
   return (
     <>
       <Header title="Projects" subtitle="Manage and track all your projects" />
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title={`Delete project "${deleteTarget?.name}"?`}
+        description="This cannot be undone. The project will be cancelled and removed."
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
+        onCancel={() => setDeleteTarget(null)}
+      />
       {(showModal || editProject) && (
         <ProjectModal
           project={editProject}
@@ -1067,16 +1078,7 @@ function ProjectsPageInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading && (
-                    <tr>
-                      <td colSpan={9} className="text-center py-10 text-slate-400">
-                        <svg className="animate-spin w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                      </td>
-                    </tr>
-                  )}
+                  {isLoading && <SkeletonTable rows={8} cols={9} />}
                   {!isLoading && projects.length === 0 && (
                     <tr>
                       <td colSpan={9}>
@@ -1173,11 +1175,7 @@ function ProjectsPageInner() {
                           )}
                           {canDeleteProject && (
                             <button
-                              onClick={() => {
-                                if (confirm('Delete this project? This action cannot be undone.')) {
-                                  deleteMutation.mutate(project.id);
-                                }
-                              }}
+                              onClick={() => setDeleteTarget(project)}
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               aria-label={`Delete ${project.name}`}
                               title="Delete"

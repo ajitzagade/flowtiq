@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
@@ -8,6 +8,9 @@ import { Plus, GitBranch, Trash2, Edit, Star, ChevronRight, X, GripVertical, Use
 import toast from 'react-hot-toast';
 import { formatDate, cn, getErrorMessage } from '@/lib/utils';
 import type { WorkflowTemplate, User as UserType } from '@flowtiq/shared-types';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonCard } from '@/components/Skeleton';
 
 interface StageInput {
   key: string;
@@ -20,7 +23,7 @@ interface StageInput {
   defaultMemberId: string;
 }
 
-const STAGE_COLORS = ['#94a3b8', '#38bdf8', '#3b82f6', '#8b5cf6', '#f59e0b', '#14b8a6', '#10b981', '#ef4444'];
+const STAGE_COLORS = ['#94a3b8', '#3b82f6', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#64748b', '#1d4ed8'];
 
 function generateKey(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'stage';
@@ -28,6 +31,8 @@ function generateKey(name: string) {
 
 function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTemplate | null; onClose: () => void; users: UserType[] }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -41,7 +46,7 @@ function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTempla
     workflow?.stages
       ? (workflow.stages as Array<{ key: string; name: string; order: number; color?: string; isRequired?: boolean; requiresApproval?: boolean; description?: string; defaultMemberId?: string }>)
           .sort((a, b) => a.order - b.order)
-          .map((s) => ({ key: s.key, name: s.name, order: s.order, color: s.color || '#6366f1', isRequired: s.isRequired !== false, requiresApproval: s.requiresApproval || false, description: s.description || '', defaultMemberId: s.defaultMemberId || '' }))
+          .map((s) => ({ key: s.key, name: s.name, order: s.order, color: s.color || '#3b82f6', isRequired: s.isRequired !== false, requiresApproval: s.requiresApproval || false, description: s.description || '', defaultMemberId: s.defaultMemberId || '' }))
       : [
           { key: 'stage_1', name: 'Stage 1', order: 1, color: '#94a3b8', isRequired: true, requiresApproval: false, description: '', defaultMemberId: '' },
         ]
@@ -128,7 +133,7 @@ function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTempla
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-2xl w-full max-h-[90vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div ref={modalRef} className="modal-content max-w-2xl w-full max-h-[90vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header flex-shrink-0">
           <h3 id="modal-title">{workflow ? 'Edit Workflow' : 'New Workflow'}</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
@@ -269,6 +274,7 @@ export default function WorkflowsPage() {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [editWorkflow, setEditWorkflow] = useState<WorkflowTemplate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowTemplate | null>(null);
 
   const { data: workflows, isLoading } = useQuery<WorkflowTemplate[]>({
     queryKey: ['workflows'],
@@ -292,6 +298,14 @@ export default function WorkflowsPage() {
   return (
     <>
       <Header title="Workflows" subtitle="Configure dynamic workflows for your projects" />
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title={`Delete workflow "${deleteTarget?.name}"?`}
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
+        onCancel={() => setDeleteTarget(null)}
+      />
       {(showModal || editWorkflow) && (
         <WorkflowModal
           workflow={editWorkflow}
@@ -313,11 +327,8 @@ export default function WorkflowsPage() {
         </div>
 
         {isLoading && (
-          <div className="flex justify-center py-12">
-            <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} rows={3} />)}
           </div>
         )}
 
@@ -346,7 +357,7 @@ export default function WorkflowsPage() {
                     <Edit size={15} />
                   </button>
                   <button
-                    onClick={() => { if (confirm('Delete workflow?')) deleteMutation.mutate(workflow.id); }}
+                    onClick={() => setDeleteTarget(workflow)}
                     className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                   >
                     <Trash2 size={15} />
@@ -366,7 +377,7 @@ export default function WorkflowsPage() {
                     <div key={stage.key} className="flex items-center gap-2">
                       <div
                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ backgroundColor: stage.color || '#6366f1' }}
+                        style={{ backgroundColor: stage.color || '#3b82f6' }}
                       >
                         {stage.order}
                       </div>

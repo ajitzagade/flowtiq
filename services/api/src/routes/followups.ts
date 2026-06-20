@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { requireAnyPermission, requirePermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
+import { sendPushNotification } from '../lib/push';
 
 export const followupsRouter = Router();
 followupsRouter.use(authenticate);
@@ -169,6 +170,15 @@ followupsRouter.post('/', requirePermission('follow_ups:create'), async (req, re
         data: { followUpId: followUp.id, projectId: data.projectId },
       },
     });
+    // AC-4: Push for follow-up assignment
+    sendPushNotification(data.ownerId, tenantId as string, {
+      title: 'Follow-up Assigned',
+      body: `You have a new follow-up for ${followUp.project.name}`,
+      eventType: 'followup_assigned',
+      entityType: 'followup',
+      entityId: followUp.id,
+      deepLinkUrl: '/follow-ups',
+    }, 'assignments');
 
     await createAuditLog({
       req: authReq,

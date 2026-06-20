@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { requirePermission, requireAnyPermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
+import { sendPushNotification } from '../lib/push';
 
 export const projectsRouter = Router();
 projectsRouter.use(authenticate);
@@ -445,6 +446,18 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
       newData: { projectNumber, name: data.name, clientName: data.clientName },
     });
 
+    // AC-3: Push for project assignment to owner
+    if (data.ownerId && tenantId) {
+      sendPushNotification(data.ownerId, tenantId as string, {
+        title: 'Project Assigned',
+        body: `You have been assigned to project ${data.name}`,
+        eventType: 'project_assigned',
+        entityType: 'project',
+        entityId: project.id,
+        deepLinkUrl: `/projects/${project.id}`,
+      }, 'assignments');
+    }
+
     res.status(201).json({ success: true, data: project });
   } catch (err) {
     next(err);
@@ -574,6 +587,18 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
       previousData: { status: project.status, priority: project.priority },
       newData: req.body,
     });
+
+    // AC-3: Push if owner changed
+    if (rest.ownerId && rest.ownerId !== project.ownerId && tenantId) {
+      sendPushNotification(rest.ownerId as string, tenantId as string, {
+        title: 'Project Assigned',
+        body: `You have been assigned to project ${updated.name}`,
+        eventType: 'project_assigned',
+        entityType: 'project',
+        entityId: project.id,
+        deepLinkUrl: `/projects/${project.id}`,
+      }, 'assignments');
+    }
 
     res.json({ success: true, data: updated });
   } catch (err) {

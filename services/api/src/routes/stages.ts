@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
+import { sendPushNotification } from '../lib/push';
 
 export const stagesRouter = Router();
 stagesRouter.use(authenticate);
@@ -233,6 +234,14 @@ stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, 
             message: `You have been assigned to "${stage.stageName}" in project "${stage.project.name}" (${stage.project.projectNumber}). Please review and take action.`,
             data: { projectId: stage.projectId, stageId: stage.id, stageName: stage.stageName, projectName: stage.project.name },
           });
+          sendPushNotification(uid, tenantId, {
+            title: 'Stage Assigned',
+            body: `You have been assigned to ${stage.stageName} on ${stage.project.name}`,
+            eventType: 'stage_assigned',
+            entityType: 'stage',
+            entityId: stage.id,
+            deepLinkUrl: `/projects/${stage.projectId}`,
+          }, 'assignments');
         }
       }
     }
@@ -302,6 +311,28 @@ stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, 
             where: { id: stage.projectId },
             data: { status: 'completed', completionDate: new Date() },
           });
+        }
+      }
+    }
+
+    // AC-2: Push for stage status update — notify all project team members (exclude acting user)
+    if (status !== undefined && status !== previousStatus) {
+      const projectForPush = await prisma.project.findUnique({
+        where: { id: stage.projectId },
+        select: { ownerId: true, teamMembers: true, tenantId: true },
+      });
+      if (projectForPush) {
+        const recipients = Array.from(new Set([projectForPush.ownerId, ...projectForPush.teamMembers]))
+          .filter((id) => id !== userId);
+        for (const uid of recipients) {
+          sendPushNotification(uid, projectForPush.tenantId, {
+            title: 'Stage Updated',
+            body: `${stage.stageName} status changed to ${status} on ${stage.project.name}`,
+            eventType: 'stage_status_updated',
+            entityType: 'stage',
+            entityId: stage.id,
+            deepLinkUrl: `/projects/${stage.projectId}`,
+          }, 'statusUpdates');
         }
       }
     }
@@ -405,6 +436,14 @@ stagesRouter.post('/:id/sub-tasks', requirePermission('projects:edit'), async (r
         message: `You have been assigned to sub-task "${data.name}" in stage "${stage.stageName}", project "${stage.project.name}" (${stage.project.projectNumber}). Please review and take action.`,
         data: { projectId: stage.project.id, stageId: stage.id, subTaskName: data.name, stageName: stage.stageName, projectName: stage.project.name },
       });
+      sendPushNotification(data.assignedTo, tenantId, {
+        title: 'Sub-task Assigned',
+        body: `You have been assigned to a sub-task on ${stage.stageName}`,
+        eventType: 'subtask_assigned',
+        entityType: 'subtask',
+        entityId: subTask.id,
+        deepLinkUrl: `/projects/${stage.project.id}`,
+      }, 'assignments');
       // Add to project team members so they can see the project
       const project = await prisma.project.findUnique({
         where: { id: stage.project.id },
@@ -441,8 +480,14 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
 
     const stage = await prisma.projectStage.findUnique({
       where: { id: req.params.stageId },
-      select: { status: true, stageName: true, projectId: true },
+      select: { status: true, stageName: true, projectId: true, project: { select: { tenantId: true } } },
     });
+
+    // Tenant isolation: ensure the stage belongs to the authenticated user's tenant
+    if (!stage || (stage.project.tenantId !== authReq.user.tenantId && !authReq.user.isSuperAdmin)) {
+      res.status(404).json({ success: false, error: 'Sub-task not found' });
+      return;
+    }
 
     const updated = await prisma.stageSubTask.update({
       where: { id: req.params.subTaskId },
@@ -471,6 +516,14 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
           message: `You have been assigned to sub-task "${subTask.name}" in stage "${stage!.stageName}", project "${project.name}" (${project.projectNumber}). Please review and take action.`,
           data: { projectId: project.id, stageId: stage!.projectId, subTaskId: subTask.id, subTaskName: subTask.name, projectName: project.name },
         });
+        sendPushNotification(assignedTo, project.tenantId, {
+          title: 'Sub-task Assigned',
+          body: `You have been assigned to a sub-task on ${stage!.stageName}`,
+          eventType: 'subtask_assigned',
+          entityType: 'subtask',
+          entityId: subTask.id,
+          deepLinkUrl: `/projects/${project.id}`,
+        }, 'assignments');
         if (!project.teamMembers.includes(assignedTo)) {
           await prisma.project.update({
             where: { id: project.id },
@@ -506,10 +559,15 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
 // DELETE /api/stages/:stageId/sub-tasks/:subTaskId
 stagesRouter.delete('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:edit'), async (req, res, next) => {
   try {
+    const authReq = req as AuthRequest;
     const subTask = await prisma.stageSubTask.findFirst({
       where: { id: req.params.subTaskId, stageId: req.params.stageId },
+      include: { stage: { select: { project: { select: { tenantId: true } } } } },
     });
-    if (!subTask) {
+    if (
+      !subTask ||
+      (subTask.stage.project.tenantId !== authReq.user.tenantId && !authReq.user.isSuperAdmin)
+    ) {
       res.status(404).json({ success: false, error: 'Sub-task not found' });
       return;
     }

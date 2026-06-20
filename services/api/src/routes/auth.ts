@@ -309,3 +309,18 @@ authRouter.put('/change-password', authenticate, async (req, res, next) => {
     next(err);
   }
 });
+
+// POST /api/auth/forgot-password — stub (email delivery is a future story)
+authRouter.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ success: false, error: 'Email is required' });
+      return;
+    }
+    // TODO: send password reset email (Phase 2 — email service not yet configured)
+    res.json({ success: true, message: 'If an account exists, a reset link has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+});

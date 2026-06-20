@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import {
   Search, FileText, Upload, Download, Trash2, X, FolderOpen,
-  ChevronDown, GitBranch, Layers,
+  ChevronDown, GitBranch, Layers, Camera,
 } from 'lucide-react';
 import { formatDate, formatFileSize, cn, getErrorMessage } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import type { Document, Project } from '@flowtiq/shared-types';
+import { isNativeApp, requestFilePick, requestCameraCapture } from '@/lib/nativeBridge';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { SkeletonCard } from '@/components/Skeleton';
 
 type EnrichedDocument = Document & {
   project?: { id: string; name: string; projectNumber: string };
@@ -22,6 +26,8 @@ type EnrichedDocument = Document & {
 
 function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; initialProjectId?: string }) {
   const qc = useQueryClient();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -32,6 +38,8 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [nativePicking, setNativePicking] = useState(false);
+  const inNativeApp = isNativeApp();
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects', 'all'],
@@ -44,6 +52,35 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
     const dropped = e.dataTransfer.files[0];
     if (dropped) setFile(dropped);
   }, []);
+
+  const handleNativeFilePick = async () => {
+    setNativePicking(true);
+    try {
+      const files = await requestFilePick({ multiple: false, accept: '*/*' });
+      if (files[0]) setFile(files[0]);
+    } catch (err) {
+      // USER_CANCELLED is the exact sentinel from bridgeHandlers — any other error is unexpected
+      if (err instanceof Error && err.message !== 'USER_CANCELLED') {
+        toast.error('Could not open file picker');
+      }
+    } finally {
+      setNativePicking(false);
+    }
+  };
+
+  const handleNativeCameraCapture = async () => {
+    setNativePicking(true);
+    try {
+      const captured = await requestCameraCapture();
+      setFile(captured);
+    } catch (err) {
+      if (err instanceof Error && err.message !== 'USER_CANCELLED') {
+        toast.error('Could not open camera');
+      }
+    } finally {
+      setNativePicking(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file || !projectId) {
@@ -62,6 +99,8 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
       });
       toast.success('Document uploaded successfully');
       qc.invalidateQueries({ queryKey: ['documents'] });
+      // Also refresh project detail so stage doc counts update immediately
+      if (projectId) qc.invalidateQueries({ queryKey: ['project', projectId] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -72,7 +111,7 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div ref={modalRef} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">Upload Document</h3>
           <button onClick={onClose} aria-label="Close" className="btn-ghost p-1.5"><X size={18} aria-hidden="true" /></button>
@@ -90,35 +129,77 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
 
           <div>
             <label className="form-label">File *</label>
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              className={cn(
-                'border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer',
-                dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
-              )}
-              onClick={() => document.getElementById('file-input')?.click()}
-            >
-              <Upload size={24} className={cn('mx-auto mb-2', dragOver ? 'text-blue-500' : 'text-slate-300')} />
-              {file ? (
-                <div>
-                  <p className="font-medium text-slate-800">{file.name}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{formatFileSize(file.size)}</p>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-slate-500">Drag & drop or click to browse</p>
-                  <p className="text-xs text-slate-400 mt-1">Max file size: 50MB</p>
-                </div>
-              )}
-              <input
-                id="file-input"
-                type="file"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-            </div>
+            {inNativeApp ? (
+              <div className="space-y-2">
+                {file ? (
+                  <div className="border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-slate-800 text-sm">{file.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{formatFileSize(file.size)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFile(null)}
+                      className="btn-ghost p-1.5"
+                      aria-label="Remove file"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleNativeFilePick}
+                      disabled={nativePicking}
+                      className="btn-secondary flex-1 flex items-center justify-center gap-2"
+                    >
+                      <Upload size={16} />
+                      {nativePicking ? 'Opening...' : 'Select File'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNativeCameraCapture}
+                      disabled={nativePicking}
+                      className="btn-secondary flex items-center justify-center gap-2 px-4"
+                    >
+                      <Camera size={16} />
+                      Take Photo
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                onDrop={handleDrop}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                className={cn(
+                  'border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer',
+                  dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
+                )}
+                onClick={() => document.getElementById('file-input')?.click()}
+              >
+                <Upload size={24} className={cn('mx-auto mb-2', dragOver ? 'text-blue-500' : 'text-slate-300')} />
+                {file ? (
+                  <div>
+                    <p className="font-medium text-slate-800">{file.name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{formatFileSize(file.size)}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm text-slate-500">Drag & drop or click to browse</p>
+                    <p className="text-xs text-slate-400 mt-1">Max file size: 50MB</p>
+                  </div>
+                )}
+                <input
+                  id="file-input"
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -134,7 +215,7 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
 
           <div className="flex justify-end gap-3">
             <button onClick={onClose} className="btn-secondary">Cancel</button>
-            <button onClick={handleUpload} disabled={uploading || !file || !projectId} className="btn-primary">
+            <button onClick={handleUpload} disabled={uploading || nativePicking || !file || !projectId} className="btn-primary">
               {uploading ? 'Uploading...' : 'Upload'}
             </button>
           </div>
@@ -164,42 +245,53 @@ function CountBadge({ count }: { count: number }) {
 
 function DocRow({ doc, onDelete }: { doc: EnrichedDocument; onDelete: (id: string) => void }) {
   const uploader = doc.uploadedBy as { firstName: string; lastName: string } | undefined;
+  const [confirmOpen, setConfirmOpen] = useState(false);
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0">
-      <FileText size={16} className={cn('flex-shrink-0', FILE_TYPE_ICONS[doc.fileType] || 'text-slate-400')} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800 truncate">{doc.originalName}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="badge badge-blue text-[10px] px-1.5 py-0">{doc.fileType}</span>
-          <span className="text-xs text-slate-400">{formatFileSize(doc.fileSize)}</span>
-          {doc.version > 1 && <span className="text-xs text-slate-400">v{doc.version}</span>}
+    <>
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Delete document?"
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => { setConfirmOpen(false); onDelete(doc.id); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0">
+        <FileText size={16} className={cn('flex-shrink-0', FILE_TYPE_ICONS[doc.fileType] || 'text-slate-400')} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-800 truncate">{doc.originalName}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="badge badge-blue text-[10px] px-1.5 py-0">{doc.fileType}</span>
+            <span className="text-xs text-slate-400">{formatFileSize(doc.fileSize)}</span>
+            {doc.version > 1 && <span className="text-xs text-slate-400">v{doc.version}</span>}
+          </div>
+        </div>
+        <div className="hidden sm:block text-right font-mono text-sm flex-shrink-0 min-w-[100px]">
+          {uploader && (
+            <p className="text-xs text-slate-500 truncate font-sans">{uploader.firstName} {uploader.lastName}</p>
+          )}
+          <p className="text-xs text-slate-400">{formatDate(doc.createdAt)}</p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <a
+            href={doc.filePath}
+            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Download"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Download size={14} />
+          </a>
+          <button
+            onClick={() => setConfirmOpen(true)}
+            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
-      <div className="hidden sm:block text-right flex-shrink-0 min-w-[100px]">
-        {uploader && (
-          <p className="text-xs text-slate-500 truncate">{uploader.firstName} {uploader.lastName}</p>
-        )}
-        <p className="text-xs text-slate-400">{formatDate(doc.createdAt)}</p>
-      </div>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <a
-          href={doc.filePath}
-          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          title="Download"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Download size={14} />
-        </a>
-        <button
-          onClick={() => { if (confirm('Delete this document?')) onDelete(doc.id); }}
-          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          title="Delete"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -286,7 +378,12 @@ export default function DocumentsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/documents/${id}`),
-    onSuccess: () => { toast.success('Document deleted'); qc.invalidateQueries({ queryKey: ['documents'] }); },
+    onSuccess: () => {
+      toast.success('Document deleted');
+      qc.invalidateQueries({ queryKey: ['documents'] });
+      // Also refresh any open project detail so stage doc counts update immediately
+      qc.invalidateQueries({ queryKey: ['project'] });
+    },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -373,11 +470,8 @@ export default function DocumentsPage() {
 
         {/* Loading */}
         {isLoading && (
-          <div className="card p-10 flex items-center justify-center">
-            <svg className="animate-spin w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => <SkeletonCard key={i} rows={3} />)}
           </div>
         )}
 
@@ -436,7 +530,7 @@ export default function DocumentsPage() {
                           className="w-full flex items-center gap-3 px-6 py-3 bg-white hover:bg-slate-50 transition-colors text-left"
                         >
                           <ChevronDown size={14} className={cn('text-slate-400 flex-shrink-0 transition-transform duration-200', !wExpanded && '-rotate-90')} />
-                          <GitBranch size={15} className="text-violet-500 flex-shrink-0" />
+                          <GitBranch size={15} className="text-indigo-500 flex-shrink-0" />
                           <span className="text-sm font-medium text-slate-700 flex-1 truncate">{wg.workflowName}</span>
                           <CountBadge count={wDocCount} />
                         </button>
