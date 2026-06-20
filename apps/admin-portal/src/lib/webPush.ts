@@ -37,7 +37,7 @@ export function deregisterWebPushToken(): void {
 
 // Returns an unsubscribe function — call it on component unmount
 export async function setupForegroundMessages(
-  onNotification: (title: string, body: string) => void,
+  onNotification: (title: string, body: string, deepLinkUrl: string) => void,
 ): Promise<() => void> {
   const messaging = await getFirebaseMessaging();
   if (!messaging) return () => {};
@@ -45,6 +45,7 @@ export async function setupForegroundMessages(
   return onMessage(messaging, (payload) => {
     const title = payload.notification?.title || 'Flowtiq';
     const body = payload.notification?.body || '';
-    onNotification(title, body);
+    const deepLinkUrl = (payload.data?.deepLinkUrl as string) || '/notifications';
+    onNotification(title, body, deepLinkUrl);
   });
 }

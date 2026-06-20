@@ -325,6 +325,16 @@ stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, 
         const recipients = Array.from(new Set([projectForPush.ownerId, ...projectForPush.teamMembers]))
           .filter((id) => id !== userId);
         for (const uid of recipients) {
+          await prisma.notification.create({
+            data: {
+              tenantId: projectForPush.tenantId,
+              userId: uid,
+              type: 'status_update',
+              title: 'Stage Updated',
+              message: `${stage.stageName} status changed to ${status} on ${stage.project.name}`,
+              data: { stageId: stage.id, projectId: stage.projectId },
+            },
+          });
           sendPushNotification(uid, projectForPush.tenantId, {
             title: 'Stage Updated',
             body: `${stage.stageName} status changed to ${status} on ${stage.project.name}`,

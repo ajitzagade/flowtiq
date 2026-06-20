@@ -26,6 +26,16 @@ async function runFollowUpReminders(): Promise<void> {
         console.warn(`Push: skipping follow-up ${followUp.id} — owner has no tenantId (super admin?)`);
         continue;
       }
+      await prisma.notification.create({
+        data: {
+          tenantId: followUp.owner.tenantId,
+          userId: followUp.ownerId,
+          type: 'reminder',
+          title: 'Follow-up Due Today',
+          message: `Follow-up for ${followUp.project.name} is due today`,
+          data: { followUpId: followUp.id },
+        },
+      });
       sendPushNotification(followUp.ownerId, followUp.owner.tenantId, {
         title: 'Follow-up Due Today',
         body: `Follow-up for ${followUp.project.name} is due today`,
@@ -53,6 +63,16 @@ async function runFollowUpReminders(): Promise<void> {
         console.warn(`Push: skipping follow-up ${followUp.id} — owner has no tenantId (super admin?)`);
         continue;
       }
+      await prisma.notification.create({
+        data: {
+          tenantId: followUp.owner.tenantId,
+          userId: followUp.ownerId,
+          type: 'reminder',
+          title: 'Follow-up Overdue',
+          message: `Follow-up for ${followUp.project.name} is overdue`,
+          data: { followUpId: followUp.id },
+        },
+      });
       sendPushNotification(followUp.ownerId, followUp.owner.tenantId, {
         title: 'Follow-up Overdue',
         body: `Follow-up for ${followUp.project.name} is overdue`,

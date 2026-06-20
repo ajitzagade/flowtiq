@@ -446,8 +446,18 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
       newData: { projectNumber, name: data.name, clientName: data.clientName },
     });
 
-    // AC-3: Push for project assignment to owner
+    // AC-3: Persist + push for project assignment to owner
     if (data.ownerId && tenantId) {
+      await prisma.notification.create({
+        data: {
+          tenantId: tenantId as string,
+          userId: data.ownerId,
+          type: 'assignment',
+          title: 'Project Assigned',
+          message: `You have been assigned to project ${data.name}`,
+          data: { projectId: project.id },
+        },
+      });
       sendPushNotification(data.ownerId, tenantId as string, {
         title: 'Project Assigned',
         body: `You have been assigned to project ${data.name}`,
@@ -588,8 +598,18 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
       newData: req.body,
     });
 
-    // AC-3: Push if owner changed
+    // AC-3: Persist + push if owner changed
     if (rest.ownerId && rest.ownerId !== project.ownerId && tenantId) {
+      await prisma.notification.create({
+        data: {
+          tenantId: tenantId as string,
+          userId: rest.ownerId as string,
+          type: 'assignment',
+          title: 'Project Assigned',
+          message: `You have been assigned to project ${updated.name}`,
+          data: { projectId: project.id },
+        },
+      });
       sendPushNotification(rest.ownerId as string, tenantId as string, {
         title: 'Project Assigned',
         body: `You have been assigned to project ${updated.name}`,

@@ -157,6 +157,16 @@ documentsRouter.post(
       if (projectMembers) {
         const recipients = Array.from(new Set([projectMembers.ownerId, ...projectMembers.teamMembers]));
         for (const uid of recipients) {
+          await prisma.notification.create({
+            data: {
+              tenantId: projectMembers.tenantId,
+              userId: uid,
+              type: 'document',
+              title: 'Document Uploaded',
+              message: `A new document was uploaded to ${projectMembers.name}`,
+              data: { documentId: document.id, projectId },
+            },
+          });
           sendPushNotification(uid, projectMembers.tenantId, {
             title: 'Document Uploaded',
             body: `A new document was uploaded to ${projectMembers.name}`,
