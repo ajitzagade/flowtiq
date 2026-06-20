@@ -192,6 +192,7 @@ function StageDocuments({
   documents: DocType[];
   onRefresh: () => void;
 }) {
+  const qc = useQueryClient();
   const [previewDoc, setPreviewDoc] = useState<DocType | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -211,6 +212,8 @@ function StageDocuments({
       if (projectWorkflowId) form.append('projectWorkflowId', projectWorkflowId);
       await uploadFile('/documents/upload', form);
       toast.success('Document uploaded');
+      // Invalidate both: project (stage doc counts) and documents tab query
+      qc.invalidateQueries({ queryKey: ['documents', projectId] });
       onRefresh();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -310,11 +313,38 @@ function StageCard({
   const updateSubTaskMutation = useMutation({
     mutationFn: ({ subTaskId, data }: { subTaskId: string; data: object }) =>
       patch(`/stages/${stage.id}/sub-tasks/${subTaskId}`, data),
-    onSuccess: () => {
+    onMutate: async ({ subTaskId, data }) => {
+      // Cancel any in-flight refetch so it doesn't overwrite our optimistic update
+      await qc.cancelQueries({ queryKey: ['project', projectId] });
+      const snapshot = qc.getQueryData<ProjectDetail>(['project', projectId]);
+      // Optimistically flip the subtask status in the cache so the checkbox updates instantly
+      qc.setQueryData<ProjectDetail>(['project', projectId], (old) => {
+        if (!old?.projectWorkflows) return old;
+        return {
+          ...old,
+          projectWorkflows: old.projectWorkflows.map((pw) => ({
+            ...pw,
+            stages: pw.stages?.map((s) => s.id !== stage.id ? s : {
+              ...s,
+              subTasks: s.subTasks?.map((st) =>
+                st.id !== subTaskId ? st : { ...st, ...(data as Record<string, unknown>) }
+              ),
+            }),
+          })),
+        };
+      });
+      return { snapshot };
+    },
+    onError: (err, _vars, ctx) => {
+      // Roll back to pre-mutation state on failure
+      if (ctx?.snapshot) qc.setQueryData(['project', projectId], ctx.snapshot);
+      toast.error(getErrorMessage(err));
+    },
+    onSettled: () => {
+      // Always re-sync with server after mutation completes or fails
       qc.invalidateQueries({ queryKey: ['project', projectId] });
       onRefresh();
     },
-    onError: (err) => toast.error(getErrorMessage(err)),
   });
 
   const assignedUser = users.find((u) => u.id === stage.assignedTo);

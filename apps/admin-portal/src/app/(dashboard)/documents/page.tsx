@@ -99,6 +99,8 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
       });
       toast.success('Document uploaded successfully');
       qc.invalidateQueries({ queryKey: ['documents'] });
+      // Also refresh project detail so stage doc counts update immediately
+      if (projectId) qc.invalidateQueries({ queryKey: ['project', projectId] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -376,7 +378,12 @@ export default function DocumentsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/documents/${id}`),
-    onSuccess: () => { toast.success('Document deleted'); qc.invalidateQueries({ queryKey: ['documents'] }); },
+    onSuccess: () => {
+      toast.success('Document deleted');
+      qc.invalidateQueries({ queryKey: ['documents'] });
+      // Also refresh any open project detail so stage doc counts update immediately
+      qc.invalidateQueries({ queryKey: ['project'] });
+    },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 

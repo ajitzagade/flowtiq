@@ -66,6 +66,8 @@ function CreateFollowUpModal({ onClose }: { onClose: () => void }) {
       toast.success('Follow-up created');
       qc.invalidateQueries({ queryKey: ['followups'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      // Refresh the specific project detail so its Follow-ups tab updates immediately
+      qc.invalidateQueries({ queryKey: ['project', data.projectId] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -157,6 +159,8 @@ function UpdateFollowUpModal({ followUp, onClose }: { followUp: FollowUp; onClos
       toast.success('Follow-up updated');
       qc.invalidateQueries({ queryKey: ['followups'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      // Refresh the specific project detail so its Follow-ups tab updates immediately
+      if (followUp.projectId) qc.invalidateQueries({ queryKey: ['project', followUp.projectId] });
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -241,6 +245,8 @@ export default function FollowUpsPage() {
       toast.success('Follow-up completed');
       qc.invalidateQueries({ queryKey: ['followups'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      // Refresh all cached project queries so any open project detail Follow-ups tab updates immediately
+      qc.invalidateQueries({ queryKey: ['project'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
