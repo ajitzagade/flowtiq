@@ -458,10 +458,10 @@ function StageCard({
       </div>
 
       {expanded && (
-        <div className="px-4 pb-4 sm:px-5 sm:pb-5 border-t border-slate-100 pt-4 flex flex-col gap-4 sm:flex-row sm:gap-5 sm:items-start">
+        <div className="px-4 pb-4 sm:px-5 sm:pb-5 border-t border-slate-100 pt-4 flex flex-col gap-4 lg:flex-row lg:gap-5 lg:items-start">
 
           {/* ── Left: existing stage content ───────────────────────────── */}
-          <div className={cn('min-w-0 space-y-4 w-full', showUpdateForm ? 'sm:w-1/2' : 'sm:flex-1')}>
+          <div className={cn('min-w-0 space-y-4 w-full', showUpdateForm ? 'lg:w-1/2' : 'lg:flex-1')}>
             {/* Dates */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <div>
@@ -685,7 +685,7 @@ function StageCard({
             ];
 
             return (
-              <div className="w-full sm:w-1/2 sm:flex-shrink-0 border-2 border-blue-500 rounded-xl bg-blue-50/30 p-4">
+              <div className="w-full lg:w-1/2 lg:flex-shrink-0 border-2 border-blue-500 rounded-xl bg-blue-50/30 p-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -703,7 +703,7 @@ function StageCard({
                 {/* ── Status Picker ── */}
                 <div className="mb-4">
                   <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Status</p>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {statusOptions.map((opt) => {
                       const isSelected = newStatus === opt.value;
                       return (
