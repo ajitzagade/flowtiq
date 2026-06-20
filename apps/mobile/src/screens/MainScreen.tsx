@@ -300,34 +300,36 @@ export function MainScreen() {
 
       {isOffline && <OfflineOverlay onRetry={handleRetry} />}
 
-      <SafeAreaView style={styles.tabBar} edges={['bottom']}>
-        <View style={styles.tabBarInner}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'home' && styles.tabActive]}
-            onPress={() => { setActiveTab('home'); navigateWebView('/dashboard'); }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabIcon, activeTab === 'home' && styles.tabIconActive]}>
-              {'\uD83C\uDFE0'}
-            </Text>
-            <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
-              Home
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'notifications' && styles.tabActive]}
-            onPress={() => { setActiveTab('notifications'); navigateWebView('/notifications'); }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabIcon, activeTab === 'notifications' && styles.tabIconActive]}>
-              {'\uD83D\uDD14'}
-            </Text>
-            <Text style={[styles.tabLabel, activeTab === 'notifications' && styles.tabLabelActive]}>
-              Notifications
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      {!isOnLoginPage && (
+        <SafeAreaView style={styles.tabBar} edges={['bottom']}>
+          <View style={styles.tabBarInner}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'home' && styles.tabActive]}
+              onPress={() => { setActiveTab('home'); navigateWebView('/dashboard'); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabIcon, activeTab === 'home' && styles.tabIconActive]}>
+                {'\uD83C\uDFE0'}
+              </Text>
+              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
+                Home
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'notifications' && styles.tabActive]}
+              onPress={() => { setActiveTab('notifications'); navigateWebView('/notifications'); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabIcon, activeTab === 'notifications' && styles.tabIconActive]}>
+                {'\uD83D\uDD14'}
+              </Text>
+              <Text style={[styles.tabLabel, activeTab === 'notifications' && styles.tabLabelActive]}>
+                Notifications
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )}
     </SafeAreaView>
   );
 }
