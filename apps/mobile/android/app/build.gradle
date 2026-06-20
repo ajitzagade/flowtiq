@@ -7,6 +7,10 @@ apply plugin: "com.google.gms.google-services"
 react {
     // Story 3.1: Enable Hermes engine
     hermesEnabled = true
+    // Monorepo: point to repo root so the plugin finds node_modules correctly
+    // app/build.gradle is at apps/mobile/android/app/ — 4 levels up reaches repo root
+    root = file("../../../..")
+    reactNativeDir = file("../../../../node_modules/react-native")
 }
 
 android {
@@ -64,3 +68,6 @@ dependencies {
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
 }
+
+apply from: file("../../../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesAppBuildGradle(project)
