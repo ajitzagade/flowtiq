@@ -7,10 +7,11 @@ apply plugin: "com.google.gms.google-services"
 react {
     // Story 3.1: Enable Hermes engine
     hermesEnabled = true
-    // Monorepo: point to repo root so the plugin finds node_modules correctly
-    // app/build.gradle is at apps/mobile/android/app/ — 4 levels up reaches repo root
-    root = file("../../../..")
-    reactNativeDir = file("../../../../node_modules/react-native")
+    // Monorepo: root must be apps/mobile so the CLI finds the metro plugin (bundle command)
+    // app/build.gradle is at apps/mobile/android/app/ — 2 levels up reaches apps/mobile/
+    root = file("../..") // apps/mobile/
+    reactNativeDir = file("../../node_modules/react-native") // apps/mobile/node_modules/react-native
+    entryFile = file("../../index.js") // apps/mobile/index.js
 }
 
 android {

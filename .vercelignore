@@ -1,0 +1,16 @@
+# Mobile app — not needed for web build
+apps/mobile/
+apps/ss/
+
+# API service — deployed to Railway separately
+services/
+
+# BMad / agent skill files
+.claude/
+.agents/
+_bmad/
+_bmad-output/
+
+# Misc
+.github/
+node_modules/
