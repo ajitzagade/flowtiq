@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Bell, Menu, User, Clock, AlertTriangle, FileText, GitBranch, CheckCheck, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, Menu, User, Clock, AlertTriangle, FileText, GitBranch, CheckCheck, Settings, LogOut, ChevronDown, Search, X } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useSidebarStore } from '@/store/sidebar';
 import { getInitials, getAvatarColor, formatRelative, cn } from '@/lib/utils';
@@ -28,9 +28,12 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
   const qc = useQueryClient();
 
   const [activePanel, setActivePanel] = useState<'bell' | 'avatar' | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const bellRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Close panels on outside click or Escape
   useEffect(() => {
@@ -98,6 +101,22 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
     router.push('/login');
   }
 
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (q) {
+      router.push(`/projects?search=${encodeURIComponent(q)}`);
+      setSearchOpen(false);
+      setSearchQuery('');
+    }
+  }
+
+  function openSearch() {
+    setActivePanel(null);
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }
+
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 sticky top-0 z-20 gap-3">
       <div className="flex items-center gap-3 min-w-0">
@@ -117,6 +136,37 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
       </div>
 
       <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+        {/* Global project search */}
+        {searchOpen ? (
+          <form onSubmit={handleSearchSubmit} className="flex items-center relative">
+            <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search projects..."
+              className="w-36 sm:w-52 pl-8 pr-7 py-1.5 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); } }}
+            />
+            <button
+              type="button"
+              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+              className="absolute right-2 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X size={13} />
+            </button>
+          </form>
+        ) : (
+          <button
+            onClick={openSearch}
+            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            aria-label="Search projects"
+          >
+            <Search size={20} />
+          </button>
+        )}
+
         {/* Notifications bell + popover */}
         <div ref={bellRef} className="relative">
           <button

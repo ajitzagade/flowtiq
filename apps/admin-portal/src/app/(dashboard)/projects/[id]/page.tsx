@@ -415,18 +415,18 @@ function StageCard({
         </button>
 
         {/* Right actions — always visible */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {stage.documents && stage.documents.length > 0 && (
-            <div className="flex items-center gap-1 text-xs text-slate-400">
+            <div className="flex items-center gap-0.5 text-xs text-slate-400">
               <Paperclip size={12} />
               {stage.documents.length}
             </div>
           )}
-          {/* Colored status badge */}
-          <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize', stageBadge[stage.status] || 'bg-slate-100 text-slate-500')}>
+          {/* Colored status badge — hidden on very small screens */}
+          <span className={cn('hidden xs:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize', stageBadge[stage.status] || 'bg-slate-100 text-slate-500')}>
             {stage.status.replace('_', ' ')}
           </span>
-          {/* Update Stage button — also expands the card */}
+          {/* Update Stage button */}
           <button
             type="button"
             onClick={(e) => {
@@ -436,15 +436,15 @@ function StageCard({
               if (opening) setExpanded(true);
             }}
             className={cn(
-              'flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border-2 transition-all duration-150 flex-shrink-0 shadow-sm',
+              'flex items-center gap-1 text-xs font-bold px-2 py-1.5 sm:px-3 rounded-lg border-2 transition-all duration-150 flex-shrink-0 shadow-sm',
               showUpdateForm
                 ? 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
                 : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 hover:shadow-md',
             )}
           >
             {showUpdateForm
-              ? <><X size={12} /> Cancel</>
-              : <><Edit size={12} /> Update Stage</>
+              ? <><X size={12} /> <span className="hidden sm:inline">Cancel</span></>
+              : <><Edit size={12} /> <span className="hidden sm:inline">Update</span></>
             }
           </button>
           <button
@@ -458,10 +458,10 @@ function StageCard({
       </div>
 
       {expanded && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4 flex gap-5 items-start">
+        <div className="px-4 pb-4 sm:px-5 sm:pb-5 border-t border-slate-100 pt-4 flex flex-col gap-4 sm:flex-row sm:gap-5 sm:items-start">
 
           {/* ── Left: existing stage content ───────────────────────────── */}
-          <div className={cn('min-w-0 space-y-4', showUpdateForm ? 'w-1/2' : 'flex-1')}>
+          <div className={cn('min-w-0 space-y-4 w-full', showUpdateForm ? 'sm:w-1/2' : 'sm:flex-1')}>
             {/* Dates */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
               <div>
@@ -685,7 +685,7 @@ function StageCard({
             ];
 
             return (
-              <div className="w-1/2 flex-shrink-0 border-2 border-blue-500 rounded-xl bg-blue-50/30 p-4">
+              <div className="w-full sm:w-1/2 sm:flex-shrink-0 border-2 border-blue-500 rounded-xl bg-blue-50/30 p-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div>
