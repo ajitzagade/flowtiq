@@ -18,15 +18,15 @@
   --color-primary-900: 30 58 138;
 
   /* Sidebar */
-  --sidebar-bg: #0d1b2e;
-  --sidebar-text: #8ba3be;
-  --sidebar-active: #60a5fa;
-  --brand-primary: #3b82f6;
-  --brand-primary-hover: #2563eb;
+  --sidebar-bg: #000000;
+  --sidebar-text: #a1a1aa;
+  --sidebar-active: #ffffff;
+  --brand-primary: #ffffff;
+  --brand-primary-hover: #e5e5e5;
   --sidebar-hover: rgba(255, 255, 255, 0.07);
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-active-bg: rgba(59, 130, 246, 0.18);
-  --sidebar-active-border: #3b82f6;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-active-border: #ffffff;
 
   /* Font */
   --font-sans: 'Inter', system-ui, sans-serif;

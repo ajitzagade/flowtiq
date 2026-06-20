@@ -335,14 +335,14 @@ export function MainScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#000000' },
   webview: { flex: 1 },
-  tabBar: { backgroundColor: '#0f172a' },
+  tabBar: { backgroundColor: '#000000' },
   tabBarInner: {
     flexDirection: 'row',
     height: 56,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: '#1a1a1a',
   },
   tab: {
     flex: 1,
@@ -352,10 +352,10 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     borderTopWidth: 2,
-    borderTopColor: '#3b82f6',
+    borderTopColor: '#ffffff',
   },
   tabIcon: { fontSize: 20, opacity: 0.5 },
   tabIconActive: { opacity: 1 },
-  tabLabel: { fontSize: 10, color: '#94a3b8', marginTop: 2 },
-  tabLabelActive: { color: '#3b82f6', fontWeight: '600' },
+  tabLabel: { fontSize: 10, color: '#71717a', marginTop: 2 },
+  tabLabelActive: { color: '#ffffff', fontWeight: '600' },
 });

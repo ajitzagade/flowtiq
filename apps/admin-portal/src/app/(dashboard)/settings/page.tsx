@@ -141,8 +141,8 @@ export default function SettingsPage() {
   const tenantSettings = (currentTenant?.settings as unknown as LocalSettings) ?? {};
 
   // Branding state
-  const [primaryColor, setPrimaryColor] = useState(branding?.primaryColor || '#3b82f6');
-  const [secondaryColor, setSecondaryColor] = useState(branding?.secondaryColor || '#64748b');
+  const [primaryColor, setPrimaryColor] = useState(branding?.primaryColor || '#ffffff');
+  const [secondaryColor, setSecondaryColor] = useState(branding?.secondaryColor || '#000000');
   const [tenantName, setTenantName] = useState(currentTenant?.name || '');
 
   // General tab state
