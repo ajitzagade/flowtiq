@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useAuthStore } from '@/store/auth';
 import { BrandingApplicator } from '@/components/BrandingApplicator';
@@ -32,6 +33,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace('/login');
     }
   }, [isAuthenticated, _hasHydrated, router]);
+
+  // Listen for foreground push notifications dispatched by the native mobile app
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { title, body } = (e as CustomEvent<{ title: string; body: string }>).detail;
+      toast(body || title, {
+        duration: 5000,
+        position: 'top-right',
+        icon: '🔔',
+        style: { maxWidth: 360 },
+      });
+    };
+    window.addEventListener('flowtiqNotification', handler);
+    return () => window.removeEventListener('flowtiqNotification', handler);
+  }, []);
 
   if (!_hasHydrated) return <Spinner />;
   if (!isAuthenticated) return <Spinner />;
