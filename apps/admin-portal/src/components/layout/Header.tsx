@@ -30,10 +30,18 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
   const [activePanel, setActivePanel] = useState<'bell' | 'avatar' | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   const bellRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search query (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // Close panels on outside click or Escape
   useEffect(() => {
@@ -61,6 +69,19 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
     };
   }, [activePanel]);
 
+  // Close search on outside click
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!searchRef.current?.contains(e.target as Node)) {
+        setSearchOpen(false);
+        setSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [searchOpen]);
+
   const { data: notifData } = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: () => get<{ items: Notification[]; unreadCount: number }>('/notifications?pageSize=5&isRead=false'),
@@ -77,6 +98,13 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
     mutationFn: () => patch('/notifications/read-all', {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
     onError: () => toast.error('Failed to mark all notifications as read'),
+  });
+
+  const { data: searchData, isFetching: searchFetching } = useQuery({
+    queryKey: ['projects', 'search', debouncedQuery],
+    queryFn: () => get<{ items: import('@flowtiq/shared-types').Project[] }>(`/projects?search=${encodeURIComponent(debouncedQuery)}&pageSize=6`),
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 10000,
   });
 
   const unreadCount = notifData?.unreadCount ?? 0;
@@ -101,14 +129,10 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
     router.push('/login');
   }
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (q) {
-      router.push(`/projects?search=${encodeURIComponent(q)}`);
-      setSearchOpen(false);
-      setSearchQuery('');
-    }
+  function handleSelectProject(id: string) {
+    router.push(`/projects/${id}`);
+    setSearchOpen(false);
+    setSearchQuery('');
   }
 
   function openSearch() {
@@ -137,35 +161,78 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
 
       <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
         {/* Global project search */}
-        {searchOpen ? (
-          <form onSubmit={handleSearchSubmit} className="flex items-center relative">
-            <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search projects..."
-              className="w-36 sm:w-52 pl-8 pr-7 py-1.5 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-              onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); } }}
-            />
+        <div ref={searchRef} className="relative">
+          {searchOpen ? (
+            <div>
+              {/* Input */}
+              <div className="flex items-center relative">
+                <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search projects..."
+                  className="w-52 sm:w-64 pl-8 pr-7 py-1.5 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); } }}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                  className="absolute right-2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+
+              {/* Results dropdown */}
+              {debouncedQuery.length >= 2 && (
+                <div className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-200 z-50 overflow-hidden animate-slide-in">
+                  {searchFetching ? (
+                    <div className="px-4 py-6 text-center text-sm text-slate-400">Searching...</div>
+                  ) : searchData?.items?.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-slate-400">No projects found</div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                      {searchData?.items?.map((project) => (
+                        <button
+                          key={project.id}
+                          onClick={() => handleSelectProject(project.id)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">{project.name}</p>
+                            <p className="text-xs text-slate-400 truncate mt-0.5">
+                              {project.clientName}
+                              {project.location ? ` · ${project.location}` : ''}
+                            </p>
+                          </div>
+                          <span className={cn(
+                            'flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5',
+                            project.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                            project.status === 'on_hold' ? 'bg-amber-100 text-amber-700' :
+                            project.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                            'bg-slate-100 text-slate-500'
+                          )}>
+                            {project.status.replace('_', ' ')}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
             <button
-              type="button"
-              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
-              className="absolute right-2 text-slate-400 hover:text-slate-600 transition-colors"
+              onClick={openSearch}
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              aria-label="Search projects"
             >
-              <X size={13} />
+              <Search size={20} />
             </button>
-          </form>
-        ) : (
-          <button
-            onClick={openSearch}
-            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-            aria-label="Search projects"
-          >
-            <Search size={20} />
-          </button>
-        )}
+          )}
+        </div>
 
         {/* Notifications bell + popover */}
         <div ref={bellRef} className="relative">
