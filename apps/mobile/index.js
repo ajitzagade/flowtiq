@@ -8,7 +8,6 @@ import { AppRegistry } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 
 import App from './App';
-import { name as appName } from './package.json';
 
 // Story 3.4: Background message handler
 // The system tray notification is displayed automatically by FCM for background messages.
@@ -19,4 +18,4 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
   }
 });
 
-AppRegistry.registerComponent(appName, () => App);
+AppRegistry.registerComponent('Flowtiq', () => App);

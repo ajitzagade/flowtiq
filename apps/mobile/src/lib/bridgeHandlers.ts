@@ -5,7 +5,7 @@ import { launchCamera } from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
 import * as Keychain from 'react-native-keychain';
 import type WebView from 'react-native-webview';
-import Config from 'react-native-config';
+import { Config } from '../config';
 
 import { getPushTokenValue } from './pushToken';
 import { navigateWebView } from './webViewNavigation';

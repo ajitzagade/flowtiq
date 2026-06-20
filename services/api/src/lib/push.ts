@@ -99,6 +99,12 @@ export async function sendPushNotification(
             },
             android: {
               priority: 'high',
+              notification: {
+                sound: 'default',
+                vibrateTimingsMillis: [0, 300, 100, 300],
+                defaultVibrateTimings: false,
+                defaultSound: true,
+              },
             },
             apns: {
               payload: {

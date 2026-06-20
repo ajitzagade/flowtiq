@@ -1,4 +1,4 @@
-import Config from 'react-native-config';
+import { Config } from '../config';
 import { webViewRef } from './webViewRef';
 
 const TRUSTED_BASE = Config.TENANT_WEBVIEW_URL ?? 'https://flowtiq-admin.vercel.app';
