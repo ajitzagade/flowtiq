@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
 import { registerPushTokenIfNative } from '@/lib/pushToken';
 import { isNativeApp } from '@/lib/nativeBridge';
+import { registerWebPushToken } from '@/lib/webPush';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -95,8 +96,10 @@ export default function LoginPage() {
           payload: { accessToken, refreshToken, user, tenant }, // P18: include tenant so native shell can restore it
         }));
       }
-      // Story 2.4: fire-and-forget push token registration
+      // Story 2.4: fire-and-forget push token registration (native)
       registerPushTokenIfNative();
+      // Web push token registration for browser notifications
+      registerWebPushToken();
       router.push('/dashboard');
     } catch (err: unknown) {
       const msg =

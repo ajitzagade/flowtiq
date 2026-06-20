@@ -46,26 +46,39 @@ export async function sendPushNotification(
       return;
     }
 
-    // Fetch tenant FCM credentials
+    // Resolve FCM credentials: tenant DB row first, then global env vars as fallback
     const creds = await prisma.tenantPushCredentials.findUnique({
       where: { tenantId },
     });
 
-    if (
-      !creds ||
-      !creds.isActive ||
-      !creds.fcmProjectId?.trim() ||
-      !creds.serviceAccountEmail?.trim() ||
-      !creds.serviceAccountKey?.trim()
+    let fcmProjectId: string;
+    let fcmClientEmail: string;
+    let fcmPrivateKey: string;
+
+    const hasDbCreds =
+      creds?.isActive &&
+      !!creds.fcmProjectId?.trim() &&
+      !!creds.serviceAccountEmail?.trim() &&
+      !!creds.serviceAccountKey?.trim();
+
+    if (hasDbCreds) {
+      fcmProjectId = creds!.fcmProjectId!;
+      fcmClientEmail = creds!.serviceAccountEmail!;
+      fcmPrivateKey = creds!.serviceAccountKey!.replace(/\\n/g, '\n');
+    } else if (
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
     ) {
-      console.warn(`Push: no active FCM credentials for tenant ${tenantId}`);
+      fcmProjectId = process.env.FIREBASE_PROJECT_ID;
+      fcmClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      fcmPrivateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    } else {
+      console.warn(`Push: no FCM credentials for tenant ${tenantId} and no env-var fallback`);
       return;
     }
 
-    // Normalize escaped newlines that may occur when credentials are copied from JSON/env
-    const normalizedKey = creds.serviceAccountKey.replace(/\\n/g, '\n');
-
-    const app = getFirebaseApp(tenantId, creds.fcmProjectId, creds.serviceAccountEmail, normalizedKey);
+    const app = getFirebaseApp(tenantId, fcmProjectId, fcmClientEmail, fcmPrivateKey);
     const messaging = getMessaging(app);
 
     // Send to each token individually to enable per-token error handling
@@ -92,6 +105,16 @@ export async function sendPushNotification(
                 aps: {
                   sound: 'default',
                 },
+              },
+            },
+            webpush: {
+              notification: {
+                title: payload.title,
+                body: payload.body,
+                icon: '/favicon.ico',
+              },
+              fcmOptions: {
+                link: payload.deepLinkUrl || 'https://flowtiq-admin.vercel.app/notifications',
               },
             },
           };
