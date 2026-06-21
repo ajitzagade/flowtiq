@@ -4,6 +4,7 @@ import {
   Platform,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import WebView from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +27,7 @@ const KEYCHAIN_SERVICE = 'com.flowtiq.auth';
 const PUSH_PERM_KEY = 'push_permission_requested';
 const FLOWTIQ_AUTH_KEY = 'flowtiq-auth';
 const WEBVIEW_URL = Config.TENANT_WEBVIEW_URL ?? 'https://flowtiq-admin.vercel.app';
+const WEBVIEW_SOURCE = { uri: WEBVIEW_URL };
 
 // Static script — only sets up NativeBridge, never changes.
 // Auth injection is done via injectJavaScript in onLoadEnd so this prop
@@ -41,8 +43,9 @@ export function MainScreen() {
   const hasFCMDeepLink = useRef(false);
   const wasOfflineRef = useRef(false);
 
+  const hasLoadedRef = useRef(false);
+
   const [isOffline, setIsOffline] = useState(false);
-  const [isWebViewLoaded, setIsWebViewLoaded] = useState(false);
   const [isOnLoginPage, setIsOnLoginPage] = useState(true);
 
   // Keep module-level webViewRef in sync with local ref
@@ -81,13 +84,19 @@ export function MainScreen() {
   }, []);
 
   // ── Story 3.6: NetInfo / offline monitoring ──────────────────────────
+  const netInfoInitializedRef = useRef(false);
   useEffect(() => {
     NetInfo.fetch().then((state) => {
       const offline = !state.isConnected || state.isInternetReachable === false;
       wasOfflineRef.current = offline;
+      netInfoInitializedRef.current = true;
       setIsOffline(offline);
     });
     const unsub = NetInfo.addEventListener((state) => {
+      // Ignore events that arrive before the initial fetch resolves —
+      // Android fires several null-valued events on startup that would
+      // otherwise falsely trigger an offline→online reload.
+      if (!netInfoInitializedRef.current) return;
       const offline = !state.isConnected || state.isInternetReachable === false;
       setIsOffline(offline);
       // Only reload on offline → online transition, not every connectivity event
@@ -180,8 +189,9 @@ export function MainScreen() {
   }, []);
 
   // ── Story 3.4: Push permission on first post-login launch ────────────
+  // Triggered when user navigates away from login (isOnLoginPage flips false)
   useEffect(() => {
-    if (!isWebViewLoaded || isOnLoginPage) return;
+    if (isOnLoginPage) return;
     async function maybeRequestPush() {
       const already = await AsyncStorage.getItem(PUSH_PERM_KEY);
       if (already) return;
@@ -211,12 +221,12 @@ export function MainScreen() {
       );
     }
     maybeRequestPush();
-  }, [isWebViewLoaded, isOnLoginPage]);
+  }, [isOnLoginPage]);
 
   // ── WebView event handlers ────────────────────────────────────────────
   const handleLoadEnd = useCallback(() => {
-    if (!isWebViewLoaded) {
-      setIsWebViewLoaded(true);
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       // Inject stored auth into localStorage after first page load.
       // Using injectJavaScript here instead of injectedJavaScriptBeforeContentLoaded
       // because changing that prop on Android causes a silent reload loop.
@@ -231,7 +241,7 @@ export function MainScreen() {
         pendingDeepLinkRef.current = null;
       }
     }
-  }, [isWebViewLoaded]);
+  }, []);
 
   const handleMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
@@ -275,7 +285,7 @@ export function MainScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <WebView
         ref={localRef}
-        source={{ uri: WEBVIEW_URL }}
+        source={WEBVIEW_SOURCE}
         style={styles.webview}
         originWhitelist={['https://*']}
         allowFileAccess={false}
@@ -287,6 +297,12 @@ export function MainScreen() {
         onMessage={handleMessage}
         onLoadEnd={handleLoadEnd}
         onNavigationStateChange={handleNavigationStateChange}
+        startInLoadingState={true}
+        renderLoading={() => (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#ffffff" />
+          </View>
+        )}
       />
 
       {isOffline && <OfflineOverlay onRetry={handleRetry} />}
@@ -298,4 +314,10 @@ export function MainScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   webview: { flex: 1 },
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

@@ -5,11 +5,8 @@ const CACHE_NAME = `flowtiq-shell-${self.SW_BUILD_ID || 'dev'}`;
 const API_URL_PREFIX = '/api/';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(['/']);
-    }).then(() => self.skipWaiting())
-  );
+  // Skip waiting immediately — no navigation URLs pre-cached (see fetch handler).
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
@@ -28,16 +25,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Never cache API calls
-  if (url.pathname.startsWith(API_URL_PREFIX)) {
-    return;
-  }
-
-  // Navigation requests: cache-first with network fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('/').then((cached) => cached || fetch(request))
-    );
+  // Never cache API calls or navigation requests.
+  // Next.js App Router relies on the server returning the correct HTML for each URL;
+  // serving a cached root-page response for /dashboard, /projects, etc. causes a
+  // redirect loop because the root page always redirects back to /dashboard.
+  if (url.pathname.startsWith(API_URL_PREFIX) || request.mode === 'navigate') {
     return;
   }
 

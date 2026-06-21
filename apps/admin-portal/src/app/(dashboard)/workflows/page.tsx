@@ -301,8 +301,8 @@ export default function WorkflowsPage() {
       <ConfirmModal
         isOpen={!!deleteTarget}
         title={`Delete workflow "${deleteTarget?.name}"?`}
-        description="This cannot be undone."
-        confirmLabel="Delete"
+        description={`The workflow "${deleteTarget?.name}" will be permanently removed. Any projects currently using this workflow will lose their stage tracking and progress history.`}
+        confirmLabel="Delete Workflow"
         onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
         onCancel={() => setDeleteTarget(null)}
       />

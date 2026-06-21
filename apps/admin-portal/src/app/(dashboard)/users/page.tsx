@@ -154,6 +154,7 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<User | null>(null);
   const { user: authUser } = useAuthStore();
   const userPermissions = (authUser?.permissions as string[] | undefined) ?? [];
   const canCreate = authUser?.isSuperAdmin || userPermissions.includes('users:create');
@@ -205,11 +206,19 @@ export default function UsersPage() {
       <Header title="Users" subtitle="Manage team members and their access" />
       <ConfirmModal
         isOpen={!!deleteTarget}
-        title={`Delete ${deleteTarget?.firstName} ${deleteTarget?.lastName}?`}
-        description="This cannot be undone. All their account data will be permanently removed."
-        confirmLabel="Delete"
+        title={`Permanently delete "${deleteTarget?.firstName} ${deleteTarget?.lastName}"?`}
+        description={`The user account for ${deleteTarget?.firstName} ${deleteTarget?.lastName} (${deleteTarget?.email}) will be permanently removed along with all associated data. This cannot be undone.`}
+        confirmLabel="Delete User"
         onConfirm={() => { if (deleteTarget) hardDeleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmModal
+        isOpen={!!deactivateTarget}
+        title={`Deactivate "${deactivateTarget?.firstName} ${deactivateTarget?.lastName}"?`}
+        description={`${deactivateTarget?.firstName} ${deactivateTarget?.lastName} (${deactivateTarget?.email}) will immediately lose access to the platform. You can reactivate them at any time.`}
+        confirmLabel="Deactivate User"
+        onConfirm={() => { if (deactivateTarget) toggleActiveMutation.mutate({ id: deactivateTarget.id, isActive: false }); setDeactivateTarget(null); }}
+        onCancel={() => setDeactivateTarget(null)}
       />
       {(showModal || editUser) && (
         <UserModal
@@ -328,7 +337,7 @@ export default function UsersPage() {
                         )}
                         {canEdit && (
                           <button
-                            onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                            onClick={() => user.isActive ? setDeactivateTarget(user) : toggleActiveMutation.mutate({ id: user.id, isActive: true })}
                             className={cn(
                               'p-1.5 rounded-lg transition-colors',
                               user.isActive

@@ -250,9 +250,9 @@ function DocRow({ doc, onDelete }: { doc: EnrichedDocument; onDelete: (id: strin
     <>
       <ConfirmModal
         isOpen={confirmOpen}
-        title="Delete document?"
-        description="This cannot be undone."
-        confirmLabel="Delete"
+        title={`Delete "${doc.originalName}"?`}
+        description={`The document "${doc.originalName}" will be permanently deleted and cannot be recovered.`}
+        confirmLabel="Delete Document"
         onConfirm={() => { setConfirmOpen(false); onDelete(doc.id); }}
         onCancel={() => setConfirmOpen(false)}
       />

@@ -184,8 +184,8 @@ export default function RolesPage() {
       <ConfirmModal
         isOpen={!!deleteTarget}
         title={`Delete role "${deleteTarget?.name}"?`}
-        description="This cannot be undone."
-        confirmLabel="Delete"
+        description={`The role "${deleteTarget?.name}" will be permanently removed. All users assigned this role will immediately lose the associated permissions.`}
+        confirmLabel="Delete Role"
         onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
         onCancel={() => setDeleteTarget(null)}
       />

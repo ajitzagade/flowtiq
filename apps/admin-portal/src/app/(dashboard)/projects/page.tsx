@@ -957,8 +957,8 @@ function ProjectsPageInner() {
       <ConfirmModal
         isOpen={!!deleteTarget}
         title={`Delete project "${deleteTarget?.name}"?`}
-        description="This cannot be undone. The project will be cancelled and removed."
-        confirmLabel="Delete"
+        description={`The project "${deleteTarget?.name}" and all its stages, follow-ups, and documents will be permanently removed. This cannot be undone.`}
+        confirmLabel="Delete Project"
         onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); setDeleteTarget(null); }}
         onCancel={() => setDeleteTarget(null)}
       />
