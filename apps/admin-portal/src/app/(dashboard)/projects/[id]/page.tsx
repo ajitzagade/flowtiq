@@ -1288,7 +1288,11 @@ export default function ProjectDetailPage() {
   const allWorkflowStages = projectWorkflows.flatMap((pw) => pw.stages || []);
   const totalStages = allWorkflowStages.length;
   const completedStages = allWorkflowStages.filter((s) => s.status === 'completed').length;
-  const overallPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+  const inProgressStages = allWorkflowStages.filter((s) => s.status === 'in_progress').length;
+  // Credit in_progress stages at 50% so overall % reflects active work across all workflows.
+  const overallPct = totalStages > 0
+    ? Math.min(100, Math.round(((completedStages + inProgressStages * 0.5) / totalStages) * 100))
+    : 0;
   const completedWorkflows = projectWorkflows.filter((pw) => pw.status === 'completed').length;
 
   const TABS = [

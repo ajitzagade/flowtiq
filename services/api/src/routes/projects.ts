@@ -21,8 +21,11 @@ async function generateProjectNumber(tenantId: string): Promise<string> {
 function computeProgress(stages: Array<{ status: string }>) {
   if (!stages.length) return { progressPct: 0, completedStages: 0, totalStages: 0 };
   const completed = stages.filter((s) => s.status === 'completed').length;
+  const inProgress = stages.filter((s) => s.status === 'in_progress').length;
+  // Credit in_progress stages at 50% so the bar reflects active work.
+  const progressPct = Math.min(100, Math.round(((completed + inProgress * 0.5) / stages.length) * 100));
   return {
-    progressPct: Math.round((completed / stages.length) * 100),
+    progressPct,
     completedStages: completed,
     totalStages: stages.length,
   };
