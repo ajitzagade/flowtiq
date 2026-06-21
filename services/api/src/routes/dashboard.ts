@@ -126,7 +126,7 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         owner: { select: { id: true, firstName: true, lastName: true } },
         projectWorkflows: {
           select: {
-            stages: { select: { status: true } },
+            stages: { select: { status: true, stageOrder: true } },
           },
         },
       },
@@ -138,7 +138,12 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         const allStages = p.projectWorkflows.flatMap((pw) => pw.stages);
         const totalStages = allStages.length;
         const completedStages = allStages.filter((s) => s.status === 'completed').length;
-        const overallProgressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : null;
+        const inProgressStages = allStages.filter((s) => s.status === 'in_progress').length;
+        // Credit completed stages fully + in_progress stages at 50% so the bar
+        // reflects active work, not just fully-closed stages.
+        const overallProgressPct = totalStages > 0
+          ? Math.min(100, Math.round(((completedStages + inProgressStages * 0.5) / totalStages) * 100))
+          : null;
         const { projectWorkflows: _pw, ...rest } = p;
         return { ...rest, overallProgressPct, completedStages, totalStages };
       });
