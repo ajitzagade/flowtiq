@@ -109,6 +109,14 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
 
   const unreadCount = notifData?.unreadCount ?? 0;
   const previewNotifs = notifData?.items ?? [];
+
+  const prevUnreadRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevUnreadRef.current !== null && unreadCount > prevUnreadRef.current) {
+      new Audio('/flowtiq_sound.mp3').play().catch(() => {});
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
   const initials = user ? getInitials(user.firstName, user.lastName) : '';
   const avatarColor = user ? getAvatarColor(`${user.firstName} ${user.lastName}`) : 'bg-blue-500';
 
