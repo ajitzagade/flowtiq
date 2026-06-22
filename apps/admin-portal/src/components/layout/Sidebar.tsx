@@ -109,7 +109,7 @@ export function Sidebar() {
                 {tenant?.name || 'Flowtiq'}
               </p>
               {tenant && (
-                <p className="text-slate-500 text-xs mt-0.5">Powered by Flowtiq</p>
+                <p className="text-white/40 text-xs mt-0.5">Powered by Flowtiq</p>
               )}
             </div>
           </div>
@@ -138,7 +138,7 @@ export function Sidebar() {
           <button
             onClick={() => setMobileOpen(false)}
             aria-label="Close sidebar"
-            className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded flex-shrink-0 ml-2"
+            className="text-white/40 hover:text-white transition-colors p-1 rounded flex-shrink-0 ml-2"
           >
             <X size={16} />
           </button>
@@ -146,7 +146,7 @@ export function Sidebar() {
           <button
             onClick={() => setCollapsed(!collapsed)}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="hidden md:block text-slate-500 hover:text-slate-300 transition-colors p-1 rounded flex-shrink-0"
+            className="hidden md:block text-white/40 hover:text-white transition-colors p-1 rounded flex-shrink-0"
             style={{ marginLeft: collapsed ? 0 : 8 }}
           >
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -184,7 +184,7 @@ export function Sidebar() {
         {showLabels && user && (
           <div className="px-3 py-2 mb-1 min-w-0">
             <p className="text-white text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
-            <p className="text-slate-500 text-xs truncate">{user.email}</p>
+            <p className="text-white/40 text-xs truncate">{user.email}</p>
           </div>
         )}
         <button

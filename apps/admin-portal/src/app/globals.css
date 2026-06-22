@@ -19,7 +19,7 @@
 
   /* Sidebar */
   --sidebar-bg: #000000;
-  --sidebar-text: #a1a1aa;
+  --sidebar-text: #ffffff;
   --sidebar-active: #ffffff;
   --brand-primary: #ffffff;
   --brand-primary-hover: #e5e5e5;
@@ -207,7 +207,7 @@
 
   .nav-item:hover {
     background-color: var(--sidebar-hover);
-    color: #cbd5e1;
+    color: #ffffff;
   }
 
   .nav-item.active {
