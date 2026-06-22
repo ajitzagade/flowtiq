@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     const handler = (e: Event) => {
       const { title, body } = (e as CustomEvent<{ title: string; body: string }>).detail;
+      new Audio('/flowtiq_sound.mp3').play().catch(() => {});
       toast(body || title, {
         duration: 5000,
         position: 'top-right',

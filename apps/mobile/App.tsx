@@ -17,7 +17,7 @@ export default function App() {
       id: 'flowtiq-default',
       name: 'Flowtiq Notifications',
       importance: AndroidImportance.HIGH,
-      sound: 'default',
+      sound: 'flowtiq_sound',
       vibration: true,
     }).catch(() => {});
   }, []);

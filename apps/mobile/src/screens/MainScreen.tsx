@@ -154,7 +154,7 @@ export function MainScreen() {
         android: {
           channelId: 'flowtiq-default',
           pressAction: { id: 'default' },
-          sound: 'default',
+          sound: 'flowtiq_sound',
           vibrationPattern: [0, 300, 100, 300],
         },
       });

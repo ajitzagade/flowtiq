@@ -71,6 +71,7 @@ export function ServiceWorkerRegistrar() {
     let unsub: (() => void) | null = null;
 
     setupForegroundMessages((title, body, deepLinkUrl) => {
+      new Audio('/flowtiq_sound.mp3').play().catch(() => {});
       toast.custom(
         (t) => (
           <NotificationToast
