@@ -31,7 +31,7 @@ seedRouter.post('/', async (req, res) => {
         slug: 'vastudeep',
         subscriptionPlan: 'professional',
         maxUsers: 50,
-        branding: { primaryColor: '#1e3a5f', secondaryColor: '#c9a84c', theme: 'light' },
+        branding: { primaryColor: '#ffffff', secondaryColor: '#000000', theme: 'light' },
         settings: {
           features: { workflows: true, documents: true, followUps: true, auditLogs: true, notifications: true },
           notificationSettings: { emailEnabled: true, inAppEnabled: true },
