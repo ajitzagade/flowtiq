@@ -114,9 +114,18 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
   useEffect(() => {
     if (prevUnreadRef.current !== null && unreadCount > prevUnreadRef.current) {
       new Audio('/flowtiq_sound.mp3').play().catch(() => {});
+      const newest = previewNotifs[0];
+      if (newest) {
+        toast(newest.message || newest.title, {
+          duration: 7000,
+          position: 'top-right',
+          icon: '🔔',
+          style: { maxWidth: 360 },
+        });
+      }
     }
     prevUnreadRef.current = unreadCount;
-  }, [unreadCount]);
+  }, [unreadCount, previewNotifs]);
   const initials = user ? getInitials(user.firstName, user.lastName) : '';
   const avatarColor = user ? getAvatarColor(`${user.firstName} ${user.lastName}`) : 'bg-blue-500';
 
