@@ -8,6 +8,7 @@ import { getInitials, getAvatarColor, formatRelative, cn } from '@/lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, patch } from '@/lib/api';
 import { playNotificationSound } from '@/lib/sound';
+import { NotificationToast } from '@/components/NotificationToast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -117,12 +118,16 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
       playNotificationSound();
       const newest = previewNotifs[0];
       if (newest) {
-        toast(newest.message || newest.title, {
-          duration: 7000,
-          position: 'top-right',
-          icon: '🔔',
-          style: { maxWidth: 360 },
-        });
+        toast.custom(
+          (t) => (
+            <NotificationToast
+              t={t}
+              title={newest.title}
+              body={newest.message || newest.title}
+            />
+          ),
+          { duration: 7000, position: 'top-right' },
+        );
       }
     }
     prevUnreadRef.current = unreadCount;
