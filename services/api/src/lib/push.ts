@@ -100,16 +100,16 @@ export async function sendPushNotification(
             android: {
               priority: 'high',
               notification: {
-                sound: 'default',
+                sound: 'flowtiq_sound',
                 vibrateTimingsMillis: [0, 300, 100, 300],
                 defaultVibrateTimings: false,
-                defaultSound: true,
+                defaultSound: false,
               },
             },
             apns: {
               payload: {
                 aps: {
-                  sound: 'default',
+                  sound: 'flowtiq_sound.mp3',
                 },
               },
             },
