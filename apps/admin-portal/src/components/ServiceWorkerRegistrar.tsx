@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Bell, X } from 'lucide-react';
 import { setupForegroundMessages } from '@/lib/webPush';
 import { useAuthStore } from '@/store/auth';
+import { playNotificationSound } from '@/lib/sound';
 
 function NotificationToast({
   t,
@@ -71,7 +72,7 @@ export function ServiceWorkerRegistrar() {
     let unsub: (() => void) | null = null;
 
     setupForegroundMessages((title, body, deepLinkUrl) => {
-      new Audio('/flowtiq_sound.mp3').play().catch(() => {});
+      playNotificationSound();
       toast.custom(
         (t) => (
           <NotificationToast

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth';
 import { BrandingApplicator } from '@/components/BrandingApplicator';
 import { useSidebarStore } from '@/store/sidebar';
 import { cn } from '@/lib/utils';
+import { unlockAudio, playNotificationSound } from '@/lib/sound';
 
 function Spinner() {
   return (
@@ -34,11 +35,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isAuthenticated, _hasHydrated, router]);
 
+  // Unlock audio on first user interaction
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('click', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
   // Listen for foreground push notifications dispatched by the native mobile app
   useEffect(() => {
     const handler = (e: Event) => {
       const { title, body } = (e as CustomEvent<{ title: string; body: string }>).detail;
-      new Audio('/flowtiq_sound.mp3').play().catch(() => {});
+      playNotificationSound();
       toast(body || title, {
         duration: 5000,
         position: 'top-right',
