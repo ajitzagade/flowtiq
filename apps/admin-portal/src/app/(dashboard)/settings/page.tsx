@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { get, patch, uploadFile } from '@/lib/api';
+import { get, patch, post, uploadFile } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { Palette, Bell, Shield, Building2, Save, Upload, X, Image, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Palette, Bell, Shield, Building2, Save, Upload, X, Image, CheckCircle, XCircle, RefreshCw, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import { cn, getErrorMessage } from '@/lib/utils';
@@ -40,6 +40,19 @@ const PUSH_PREFS = [
 function PushStatus() {
   type Status = 'idle' | 'checking' | 'registered' | 'permission_denied' | 'unsupported' | 'error';
   const [status, setStatus] = useState<Status>('idle');
+  const [isSendingTest, setIsSendingTest] = useState(false);
+
+  async function handleSendTest() {
+    setIsSendingTest(true);
+    try {
+      await post('/notifications/test-push', {});
+      toast.success('Test notification sent — check your device!');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsSendingTest(false);
+    }
+  }
 
   useEffect(() => {
     if (!('Notification' in window)) { setStatus('unsupported'); return; }
@@ -84,14 +97,26 @@ function PushStatus() {
               <p className="text-xs text-slate-500 mt-0.5">{c.desc}</p>
             </div>
           </div>
-          <button
-            onClick={handleReconnect}
-            disabled={status === 'checking'}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={12} />
-            Reconnect
-          </button>
+          <div className="flex items-center gap-2">
+            {status === 'registered' && (
+              <button
+                onClick={handleSendTest}
+                disabled={isSendingTest}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors"
+              >
+                <Send size={12} />
+                {isSendingTest ? 'Sending...' : 'Send Test'}
+              </button>
+            )}
+            <button
+              onClick={handleReconnect}
+              disabled={status === 'checking'}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw size={12} />
+              Reconnect
+            </button>
+          </div>
         </div>
       </div>
     </div>
