@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { sendPushNotification } from '../lib/push';
 
 export const notificationsRouter = Router();
 notificationsRouter.use(authenticate);
@@ -58,6 +59,36 @@ notificationsRouter.patch('/:id/read', async (req, res, next) => {
     });
 
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/notifications/test-push — sends a test push to the logged-in user's devices
+notificationsRouter.post('/test-push', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const { userId, tenantId } = authReq.user;
+    if (!tenantId) {
+      res.status(400).json({ success: false, error: 'No tenant context' });
+      return;
+    }
+
+    await sendPushNotification(
+      userId,
+      tenantId,
+      {
+        title: 'Test Notification',
+        body: 'Push notifications are working correctly on Flowtiq!',
+        eventType: 'test',
+        entityType: 'notification',
+        entityId: userId,
+        deepLinkUrl: '/notifications',
+      },
+      'assignments',
+    );
+
+    res.json({ success: true, message: 'Test push sent' });
   } catch (err) {
     next(err);
   }
