@@ -77,6 +77,58 @@ usersRouter.get('/', requirePermission('users:view'), async (req, res, next) => 
   }
 });
 
+// GET /api/users/notification-preferences
+usersRouter.get('/notification-preferences', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const { userId, tenantId } = authReq.user;
+    if (!tenantId) {
+      res.status(400).json({ success: false, error: 'No tenant context' });
+      return;
+    }
+
+    const prefs = await prisma.userNotificationPreference.upsert({
+      where: { userId_tenantId: { userId, tenantId } },
+      create: { userId, tenantId, assignments: true, statusUpdates: true, documentUploads: true, followUpReminders: true },
+      update: {},
+    });
+
+    res.json({ success: true, data: { assignments: prefs.assignments, statusUpdates: prefs.statusUpdates, documentUploads: prefs.documentUploads, followUpReminders: prefs.followUpReminders } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/users/notification-preferences
+usersRouter.patch('/notification-preferences', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const { userId, tenantId } = authReq.user;
+    if (!tenantId) {
+      res.status(400).json({ success: false, error: 'No tenant context' });
+      return;
+    }
+
+    const schema = z.object({
+      assignments: z.boolean().optional(),
+      statusUpdates: z.boolean().optional(),
+      documentUploads: z.boolean().optional(),
+      followUpReminders: z.boolean().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    const prefs = await prisma.userNotificationPreference.upsert({
+      where: { userId_tenantId: { userId, tenantId } },
+      create: { userId, tenantId, assignments: true, statusUpdates: true, documentUploads: true, followUpReminders: true, ...data },
+      update: data,
+    });
+
+    res.json({ success: true, data: { assignments: prefs.assignments, statusUpdates: prefs.statusUpdates, documentUploads: prefs.documentUploads, followUpReminders: prefs.followUpReminders } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/users/:id
 usersRouter.get('/:id', requirePermission('users:view'), async (req, res, next) => {
   try {

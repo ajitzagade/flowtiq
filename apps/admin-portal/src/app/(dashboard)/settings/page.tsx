@@ -44,8 +44,11 @@ function PushStatus() {
   useEffect(() => {
     if (!('Notification' in window)) { setStatus('unsupported'); return; }
     if (Notification.permission === 'denied') { setStatus('permission_denied'); return; }
-    // Actually verify Firebase token — don't assume granted = working
-    handleReconnect();
+    if (Notification.permission === 'granted') {
+      // Permission already granted — safe to verify FCM token silently
+      handleReconnect();
+    }
+    // If permission is 'default' (not yet asked), leave status as 'idle' — wait for user click
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
