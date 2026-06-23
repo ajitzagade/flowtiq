@@ -7,7 +7,7 @@ const router = Router();
 
 const registerSchema = z.object({
   token: z.string().min(1).max(4096),
-  platform: z.enum(['ios', 'android']),
+  platform: z.enum(['ios', 'android', 'web']),
 });
 
 const deregisterSchema = z.object({
