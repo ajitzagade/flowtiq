@@ -5,25 +5,26 @@ import { post, del } from './api';
 // Stored in memory — same pattern as native push token (NFR-1-SEC-A)
 let _registeredWebToken: string | null = null;
 
-export async function registerWebPushToken(): Promise<void> {
+export async function registerWebPushToken(): Promise<'registered' | 'permission_denied' | 'unsupported' | 'error'> {
   try {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
 
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
+    if (permission !== 'granted') return 'permission_denied';
 
     const messaging = await getFirebaseMessaging();
-    if (!messaging) return;
+    if (!messaging) return 'unsupported';
 
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
     });
-    if (!token) return;
+    if (!token) return 'error';
 
     _registeredWebToken = token;
     post<unknown>('/users/device-token', { token, platform: 'web' }).catch(() => {});
+    return 'registered';
   } catch {
-    // Non-blocking — never interrupt login flow
+    return 'error';
   }
 }
 

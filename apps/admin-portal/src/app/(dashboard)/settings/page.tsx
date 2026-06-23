@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, patch, uploadFile } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { Palette, Bell, Shield, Building2, Save, Upload, X, Image } from 'lucide-react';
+import { Palette, Bell, Shield, Building2, Save, Upload, X, Image, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import { cn, getErrorMessage } from '@/lib/utils';
 import type { Tenant, NotificationPreferences } from '@flowtiq/shared-types';
+import { registerWebPushToken } from '@/lib/webPush';
 
 const TABS = [
   { key: 'branding', label: 'Branding', icon: Palette },
@@ -35,6 +36,62 @@ const PUSH_PREFS = [
   { field: 'documentUploads' as const, label: 'Document Uploads', desc: 'Documents uploaded to my projects' },
   { field: 'followUpReminders' as const, label: 'Follow-up Reminders', desc: 'Due today and overdue follow-up alerts' },
 ] as const;
+
+function PushStatus() {
+  type Status = 'idle' | 'checking' | 'registered' | 'permission_denied' | 'unsupported' | 'error';
+  const [status, setStatus] = useState<Status>('idle');
+
+  useEffect(() => {
+    if (!('Notification' in window)) { setStatus('unsupported'); return; }
+    if (Notification.permission === 'denied') { setStatus('permission_denied'); return; }
+    if (Notification.permission === 'granted') setStatus('registered');
+  }, []);
+
+  async function handleReconnect() {
+    setStatus('checking');
+    const result = await registerWebPushToken();
+    setStatus(result);
+    if (result === 'registered') toast.success('Push notifications connected');
+    else if (result === 'permission_denied') toast.error('Notification permission denied — enable it in browser settings');
+    else if (result === 'error') toast.error('Failed to connect push notifications');
+  }
+
+  const config: Record<Status, { icon: React.ReactNode; label: string; desc: string; color: string; bg: string }> = {
+    idle:             { icon: <Bell size={16} />,        label: 'Unknown',           desc: 'Click Reconnect to check status',              color: '#64748b', bg: '#f1f5f9' },
+    checking:         { icon: <RefreshCw size={16} className="animate-spin" />, label: 'Checking...', desc: 'Registering with Firebase...', color: '#6366f1', bg: '#eef2ff' },
+    registered:       { icon: <CheckCircle size={16} />, label: 'Connected',         desc: 'Firebase push notifications are active',        color: '#16a34a', bg: '#f0fdf4' },
+    permission_denied:{ icon: <XCircle size={16} />,     label: 'Permission Denied', desc: 'Allow notifications in browser site settings', color: '#dc2626', bg: '#fef2f2' },
+    unsupported:      { icon: <XCircle size={16} />,     label: 'Not Supported',     desc: 'This browser does not support push notifications', color: '#d97706', bg: '#fffbeb' },
+    error:            { icon: <XCircle size={16} />,     label: 'Not Connected',     desc: 'Firebase config may be missing — check Vercel env vars', color: '#dc2626', bg: '#fef2f2' },
+  };
+
+  const c = config[status];
+
+  return (
+    <div className="card">
+      <div className="card-header"><h3>Push Notification Status</h3></div>
+      <div className="card-body">
+        <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: c.bg }}>
+          <div className="flex items-center gap-3">
+            <span style={{ color: c.color }}>{c.icon}</span>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: c.color }}>{c.label}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{c.desc}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleReconnect}
+            disabled={status === 'checking'}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Reconnect
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PushNotificationPreferences({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const { data: prefs, isLoading, isError } = useQuery<NotificationPreferences>({
@@ -486,6 +543,9 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Push notification connection status */}
+                <PushStatus />
 
                 {/* User-level push notification preferences */}
                 <PushNotificationPreferences qc={qc} />
