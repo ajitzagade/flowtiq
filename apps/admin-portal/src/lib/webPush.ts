@@ -13,17 +13,30 @@ export async function registerWebPushToken(): Promise<'registered' | 'permission
     if (permission !== 'granted') return 'permission_denied';
 
     const messaging = await getFirebaseMessaging();
-    if (!messaging) return 'unsupported';
+    if (!messaging) {
+      console.error('[Push] Firebase Messaging not supported in this browser');
+      return 'unsupported';
+    }
+
+    if (!process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY) {
+      console.error('[Push] NEXT_PUBLIC_FIREBASE_VAPID_KEY is not set');
+      return 'error';
+    }
 
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
     });
-    if (!token) return 'error';
+    if (!token) {
+      console.error('[Push] getToken() returned empty — check VAPID key and Firebase project config');
+      return 'error';
+    }
 
     _registeredWebToken = token;
     post<unknown>('/users/device-token', { token, platform: 'web' }).catch(() => {});
+    console.log('[Push] Web push token registered successfully');
     return 'registered';
-  } catch {
+  } catch (err) {
+    console.error('[Push] Registration failed:', err);
     return 'error';
   }
 }

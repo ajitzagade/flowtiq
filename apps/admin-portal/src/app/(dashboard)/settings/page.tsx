@@ -44,7 +44,9 @@ function PushStatus() {
   useEffect(() => {
     if (!('Notification' in window)) { setStatus('unsupported'); return; }
     if (Notification.permission === 'denied') { setStatus('permission_denied'); return; }
-    if (Notification.permission === 'granted') setStatus('registered');
+    // Actually verify Firebase token — don't assume granted = working
+    handleReconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleReconnect() {
