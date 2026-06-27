@@ -40,7 +40,7 @@ function autoWidth(worksheet: ExcelJS.Worksheet): void {
       const len = String(cell.value ?? '').length;
       if (len > maxLen) maxLen = len;
     });
-    col.width = Math.min(40, Math.max(12, maxLen + 2));
+    col.width = Math.min(50, Math.max(12, maxLen + 2));
   });
 }
 
@@ -48,413 +48,132 @@ const MONEY_FMT = '#,##0.00';
 
 function applyMoneyFmt(worksheet: ExcelJS.Worksheet, colKeys: string[]): void {
   worksheet.columns.forEach((col) => {
-    if (col.key && colKeys.includes(col.key)) {
-      col.numFmt = MONEY_FMT;
-    }
+    if (col.key && colKeys.includes(col.key)) col.numFmt = MONEY_FMT;
   });
 }
 
-// ── GET /api/export/excel ─────────────────────────────────────────────────────
-
-exportRouter.get('/excel', requirePermission('reports:view'), async (req, res, next) => {
-  try {
-    const authReq = req as AuthRequest;
-    const isSuperAdmin = authReq.user.isSuperAdmin;
-    const tenantId = authReq.user.tenantId as string | null;
-    const tenantFilter = isSuperAdmin ? {} : { tenantId: tenantId! };
-
-    // ── Fetch all data in parallel ──────────────────────────────────────────
-
-    const [projects, financials, milestones, invoices, followUps, users, allTenants] =
-      await Promise.all([
-        prisma.project.findMany({
-          where: { ...tenantFilter, deletedAt: null, status: { not: 'cancelled' } },
-          include: { financial: true },
-          orderBy: { createdAt: 'asc' },
-        }),
-        prisma.projectFinancial.findMany({
-          where: tenantFilter,
-          include: { project: { select: { projectNumber: true, name: true } } },
-          orderBy: { createdAt: 'asc' },
-        }),
-        prisma.paymentMilestone.findMany({
-          where: tenantFilter,
-          include: {
-            project: { select: { projectNumber: true, name: true } },
-            linkedStage: { select: { stageName: true, stageKey: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        }),
-        prisma.invoice.findMany({
-          where: tenantFilter,
-          include: {
-            project: { select: { projectNumber: true, name: true } },
-            payments: true,
-          },
-          orderBy: { createdAt: 'asc' },
-        }),
-        prisma.followUp.findMany({
-          where: tenantFilter,
-          include: {
-            project: { select: { projectNumber: true, name: true } },
-            owner: { select: { firstName: true, lastName: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        }),
-        prisma.user.findMany({
-          where: { ...tenantFilter, isActive: true },
-          include: { userRoles: { include: { role: { select: { name: true } } } } },
-          orderBy: { createdAt: 'asc' },
-        }),
-        isSuperAdmin
-          ? prisma.tenant.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
-          : Promise.resolve([]),
-      ]);
-
-    // Collect all invoice payment records (no tenantId on model — filter via invoice tenantId)
-    const invoiceIds = invoices.map((inv) => inv.id);
-    const payments = await prisma.invoicePayment.findMany({
-      where: { invoiceId: { in: invoiceIds } },
-      include: { invoice: { select: { invoiceNumber: true, project: { select: { projectNumber: true } } } } },
-      orderBy: { paymentDate: 'asc' },
-    });
-
-    const tenantNameMap = new Map(allTenants.map((t) => [t.id, t.name]));
-    const tCol = (tid: string) =>
-      isSuperAdmin ? { tenant: tenantNameMap.get(tid) ?? tid } : {};
-
-    const today = new Date().toISOString().slice(0, 10);
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Flowtiq';
-    workbook.created = new Date();
-
-    // ── Sheet 1: Projects ──────────────────────────────────────────────────
-
-    const projSheet = workbook.addWorksheet('Projects');
-    projSheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'Project Number', key: 'projectNumber' },
-      { header: 'Project Name', key: 'name' },
-      { header: 'Status', key: 'status' },
-      { header: 'Priority', key: 'priority' },
-      { header: 'Client Name', key: 'clientName' },
-      { header: 'Start Date', key: 'startDate' },
-      { header: 'Due Date', key: 'dueDate' },
-      { header: 'Contract Value', key: 'contractValue' },
-      { header: 'Currency', key: 'currency' },
-      { header: 'Billing Type', key: 'billingType' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    for (const p of projects) {
-      projSheet.addRow({
-        ...tCol(p.tenantId),
-        projectNumber: p.projectNumber,
-        name: p.name,
-        status: p.status,
-        priority: p.priority,
-        clientName: p.clientName,
-        startDate: fmtDate(p.startDate),
-        dueDate: fmtDate(p.dueDate),
-        contractValue: toNum(p.financial?.contractValue),
-        currency: p.financial?.currency ?? 'INR',
-        billingType: p.financial?.billingType ?? '',
-        createdAt: fmtDate(p.createdAt),
-      });
-    }
-
-    applyMoneyFmt(projSheet, ['contractValue']);
-    styleHeader(projSheet);
-    autoWidth(projSheet);
-
-    // ── Sheet 2: Project Financials ────────────────────────────────────────
-
-    const finSheet = workbook.addWorksheet('Project Financials');
-    finSheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'Project Number', key: 'projectNumber' },
-      { header: 'Project Name', key: 'projectName' },
-      { header: 'Contract Value', key: 'contractValue' },
-      { header: 'Currency', key: 'currency' },
-      { header: 'Billing Type', key: 'billingType' },
-      { header: 'Notes', key: 'notes' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    for (const f of financials) {
-      finSheet.addRow({
-        ...tCol(f.tenantId),
-        projectNumber: f.project.projectNumber,
-        projectName: f.project.name,
-        contractValue: toNum(f.contractValue),
-        currency: f.currency,
-        billingType: f.billingType,
-        notes: f.notes ?? '',
-        createdAt: fmtDate(f.createdAt),
-      });
-    }
-
-    applyMoneyFmt(finSheet, ['contractValue']);
-    styleHeader(finSheet);
-    autoWidth(finSheet);
-
-    // ── Sheet 3: Payment Milestones ────────────────────────────────────────
-
-    const milSheet = workbook.addWorksheet('Payment Milestones');
-    milSheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'Project Number', key: 'projectNumber' },
-      { header: 'Project Name', key: 'projectName' },
-      { header: 'Milestone Name', key: 'name' },
-      { header: 'Amount', key: 'amount' },
-      { header: 'Status', key: 'status' },
-      { header: 'Due Date', key: 'dueDate' },
-      { header: 'Linked Stage', key: 'linkedStage' },
-      { header: 'Notes', key: 'notes' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    for (const m of milestones) {
-      milSheet.addRow({
-        ...tCol(m.tenantId),
-        projectNumber: m.project.projectNumber,
-        projectName: m.project.name,
-        name: m.name,
-        amount: toNum(m.amount),
-        status: m.status,
-        dueDate: fmtDate(m.dueDate),
-        linkedStage: m.linkedStage?.stageName ?? m.linkedStage?.stageKey ?? '',
-        notes: m.notes ?? '',
-        createdAt: fmtDate(m.createdAt),
-      });
-    }
-
-    applyMoneyFmt(milSheet, ['amount']);
-    styleHeader(milSheet);
-    autoWidth(milSheet);
-
-    // ── Sheet 4: Invoices ──────────────────────────────────────────────────
-
-    const invSheet = workbook.addWorksheet('Invoices');
-    invSheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'Invoice Number', key: 'invoiceNumber' },
-      { header: 'Project Number', key: 'projectNumber' },
-      { header: 'Project Name', key: 'projectName' },
-      { header: 'Title', key: 'title' },
-      { header: 'Status', key: 'status' },
-      { header: 'Issued At', key: 'issuedAt' },
-      { header: 'Due Date', key: 'dueDate' },
-      { header: 'Amount', key: 'amount' },
-      { header: 'Tax Amount', key: 'taxAmount' },
-      { header: 'Total Amount', key: 'totalAmount' },
-      { header: 'Amount Paid', key: 'amountPaid' },
-      { header: 'Outstanding', key: 'outstanding' },
-      { header: 'Notes', key: 'notes' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    for (const inv of invoices) {
-      const totalAmount = toNum(inv.totalAmount);
-      const amountPaid = inv.payments.reduce((s, p) => s + toNum(p.amount), 0);
-      invSheet.addRow({
-        ...tCol(inv.tenantId),
-        invoiceNumber: inv.invoiceNumber,
-        projectNumber: inv.project.projectNumber,
-        projectName: inv.project.name,
-        title: inv.title,
-        status: inv.status,
-        issuedAt: fmtDate(inv.issuedAt),
-        dueDate: fmtDate(inv.dueDate),
-        amount: toNum(inv.amount),
-        taxAmount: toNum(inv.taxAmount),
-        totalAmount,
-        amountPaid,
-        outstanding: Math.max(0, totalAmount - amountPaid),
-        notes: inv.notes ?? '',
-        createdAt: fmtDate(inv.createdAt),
-      });
-    }
-
-    applyMoneyFmt(invSheet, ['amount', 'taxAmount', 'totalAmount', 'amountPaid', 'outstanding']);
-    styleHeader(invSheet);
-    autoWidth(invSheet);
-
-    // ── Sheet 5: Invoice Payments ──────────────────────────────────────────
-
-    const paySheet = workbook.addWorksheet('Invoice Payments');
-    paySheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'Invoice Number', key: 'invoiceNumber' },
-      { header: 'Project Number', key: 'projectNumber' },
-      { header: 'Amount', key: 'amount' },
-      { header: 'Payment Mode', key: 'mode' },
-      { header: 'Payment Date', key: 'paymentDate' },
-      { header: 'Reference', key: 'reference' },
-      { header: 'Notes', key: 'notes' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    // tenantId for super-admin display: derive from invoice via the already-fetched invoice map
-    const invoiceTenantMap = new Map(invoices.map((inv) => [inv.id, inv.tenantId]));
-
-    for (const p of payments) {
-      const ptid = invoiceTenantMap.get(p.invoiceId) ?? '';
-      paySheet.addRow({
-        ...(isSuperAdmin ? { tenant: tenantNameMap.get(ptid) ?? ptid } : {}),
-        invoiceNumber: p.invoice.invoiceNumber,
-        projectNumber: p.invoice.project.projectNumber,
-        amount: toNum(p.amount),
-        mode: p.mode,
-        paymentDate: fmtDate(p.paymentDate),
-        reference: p.reference ?? '',
-        notes: p.notes ?? '',
-        createdAt: fmtDate(p.createdAt),
-      });
-    }
-
-    applyMoneyFmt(paySheet, ['amount']);
-    styleHeader(paySheet);
-    autoWidth(paySheet);
-
-    // ── Sheet 6: Follow-ups ────────────────────────────────────────────────
-
-    const fuSheet = workbook.addWorksheet('Follow-ups');
-    fuSheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'Project Number', key: 'projectNumber' },
-      { header: 'Project Name', key: 'projectName' },
-      { header: 'Status', key: 'status' },
-      { header: 'Next Follow-up', key: 'nextFollowUp' },
-      { header: 'Last Follow-up', key: 'lastFollowUp' },
-      { header: 'Assigned To', key: 'assignedTo' },
-      { header: 'Notes', key: 'notes' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    for (const fu of followUps) {
-      fuSheet.addRow({
-        ...tCol(fu.tenantId),
-        projectNumber: fu.project?.projectNumber ?? '',
-        projectName: fu.project?.name ?? '',
-        status: fu.status,
-        nextFollowUp: fmtDate(fu.nextFollowUp),
-        lastFollowUp: fmtDate(fu.lastFollowUp),
-        assignedTo: `${fu.owner.firstName} ${fu.owner.lastName}`.trim(),
-        notes: fu.notes ?? '',
-        createdAt: fmtDate(fu.createdAt),
-      });
-    }
-
-    styleHeader(fuSheet);
-    autoWidth(fuSheet);
-
-    // ── Sheet 7: Users ─────────────────────────────────────────────────────
-
-    const userSheet = workbook.addWorksheet('Users');
-    userSheet.columns = [
-      ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-      { header: 'First Name', key: 'firstName' },
-      { header: 'Last Name', key: 'lastName' },
-      { header: 'Email', key: 'email' },
-      { header: 'Roles', key: 'roles' },
-      { header: 'Is Active', key: 'isActive' },
-      { header: 'Created At', key: 'createdAt' },
-    ];
-
-    for (const u of users) {
-      userSheet.addRow({
-        ...(isSuperAdmin ? { tenant: tenantNameMap.get(u.tenantId ?? '') ?? u.tenantId ?? '' } : {}),
-        firstName: u.firstName,
-        lastName: u.lastName,
-        email: u.email,
-        roles: u.userRoles.map((ur) => ur.role.name).join(', '),
-        isActive: u.isActive ? 'Yes' : 'No',
-        createdAt: fmtDate(u.createdAt),
-      });
-    }
-
-    styleHeader(userSheet);
-    autoWidth(userSheet);
-
-    // ── Stream response ────────────────────────────────────────────────────
-
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="flowtiq-export-${today}.xlsx"`,
-    );
-
-    await workbook.xlsx.write(res);
-    res.end();
-
-    // Audit log — fire-and-forget after response
-    createAuditLog({
-      req,
-      action: 'EXPORTED',
-      module: 'export',
-      entityType: 'excel',
-      entityName: `flowtiq-export-${today}.xlsx`,
-    }).catch(() => {});
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ── Shared: build sheet rows from DB data ─────────────────────────────────────
+// ── Shared: fetch all export data ─────────────────────────────────────────────
 
 export async function fetchExportData(tenantId: string | null, isSuperAdmin: boolean) {
   const tenantFilter = isSuperAdmin ? {} : { tenantId: tenantId! };
+  // For models without their own tenantId, filter via the parent project
+  const viaProject = isSuperAdmin ? {} : { project: { tenantId: tenantId! } };
 
-  const [projects, financials, milestones, invoices, followUps, users, allTenants] =
-    await Promise.all([
-      prisma.project.findMany({
-        where: { ...tenantFilter, deletedAt: null, status: { not: 'cancelled' } },
-        include: { financial: true },
-        orderBy: { createdAt: 'asc' },
-      }),
-      prisma.projectFinancial.findMany({
-        where: tenantFilter,
-        include: { project: { select: { projectNumber: true, name: true } } },
-        orderBy: { createdAt: 'asc' },
-      }),
-      prisma.paymentMilestone.findMany({
-        where: tenantFilter,
-        include: {
-          project: { select: { projectNumber: true, name: true } },
-          linkedStage: { select: { stageName: true, stageKey: true } },
-        },
-        orderBy: { createdAt: 'asc' },
-      }),
-      prisma.invoice.findMany({
-        where: tenantFilter,
-        include: {
-          project: { select: { projectNumber: true, name: true } },
-          payments: true,
-        },
-        orderBy: { createdAt: 'asc' },
-      }),
-      prisma.followUp.findMany({
-        where: tenantFilter,
-        include: {
-          project: { select: { projectNumber: true, name: true } },
-          owner: { select: { firstName: true, lastName: true } },
-        },
-        orderBy: { createdAt: 'asc' },
-      }),
-      prisma.user.findMany({
-        where: { ...tenantFilter, isActive: true },
-        include: { userRoles: { include: { role: { select: { name: true } } } } },
-        orderBy: { createdAt: 'asc' },
-      }),
-      isSuperAdmin
-        ? prisma.tenant.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
-        : Promise.resolve([]),
-    ]);
+  const [
+    projects,
+    financials,
+    milestones,
+    invoices,
+    followUps,
+    users,
+    allTenants,
+    workflowTemplates,
+    projectStages,
+    stageSubTasks,
+    documents,
+  ] = await Promise.all([
+    // 1. Projects (include owner name + financial for contract value)
+    prisma.project.findMany({
+      where: { ...tenantFilter, deletedAt: null, status: { not: 'cancelled' } },
+      include: {
+        financial: true,
+        owner: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
 
+    // 2. Project Financials
+    prisma.projectFinancial.findMany({
+      where: tenantFilter,
+      include: { project: { select: { projectNumber: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 3. Payment Milestones
+    prisma.paymentMilestone.findMany({
+      where: tenantFilter,
+      include: {
+        project: { select: { projectNumber: true, name: true } },
+        linkedStage: { select: { stageName: true, stageKey: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 4. Invoices
+    prisma.invoice.findMany({
+      where: tenantFilter,
+      include: {
+        project: { select: { projectNumber: true, name: true } },
+        payments: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 5. Follow-ups
+    prisma.followUp.findMany({
+      where: tenantFilter,
+      include: {
+        project: { select: { projectNumber: true, name: true } },
+        owner: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 6. Users
+    prisma.user.findMany({
+      where: { ...tenantFilter, isActive: true },
+      include: { userRoles: { include: { role: { select: { name: true } } } } },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 7. All tenants (super admin only, for tenant name lookup)
+    isSuperAdmin
+      ? prisma.tenant.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
+      : Promise.resolve([]),
+
+    // 8. Workflow Templates
+    prisma.workflowTemplate.findMany({
+      where: { ...tenantFilter, isActive: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 9. Project Stages
+    prisma.projectStage.findMany({
+      where: viaProject,
+      include: {
+        project: { select: { projectNumber: true, name: true, tenantId: true } },
+        projectWorkflow: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 10. Stage Sub-tasks
+    prisma.stageSubTask.findMany({
+      where: { stage: viaProject },
+      include: {
+        stage: {
+          select: {
+            stageName: true,
+            stageKey: true,
+            project: { select: { projectNumber: true, name: true, tenantId: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+
+    // 11. Documents (metadata only — not the files themselves)
+    prisma.document.findMany({
+      where: { ...tenantFilter, isActive: true },
+      include: {
+        project: { select: { projectNumber: true, name: true } },
+        uploadedBy: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
+
+  // Invoice Payments: no tenantId on model — filter via invoice scope above
   const invoiceIds = invoices.map((inv) => inv.id);
   const payments = await prisma.invoicePayment.findMany({
     where: { invoiceId: { in: invoiceIds } },
@@ -462,37 +181,107 @@ export async function fetchExportData(tenantId: string | null, isSuperAdmin: boo
     orderBy: { paymentDate: 'asc' },
   });
 
-  return { projects, financials, milestones, invoices, payments, followUps, users, allTenants };
+  return {
+    projects, financials, milestones, invoices, payments,
+    followUps, users, allTenants,
+    workflowTemplates, projectStages, stageSubTasks, documents,
+  };
 }
 
-// Build 2D array rows for a given sheet name
 export type ExportData = Awaited<ReturnType<typeof fetchExportData>>;
+
+// ── Shared: build 2D rows for each sheet ─────────────────────────────────────
 
 export function buildSheetRows(
   sheetName: string,
   data: ExportData,
   isSuperAdmin: boolean,
 ): { headers: string[]; rows: (string | number)[][] } {
-  const { projects, financials, milestones, invoices, payments, followUps, users, allTenants } = data;
+  const {
+    projects, financials, milestones, invoices, payments,
+    followUps, users, allTenants,
+    workflowTemplates, projectStages, stageSubTasks, documents,
+  } = data;
+
   const tenantNameMap = new Map(allTenants.map((t) => [t.id, t.name]));
   const invoiceTenantMap = new Map(invoices.map((inv) => [inv.id, inv.tenantId]));
+  const userNameMap = new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
   const sa = isSuperAdmin;
   const tName = (tid: string) => (sa ? [tenantNameMap.get(tid) ?? tid] : []);
 
   if (sheetName === 'Projects') {
     const headers = [
       ...(sa ? ['Tenant'] : []),
-      'Project Number', 'Project Name', 'Status', 'Priority', 'Client Name',
-      'Start Date', 'Due Date', 'Contract Value', 'Currency', 'Billing Type', 'Created At',
+      'Project Number', 'Project Name', 'Status', 'Priority', 'Client Name', 'Location',
+      'Start Date', 'Due Date', 'Completion Date', 'Contract Value', 'Currency', 'Billing Type',
+      'Owner', 'Team Members', 'Created At',
     ];
     const rows = projects.map((p) => [
       ...tName(p.tenantId),
-      p.projectNumber, p.name, p.status, p.priority, p.clientName,
-      fmtDate(p.startDate), fmtDate(p.dueDate),
-      toNum(p.financial?.contractValue),
-      p.financial?.currency ?? 'INR',
-      p.financial?.billingType ?? '',
+      p.projectNumber, p.name, p.status, p.priority, p.clientName, p.location ?? '',
+      fmtDate(p.startDate), fmtDate(p.dueDate), fmtDate(p.completionDate),
+      toNum(p.financial?.contractValue), p.financial?.currency ?? 'INR', p.financial?.billingType ?? '',
+      `${p.owner.firstName} ${p.owner.lastName}`.trim(),
+      p.teamMembers.length,
       fmtDate(p.createdAt),
+    ]);
+    return { headers, rows };
+  }
+
+  if (sheetName === 'Workflow Templates') {
+    const headers = [
+      ...(sa ? ['Tenant'] : []),
+      'Template Name', 'Description', 'Is Default', 'Is Active', 'Stage Count', 'Stage Names', 'Created At',
+    ];
+    const rows = workflowTemplates.map((wf) => {
+      const stages = Array.isArray(wf.stages)
+        ? (wf.stages as Array<Record<string, unknown>>)
+        : [];
+      const stageNames = stages
+        .map((s) => (s['name'] ?? s['stageName'] ?? s['key'] ?? s['stageKey'] ?? '') as string)
+        .filter(Boolean)
+        .join(', ');
+      return [
+        ...tName(wf.tenantId),
+        wf.name, wf.description ?? '', wf.isDefault ? 'Yes' : 'No', wf.isActive ? 'Yes' : 'No',
+        stages.length, stageNames, fmtDate(wf.createdAt),
+      ];
+    });
+    return { headers, rows };
+  }
+
+  if (sheetName === 'Project Stages') {
+    const headers = [
+      ...(sa ? ['Tenant'] : []),
+      'Project Number', 'Project Name', 'Workflow', 'Stage Name', 'Stage Key', 'Order',
+      'Status', 'Is Required', 'Assigned To', 'Start Date', 'Completion Date', 'Notes', 'Created At',
+    ];
+    const rows = projectStages.map((s) => [
+      ...tName(s.project.tenantId),
+      s.project.projectNumber, s.project.name,
+      s.projectWorkflow?.name ?? '',
+      s.stageName, s.stageKey, s.stageOrder, s.status,
+      s.isRequired ? 'Yes' : 'No',
+      // Resolve assignedToIds to names where possible
+      s.assignedToIds.map((id) => userNameMap.get(id) ?? id).join(', '),
+      fmtDate(s.startDate), fmtDate(s.completionDate), s.notes ?? '',
+      fmtDate(s.createdAt),
+    ]);
+    return { headers, rows };
+  }
+
+  if (sheetName === 'Stage Sub-tasks') {
+    const headers = [
+      ...(sa ? ['Tenant'] : []),
+      'Project Number', 'Project Name', 'Stage Name', 'Sub-task Name', 'Description',
+      'Status', 'Is Required', 'Order', 'Notes', 'Completed At', 'Created At',
+    ];
+    const rows = stageSubTasks.map((st) => [
+      ...tName(st.stage.project.tenantId),
+      st.stage.project.projectNumber, st.stage.project.name, st.stage.stageName,
+      st.name, st.description ?? '', st.status,
+      st.isRequired ? 'Yes' : 'No', st.order, st.notes ?? '',
+      fmtDate(st.completedAt), fmtDate(st.createdAt),
     ]);
     return { headers, rows };
   }
@@ -582,16 +371,35 @@ export function buildSheetRows(
     return { headers, rows };
   }
 
+  if (sheetName === 'Documents') {
+    const headers = [
+      ...(sa ? ['Tenant'] : []),
+      'Project Number', 'Project Name', 'File Name', 'File Type', 'File Size (KB)',
+      'Version', 'Tags', 'Uploaded By', 'Created At',
+    ];
+    const rows = documents.map((doc) => [
+      ...tName(doc.tenantId),
+      doc.project.projectNumber, doc.project.name, doc.originalName, doc.fileType,
+      Math.round(Number(doc.fileSize) / 1024),
+      doc.version,
+      doc.tags.join(', '),
+      `${doc.uploadedBy.firstName} ${doc.uploadedBy.lastName}`.trim(),
+      fmtDate(doc.createdAt),
+    ]);
+    return { headers, rows };
+  }
+
   if (sheetName === 'Users') {
     const headers = [
       ...(sa ? ['Tenant'] : []),
-      'First Name', 'Last Name', 'Email', 'Roles', 'Is Active', 'Created At',
+      'First Name', 'Last Name', 'Email', 'Phone', 'Roles', 'Is Active', 'Last Login', 'Created At',
     ];
     const rows = users.map((u) => [
       ...(sa ? [tenantNameMap.get(u.tenantId ?? '') ?? u.tenantId ?? ''] : []),
-      u.firstName, u.lastName, u.email,
+      u.firstName, u.lastName, u.email, u.phone ?? '',
       u.userRoles.map((ur) => ur.role.name).join(', '),
       u.isActive ? 'Yes' : 'No',
+      fmtDate(u.lastLoginAt),
       fmtDate(u.createdAt),
     ]);
     return { headers, rows };
@@ -601,168 +409,393 @@ export function buildSheetRows(
 }
 
 export const SHEET_NAMES = [
-  'Projects', 'Project Financials', 'Payment Milestones',
-  'Invoices', 'Invoice Payments', 'Follow-ups', 'Users',
+  'Projects',
+  'Workflow Templates',
+  'Project Stages',
+  'Stage Sub-tasks',
+  'Project Financials',
+  'Payment Milestones',
+  'Invoices',
+  'Invoice Payments',
+  'Follow-ups',
+  'Documents',
+  'Users',
 ];
 
-// Build a complete ExcelJS workbook from pre-fetched export data (used by scheduled backup job)
+// Build a complete ExcelJS workbook from pre-fetched export data
 export function buildExcelWorkbook(data: ExportData, isSuperAdmin: boolean): ExcelJS.Workbook {
-  const { projects, financials, milestones, invoices, payments, followUps, users, allTenants } = data;
+  const {
+    projects, financials, milestones, invoices, payments,
+    followUps, users, allTenants,
+    workflowTemplates, projectStages, stageSubTasks, documents,
+  } = data;
+
   const tenantNameMap = new Map(allTenants.map((t) => [t.id, t.name]));
-  const tCol = (tid: string) => isSuperAdmin ? { tenant: tenantNameMap.get(tid) ?? tid } : {};
   const invoiceTenantMap = new Map(invoices.map((inv) => [inv.id, inv.tenantId]));
+  const userNameMap = new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
+  const sa = isSuperAdmin;
+  const tCol = (tid: string) => sa ? { tenant: tenantNameMap.get(tid) ?? tid } : {};
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Flowtiq';
   workbook.created = new Date();
 
-  // Sheet 1: Projects
+  // ── Sheet 1: Projects ────────────────────────────────────────────────────────
+
   const projSheet = workbook.addWorksheet('Projects');
   projSheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'Project Number', key: 'projectNumber' }, { header: 'Project Name', key: 'name' },
-    { header: 'Status', key: 'status' }, { header: 'Priority', key: 'priority' },
-    { header: 'Client Name', key: 'clientName' }, { header: 'Start Date', key: 'startDate' },
-    { header: 'Due Date', key: 'dueDate' }, { header: 'Contract Value', key: 'contractValue' },
-    { header: 'Currency', key: 'currency' }, { header: 'Billing Type', key: 'billingType' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'name' },
+    { header: 'Status', key: 'status' },
+    { header: 'Priority', key: 'priority' },
+    { header: 'Client Name', key: 'clientName' },
+    { header: 'Location', key: 'location' },
+    { header: 'Start Date', key: 'startDate' },
+    { header: 'Due Date', key: 'dueDate' },
+    { header: 'Completion Date', key: 'completionDate' },
+    { header: 'Contract Value', key: 'contractValue' },
+    { header: 'Currency', key: 'currency' },
+    { header: 'Billing Type', key: 'billingType' },
+    { header: 'Owner', key: 'owner' },
+    { header: 'Team Members', key: 'teamMembers' },
     { header: 'Created At', key: 'createdAt' },
   ];
   for (const p of projects) {
     projSheet.addRow({
-      ...tCol(p.tenantId), projectNumber: p.projectNumber, name: p.name, status: p.status,
-      priority: p.priority, clientName: p.clientName, startDate: fmtDate(p.startDate),
-      dueDate: fmtDate(p.dueDate), contractValue: toNum(p.financial?.contractValue),
+      ...tCol(p.tenantId),
+      projectNumber: p.projectNumber, name: p.name, status: p.status, priority: p.priority,
+      clientName: p.clientName, location: p.location ?? '',
+      startDate: fmtDate(p.startDate), dueDate: fmtDate(p.dueDate), completionDate: fmtDate(p.completionDate),
+      contractValue: toNum(p.financial?.contractValue),
       currency: p.financial?.currency ?? 'INR', billingType: p.financial?.billingType ?? '',
+      owner: `${p.owner.firstName} ${p.owner.lastName}`.trim(),
+      teamMembers: p.teamMembers.length,
       createdAt: fmtDate(p.createdAt),
     });
   }
-  applyMoneyFmt(projSheet, ['contractValue']); styleHeader(projSheet); autoWidth(projSheet);
+  applyMoneyFmt(projSheet, ['contractValue']);
+  styleHeader(projSheet); autoWidth(projSheet);
 
-  // Sheet 2: Project Financials
+  // ── Sheet 2: Workflow Templates ──────────────────────────────────────────────
+
+  const wfSheet = workbook.addWorksheet('Workflow Templates');
+  wfSheet.columns = [
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Template Name', key: 'name' },
+    { header: 'Description', key: 'description' },
+    { header: 'Is Default', key: 'isDefault' },
+    { header: 'Is Active', key: 'isActive' },
+    { header: 'Stage Count', key: 'stageCount' },
+    { header: 'Stage Names', key: 'stageNames' },
+    { header: 'Created At', key: 'createdAt' },
+  ];
+  for (const wf of workflowTemplates) {
+    const stages = Array.isArray(wf.stages) ? (wf.stages as Array<Record<string, unknown>>) : [];
+    const stageNames = stages
+      .map((s) => (s['name'] ?? s['stageName'] ?? s['key'] ?? s['stageKey'] ?? '') as string)
+      .filter(Boolean)
+      .join(', ');
+    wfSheet.addRow({
+      ...tCol(wf.tenantId),
+      name: wf.name, description: wf.description ?? '',
+      isDefault: wf.isDefault ? 'Yes' : 'No', isActive: wf.isActive ? 'Yes' : 'No',
+      stageCount: stages.length, stageNames, createdAt: fmtDate(wf.createdAt),
+    });
+  }
+  styleHeader(wfSheet); autoWidth(wfSheet);
+
+  // ── Sheet 3: Project Stages ──────────────────────────────────────────────────
+
+  const stageSheet = workbook.addWorksheet('Project Stages');
+  stageSheet.columns = [
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'Workflow', key: 'workflow' },
+    { header: 'Stage Name', key: 'stageName' },
+    { header: 'Stage Key', key: 'stageKey' },
+    { header: 'Order', key: 'stageOrder' },
+    { header: 'Status', key: 'status' },
+    { header: 'Is Required', key: 'isRequired' },
+    { header: 'Assigned To', key: 'assignedTo' },
+    { header: 'Start Date', key: 'startDate' },
+    { header: 'Completion Date', key: 'completionDate' },
+    { header: 'Notes', key: 'notes' },
+    { header: 'Created At', key: 'createdAt' },
+  ];
+  for (const s of projectStages) {
+    stageSheet.addRow({
+      ...tCol(s.project.tenantId),
+      projectNumber: s.project.projectNumber, projectName: s.project.name,
+      workflow: s.projectWorkflow?.name ?? '',
+      stageName: s.stageName, stageKey: s.stageKey, stageOrder: s.stageOrder, status: s.status,
+      isRequired: s.isRequired ? 'Yes' : 'No',
+      assignedTo: s.assignedToIds.map((id) => userNameMap.get(id) ?? id).join(', '),
+      startDate: fmtDate(s.startDate), completionDate: fmtDate(s.completionDate),
+      notes: s.notes ?? '', createdAt: fmtDate(s.createdAt),
+    });
+  }
+  styleHeader(stageSheet); autoWidth(stageSheet);
+
+  // ── Sheet 4: Stage Sub-tasks ─────────────────────────────────────────────────
+
+  const subTaskSheet = workbook.addWorksheet('Stage Sub-tasks');
+  subTaskSheet.columns = [
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'Stage Name', key: 'stageName' },
+    { header: 'Sub-task Name', key: 'name' },
+    { header: 'Description', key: 'description' },
+    { header: 'Status', key: 'status' },
+    { header: 'Is Required', key: 'isRequired' },
+    { header: 'Order', key: 'order' },
+    { header: 'Notes', key: 'notes' },
+    { header: 'Completed At', key: 'completedAt' },
+    { header: 'Created At', key: 'createdAt' },
+  ];
+  for (const st of stageSubTasks) {
+    subTaskSheet.addRow({
+      ...tCol(st.stage.project.tenantId),
+      projectNumber: st.stage.project.projectNumber, projectName: st.stage.project.name,
+      stageName: st.stage.stageName, name: st.name, description: st.description ?? '',
+      status: st.status, isRequired: st.isRequired ? 'Yes' : 'No', order: st.order,
+      notes: st.notes ?? '', completedAt: fmtDate(st.completedAt), createdAt: fmtDate(st.createdAt),
+    });
+  }
+  styleHeader(subTaskSheet); autoWidth(subTaskSheet);
+
+  // ── Sheet 5: Project Financials ──────────────────────────────────────────────
+
   const finSheet = workbook.addWorksheet('Project Financials');
   finSheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'Project Number', key: 'projectNumber' }, { header: 'Project Name', key: 'projectName' },
-    { header: 'Contract Value', key: 'contractValue' }, { header: 'Currency', key: 'currency' },
-    { header: 'Billing Type', key: 'billingType' }, { header: 'Notes', key: 'notes' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'Contract Value', key: 'contractValue' },
+    { header: 'Currency', key: 'currency' },
+    { header: 'Billing Type', key: 'billingType' },
+    { header: 'Notes', key: 'notes' },
     { header: 'Created At', key: 'createdAt' },
   ];
   for (const f of financials) {
     finSheet.addRow({
-      ...tCol(f.tenantId), projectNumber: f.project.projectNumber, projectName: f.project.name,
-      contractValue: toNum(f.contractValue), currency: f.currency, billingType: f.billingType,
-      notes: f.notes ?? '', createdAt: fmtDate(f.createdAt),
+      ...tCol(f.tenantId),
+      projectNumber: f.project.projectNumber, projectName: f.project.name,
+      contractValue: toNum(f.contractValue), currency: f.currency,
+      billingType: f.billingType, notes: f.notes ?? '', createdAt: fmtDate(f.createdAt),
     });
   }
-  applyMoneyFmt(finSheet, ['contractValue']); styleHeader(finSheet); autoWidth(finSheet);
+  applyMoneyFmt(finSheet, ['contractValue']);
+  styleHeader(finSheet); autoWidth(finSheet);
 
-  // Sheet 3: Payment Milestones
+  // ── Sheet 6: Payment Milestones ──────────────────────────────────────────────
+
   const milSheet = workbook.addWorksheet('Payment Milestones');
   milSheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'Project Number', key: 'projectNumber' }, { header: 'Project Name', key: 'projectName' },
-    { header: 'Milestone Name', key: 'name' }, { header: 'Amount', key: 'amount' },
-    { header: 'Status', key: 'status' }, { header: 'Due Date', key: 'dueDate' },
-    { header: 'Linked Stage', key: 'linkedStage' }, { header: 'Notes', key: 'notes' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'Milestone Name', key: 'name' },
+    { header: 'Amount', key: 'amount' },
+    { header: 'Status', key: 'status' },
+    { header: 'Due Date', key: 'dueDate' },
+    { header: 'Linked Stage', key: 'linkedStage' },
+    { header: 'Notes', key: 'notes' },
     { header: 'Created At', key: 'createdAt' },
   ];
   for (const m of milestones) {
     milSheet.addRow({
-      ...tCol(m.tenantId), projectNumber: m.project.projectNumber, projectName: m.project.name,
+      ...tCol(m.tenantId),
+      projectNumber: m.project.projectNumber, projectName: m.project.name,
       name: m.name, amount: toNum(m.amount), status: m.status, dueDate: fmtDate(m.dueDate),
       linkedStage: m.linkedStage?.stageName ?? m.linkedStage?.stageKey ?? '',
       notes: m.notes ?? '', createdAt: fmtDate(m.createdAt),
     });
   }
-  applyMoneyFmt(milSheet, ['amount']); styleHeader(milSheet); autoWidth(milSheet);
+  applyMoneyFmt(milSheet, ['amount']);
+  styleHeader(milSheet); autoWidth(milSheet);
 
-  // Sheet 4: Invoices
+  // ── Sheet 7: Invoices ────────────────────────────────────────────────────────
+
   const invSheet = workbook.addWorksheet('Invoices');
   invSheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'Invoice Number', key: 'invoiceNumber' }, { header: 'Project Number', key: 'projectNumber' },
-    { header: 'Project Name', key: 'projectName' }, { header: 'Title', key: 'title' },
-    { header: 'Status', key: 'status' }, { header: 'Issued At', key: 'issuedAt' },
-    { header: 'Due Date', key: 'dueDate' }, { header: 'Amount', key: 'amount' },
-    { header: 'Tax Amount', key: 'taxAmount' }, { header: 'Total Amount', key: 'totalAmount' },
-    { header: 'Amount Paid', key: 'amountPaid' }, { header: 'Outstanding', key: 'outstanding' },
-    { header: 'Notes', key: 'notes' }, { header: 'Created At', key: 'createdAt' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Invoice Number', key: 'invoiceNumber' },
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'Title', key: 'title' },
+    { header: 'Status', key: 'status' },
+    { header: 'Issued At', key: 'issuedAt' },
+    { header: 'Due Date', key: 'dueDate' },
+    { header: 'Amount', key: 'amount' },
+    { header: 'Tax Amount', key: 'taxAmount' },
+    { header: 'Total Amount', key: 'totalAmount' },
+    { header: 'Amount Paid', key: 'amountPaid' },
+    { header: 'Outstanding', key: 'outstanding' },
+    { header: 'Notes', key: 'notes' },
+    { header: 'Created At', key: 'createdAt' },
   ];
   for (const inv of invoices) {
     const totalAmount = toNum(inv.totalAmount);
     const amountPaid = inv.payments.reduce((s, p) => s + toNum(p.amount), 0);
     invSheet.addRow({
-      ...tCol(inv.tenantId), invoiceNumber: inv.invoiceNumber, projectNumber: inv.project.projectNumber,
+      ...tCol(inv.tenantId),
+      invoiceNumber: inv.invoiceNumber, projectNumber: inv.project.projectNumber,
       projectName: inv.project.name, title: inv.title, status: inv.status,
       issuedAt: fmtDate(inv.issuedAt), dueDate: fmtDate(inv.dueDate),
       amount: toNum(inv.amount), taxAmount: toNum(inv.taxAmount), totalAmount, amountPaid,
-      outstanding: Math.max(0, totalAmount - amountPaid), notes: inv.notes ?? '',
-      createdAt: fmtDate(inv.createdAt),
+      outstanding: Math.max(0, totalAmount - amountPaid),
+      notes: inv.notes ?? '', createdAt: fmtDate(inv.createdAt),
     });
   }
   applyMoneyFmt(invSheet, ['amount', 'taxAmount', 'totalAmount', 'amountPaid', 'outstanding']);
   styleHeader(invSheet); autoWidth(invSheet);
 
-  // Sheet 5: Invoice Payments
+  // ── Sheet 8: Invoice Payments ────────────────────────────────────────────────
+
   const paySheet = workbook.addWorksheet('Invoice Payments');
   paySheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'Invoice Number', key: 'invoiceNumber' }, { header: 'Project Number', key: 'projectNumber' },
-    { header: 'Amount', key: 'amount' }, { header: 'Payment Mode', key: 'mode' },
-    { header: 'Payment Date', key: 'paymentDate' }, { header: 'Reference', key: 'reference' },
-    { header: 'Notes', key: 'notes' }, { header: 'Created At', key: 'createdAt' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Invoice Number', key: 'invoiceNumber' },
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Amount', key: 'amount' },
+    { header: 'Payment Mode', key: 'mode' },
+    { header: 'Payment Date', key: 'paymentDate' },
+    { header: 'Reference', key: 'reference' },
+    { header: 'Notes', key: 'notes' },
+    { header: 'Created At', key: 'createdAt' },
   ];
   for (const p of payments) {
     const ptid = invoiceTenantMap.get(p.invoiceId) ?? '';
     paySheet.addRow({
-      ...(isSuperAdmin ? { tenant: tenantNameMap.get(ptid) ?? ptid } : {}),
+      ...(sa ? { tenant: tenantNameMap.get(ptid) ?? ptid } : {}),
       invoiceNumber: p.invoice.invoiceNumber, projectNumber: p.invoice.project.projectNumber,
       amount: toNum(p.amount), mode: p.mode, paymentDate: fmtDate(p.paymentDate),
       reference: p.reference ?? '', notes: p.notes ?? '', createdAt: fmtDate(p.createdAt),
     });
   }
-  applyMoneyFmt(paySheet, ['amount']); styleHeader(paySheet); autoWidth(paySheet);
+  applyMoneyFmt(paySheet, ['amount']);
+  styleHeader(paySheet); autoWidth(paySheet);
 
-  // Sheet 6: Follow-ups
+  // ── Sheet 9: Follow-ups ──────────────────────────────────────────────────────
+
   const fuSheet = workbook.addWorksheet('Follow-ups');
   fuSheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'Project Number', key: 'projectNumber' }, { header: 'Project Name', key: 'projectName' },
-    { header: 'Status', key: 'status' }, { header: 'Next Follow-up', key: 'nextFollowUp' },
-    { header: 'Last Follow-up', key: 'lastFollowUp' }, { header: 'Assigned To', key: 'assignedTo' },
-    { header: 'Notes', key: 'notes' }, { header: 'Created At', key: 'createdAt' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'Status', key: 'status' },
+    { header: 'Next Follow-up', key: 'nextFollowUp' },
+    { header: 'Last Follow-up', key: 'lastFollowUp' },
+    { header: 'Assigned To', key: 'assignedTo' },
+    { header: 'Notes', key: 'notes' },
+    { header: 'Created At', key: 'createdAt' },
   ];
   for (const fu of followUps) {
     fuSheet.addRow({
-      ...tCol(fu.tenantId), projectNumber: fu.project?.projectNumber ?? '',
-      projectName: fu.project?.name ?? '', status: fu.status,
-      nextFollowUp: fmtDate(fu.nextFollowUp), lastFollowUp: fmtDate(fu.lastFollowUp),
+      ...tCol(fu.tenantId),
+      projectNumber: fu.project?.projectNumber ?? '', projectName: fu.project?.name ?? '',
+      status: fu.status, nextFollowUp: fmtDate(fu.nextFollowUp), lastFollowUp: fmtDate(fu.lastFollowUp),
       assignedTo: `${fu.owner.firstName} ${fu.owner.lastName}`.trim(),
       notes: fu.notes ?? '', createdAt: fmtDate(fu.createdAt),
     });
   }
   styleHeader(fuSheet); autoWidth(fuSheet);
 
-  // Sheet 7: Users
+  // ── Sheet 10: Documents ──────────────────────────────────────────────────────
+
+  const docSheet = workbook.addWorksheet('Documents');
+  docSheet.columns = [
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'Project Number', key: 'projectNumber' },
+    { header: 'Project Name', key: 'projectName' },
+    { header: 'File Name', key: 'originalName' },
+    { header: 'File Type', key: 'fileType' },
+    { header: 'File Size (KB)', key: 'fileSizeKb' },
+    { header: 'Version', key: 'version' },
+    { header: 'Tags', key: 'tags' },
+    { header: 'Uploaded By', key: 'uploadedBy' },
+    { header: 'Created At', key: 'createdAt' },
+  ];
+  for (const doc of documents) {
+    docSheet.addRow({
+      ...tCol(doc.tenantId),
+      projectNumber: doc.project.projectNumber, projectName: doc.project.name,
+      originalName: doc.originalName, fileType: doc.fileType,
+      fileSizeKb: Math.round(Number(doc.fileSize) / 1024),
+      version: doc.version, tags: doc.tags.join(', '),
+      uploadedBy: `${doc.uploadedBy.firstName} ${doc.uploadedBy.lastName}`.trim(),
+      createdAt: fmtDate(doc.createdAt),
+    });
+  }
+  styleHeader(docSheet); autoWidth(docSheet);
+
+  // ── Sheet 11: Users ──────────────────────────────────────────────────────────
+
   const userSheet = workbook.addWorksheet('Users');
   userSheet.columns = [
-    ...(isSuperAdmin ? [{ header: 'Tenant', key: 'tenant' }] : []),
-    { header: 'First Name', key: 'firstName' }, { header: 'Last Name', key: 'lastName' },
-    { header: 'Email', key: 'email' }, { header: 'Roles', key: 'roles' },
-    { header: 'Is Active', key: 'isActive' }, { header: 'Created At', key: 'createdAt' },
+    ...(sa ? [{ header: 'Tenant', key: 'tenant' }] : []),
+    { header: 'First Name', key: 'firstName' },
+    { header: 'Last Name', key: 'lastName' },
+    { header: 'Email', key: 'email' },
+    { header: 'Phone', key: 'phone' },
+    { header: 'Roles', key: 'roles' },
+    { header: 'Is Active', key: 'isActive' },
+    { header: 'Last Login', key: 'lastLoginAt' },
+    { header: 'Created At', key: 'createdAt' },
   ];
   for (const u of users) {
     userSheet.addRow({
-      ...(isSuperAdmin ? { tenant: tenantNameMap.get(u.tenantId ?? '') ?? u.tenantId ?? '' } : {}),
-      firstName: u.firstName, lastName: u.lastName, email: u.email,
+      ...(sa ? { tenant: tenantNameMap.get(u.tenantId ?? '') ?? u.tenantId ?? '' } : {}),
+      firstName: u.firstName, lastName: u.lastName, email: u.email, phone: u.phone ?? '',
       roles: u.userRoles.map((ur) => ur.role.name).join(', '),
-      isActive: u.isActive ? 'Yes' : 'No', createdAt: fmtDate(u.createdAt),
+      isActive: u.isActive ? 'Yes' : 'No',
+      lastLoginAt: fmtDate(u.lastLoginAt),
+      createdAt: fmtDate(u.createdAt),
     });
   }
   styleHeader(userSheet); autoWidth(userSheet);
 
   return workbook;
 }
+
+// ── GET /api/export/excel ─────────────────────────────────────────────────────
+
+exportRouter.get('/excel', requirePermission('reports:view'), async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const isSuperAdmin = authReq.user.isSuperAdmin;
+    const tenantId = authReq.user.tenantId as string | null;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const exportData = await fetchExportData(isSuperAdmin ? null : tenantId, isSuperAdmin);
+    const workbook = buildExcelWorkbook(exportData, isSuperAdmin);
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="flowtiq-export-${today}.xlsx"`,
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+    createAuditLog({
+      req,
+      action: 'EXPORTED',
+      module: 'export',
+      entityType: 'excel',
+      entityName: `flowtiq-export-${today}.xlsx`,
+    }).catch(() => {});
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ── GET /api/export/google-sheets/config ─────────────────────────────────────
 
@@ -822,20 +855,17 @@ exportRouter.put(
       };
 
       // Validate service account JSON if provided
-      let parsedSA: Record<string, unknown> | null = null;
       if (googleServiceAccountJson !== undefined) {
+        let parsedSA: Record<string, unknown>;
         try {
           parsedSA = JSON.parse(googleServiceAccountJson) as Record<string, unknown>;
         } catch {
           return res.status(400).json({ success: false, error: 'Invalid service account JSON' });
         }
         const required = ['type', 'project_id', 'private_key', 'client_email'];
-        const missing = required.filter((k) => !parsedSA![k]);
+        const missing = required.filter((k) => !parsedSA[k]);
         if (missing.length > 0) {
-          return res.status(400).json({
-            success: false,
-            error: 'Service account JSON missing required fields',
-          });
+          return res.status(400).json({ success: false, error: 'Service account JSON missing required fields' });
         }
       }
 
@@ -918,7 +948,6 @@ exportRouter.post(
         const sheets = google.sheets({ version: 'v4', auth });
         const spreadsheetId = config.googleSpreadsheetId;
 
-        // Fetch data
         const exportData = await fetchExportData(isSuperAdmin ? null : tenantId, isSuperAdmin);
 
         // Get existing sheet names
@@ -942,11 +971,7 @@ exportRouter.post(
 
         // Clear + write each sheet
         for (const sheetName of SHEET_NAMES) {
-          await sheets.spreadsheets.values.clear({
-            spreadsheetId,
-            range: sheetName,
-          });
-
+          await sheets.spreadsheets.values.clear({ spreadsheetId, range: sheetName });
           const { headers, rows } = buildSheetRows(sheetName, exportData, isSuperAdmin);
           await sheets.spreadsheets.values.update({
             spreadsheetId,
@@ -956,13 +981,11 @@ exportRouter.post(
           });
         }
 
-        // Update sync status
         await prisma.tenantExportConfig.update({
           where: { tenantId },
           data: { lastSyncedAt: new Date(), lastSyncStatus: 'success', lastSyncError: null },
         });
 
-        // Record backup run
         await prisma.tenantBackupRun.create({
           data: {
             tenantId,
@@ -988,7 +1011,6 @@ exportRouter.post(
         });
       } catch (syncErr) {
         const raw = syncErr instanceof Error ? syncErr.message : String(syncErr);
-        // Friendly permission error
         const errorMessage = raw.includes('403') || raw.toLowerCase().includes('permission')
           ? `Permission denied. Share the spreadsheet with ${clientEmail} as Editor.`
           : raw;
@@ -999,13 +1021,7 @@ exportRouter.post(
         }).catch(() => {});
 
         await prisma.tenantBackupRun.create({
-          data: {
-            tenantId,
-            type: 'google_sheets',
-            status: 'error',
-            errorMessage,
-            triggeredBy: 'manual',
-          },
+          data: { tenantId, type: 'google_sheets', status: 'error', errorMessage, triggeredBy: 'manual' },
         }).catch(() => {});
 
         createAuditLog({
@@ -1033,7 +1049,7 @@ exportRouter.get('/backup-runs', requirePermission('reports:view'), async (req, 
   try {
     const authReq = req as AuthRequest;
     const tenantId = authReq.user.tenantId as string;
-    const limit = Math.min(50, parseInt(req.query.limit as string ?? '10', 10));
+    const limit = Math.min(50, parseInt((req.query.limit as string) ?? '10', 10));
 
     const [items, total] = await Promise.all([
       prisma.tenantBackupRun.findMany({
