@@ -618,6 +618,128 @@ export interface SuperAdminStats {
 }
 
 // =============================================
+// CASHFLOW / FINANCE
+// =============================================
+
+export type BillingType = 'milestone' | 'time_material' | 'fixed';
+export type MilestoneStatus = 'pending' | 'due' | 'invoiced' | 'paid';
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'cancelled';
+export type PaymentMode = 'bank_transfer' | 'cheque' | 'cash' | 'upi' | 'other';
+
+export interface ProjectFinancial {
+  id: string;
+  projectId: string;
+  tenantId: string;
+  contractValue: number;
+  currency: string;
+  billingType: BillingType;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentMilestone {
+  id: string;
+  projectId: string;
+  tenantId: string;
+  name: string;
+  amount: number;
+  percentage?: number;
+  linkedStageId?: string;
+  dueDate?: string;
+  status: MilestoneStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  linkedStage?: ProjectStage;
+}
+
+export interface Invoice {
+  id: string;
+  projectId: string;
+  tenantId: string;
+  invoiceNumber: string;
+  title: string;
+  amount: number;
+  taxAmount: number;
+  totalAmount: number;
+  dueDate?: string;
+  status: InvoiceStatus;
+  notes?: string;
+  issuedAt?: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  payments?: InvoicePayment[];
+  // computed
+  totalPaid?: number;
+  outstanding?: number;
+}
+
+export interface InvoicePayment {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  paymentDate: string;
+  mode: PaymentMode;
+  reference?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractSummary {
+  totalContractValue: number;
+  totalInvoiced: number;
+  totalReceived: number;
+  outstanding: number;
+  currency: string;
+}
+
+export interface CreateProjectFinancialInput {
+  contractValue: number;
+  currency?: string;
+  billingType?: BillingType;
+  notes?: string;
+}
+
+export interface CreatePaymentMilestoneInput {
+  name: string;
+  amount: number;
+  percentage?: number;
+  linkedStageId?: string;
+  dueDate?: string;
+  notes?: string;
+}
+
+export interface UpdatePaymentMilestoneInput {
+  name?: string;
+  amount?: number;
+  percentage?: number;
+  linkedStageId?: string;
+  dueDate?: string;
+  status?: MilestoneStatus;
+  notes?: string;
+}
+
+export interface CreateInvoiceInput {
+  invoiceNumber: string;
+  title: string;
+  amount: number;
+  taxAmount?: number;
+  dueDate?: string;
+  notes?: string;
+}
+
+export interface CreateInvoicePaymentInput {
+  amount: number;
+  paymentDate: string;
+  mode?: PaymentMode;
+  reference?: string;
+  notes?: string;
+}
+
+// =============================================
 // API RESPONSE TYPES
 // =============================================
 

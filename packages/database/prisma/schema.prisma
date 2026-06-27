@@ -38,6 +38,9 @@ model Tenant {
   deviceTokens            DeviceToken[]
   notificationPreferences UserNotificationPreference[]
   pushCredentials         TenantPushCredentials?
+  projectFinancials       ProjectFinancial[]
+  paymentMilestones       PaymentMilestone[]
+  invoices                Invoice[]
 
   @@map("tenants")
 }
@@ -211,6 +214,9 @@ model Project {
   documents        Document[]
   userRoles        UserRole[]
   projectWorkflows ProjectWorkflow[]
+  financial        ProjectFinancial?
+  paymentMilestones PaymentMilestone[]
+  invoices         Invoice[]
 
   @@unique([tenantId, projectNumber])
   @@map("projects")
@@ -264,11 +270,12 @@ model ProjectStage {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectWorkflow ProjectWorkflow? @relation(fields: [projectWorkflowId], references: [id])
-  stageHistory    StageHistory[]
-  documents       Document[]
-  subTasks        StageSubTask[]
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectWorkflow   ProjectWorkflow?  @relation(fields: [projectWorkflowId], references: [id])
+  stageHistory      StageHistory[]
+  documents         Document[]
+  subTasks          StageSubTask[]
+  paymentMilestones PaymentMilestone[]
 
   @@index([projectId])
   @@index([projectWorkflowId])
@@ -512,4 +519,94 @@ model TenantPushCredentials {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_push_credentials")
+}
+
+// =============================================
+// CASHFLOW MANAGEMENT
+// =============================================
+
+// billingType: milestone | time_material | fixed
+model ProjectFinancial {
+  id            String   @id @default(cuid())
+  projectId     String   @unique
+  tenantId      String
+  contractValue Decimal  @default(0) @db.Decimal(15, 2)
+  currency      String   @default("INR")
+  billingType   String   @default("milestone")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("project_financials")
+}
+
+// status: pending | due | invoiced | paid
+model PaymentMilestone {
+  id            String    @id @default(cuid())
+  projectId     String
+  tenantId      String
+  name          String
+  amount        Decimal   @db.Decimal(15, 2)
+  percentage    Decimal?  @db.Decimal(5, 2)
+  linkedStageId String?
+  dueDate       DateTime?
+  status        String    @default("pending")
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  linkedStage ProjectStage? @relation(fields: [linkedStageId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@map("payment_milestones")
+}
+
+// status: draft | sent | partial | paid | cancelled
+model Invoice {
+  id            String    @id @default(cuid())
+  projectId     String
+  tenantId      String
+  invoiceNumber String
+  title         String
+  amount        Decimal   @db.Decimal(15, 2)
+  taxAmount     Decimal   @default(0) @db.Decimal(15, 2)
+  totalAmount   Decimal   @db.Decimal(15, 2)
+  dueDate       DateTime?
+  status        String    @default("draft")
+  notes         String?
+  issuedAt      DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project  Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments InvoicePayment[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([projectId])
+  @@map("invoices")
+}
+
+// mode: bank_transfer | cheque | cash | upi | other
+model InvoicePayment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  amount      Decimal  @db.Decimal(15, 2)
+  paymentDate DateTime
+  mode        String   @default("bank_transfer")
+  reference   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_payments")
 }

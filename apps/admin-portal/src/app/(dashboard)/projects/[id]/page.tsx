@@ -9,8 +9,9 @@ import {
   FileText, Upload, History, ChevronDown, ChevronUp, X,
   User, Calendar, GitBranch, AlertTriangle, Plus, Paperclip,
   ChevronRight, ListChecks, Eye, Download, RefreshCw,
-  Lock, Unlock, GripVertical, Search, MessageSquare, StickyNote, Edit,
+  Lock, Unlock, GripVertical, Search, MessageSquare, StickyNote, Edit, DollarSign,
 } from 'lucide-react';
+import { FinanceTab } from './FinanceTab';
 import Link from 'next/link';
 import {
   formatDate, formatDateTime, getStatusBadgeClass, getPriorityBadgeClass, cn, getErrorMessage,
@@ -1197,10 +1198,10 @@ export default function ProjectDetailPage() {
 
   const initialTab = (() => {
     const t = searchParams.get('tab');
-    if (t === 'documents' || t === 'followups') return t;
+    if (t === 'documents' || t === 'followups' || t === 'finance') return t;
     return 'workflows';
   })();
-  const [activeTab, setActiveTab] = useState<'workflows' | 'documents' | 'followups'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'workflows' | 'documents' | 'followups' | 'finance'>(initialTab);
   const [showAddWorkflow, setShowAddWorkflow] = useState(false);
   const [wfOrder, setWfOrder] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -1299,6 +1300,7 @@ export default function ProjectDetailPage() {
     { key: 'workflows', label: `Workflows (${projectWorkflows.length})`, icon: GitBranch },
     { key: 'documents', label: 'Documents', icon: FileText },
     { key: 'followups', label: 'Follow-ups', icon: Clock },
+    { key: 'finance', label: 'Finance', icon: DollarSign },
   ] as const;
 
   return (
@@ -1494,6 +1496,13 @@ export default function ProjectDetailPage() {
         )}
 
         {activeTab === 'documents' && <DocumentsTab project={project} />}
+
+        {activeTab === 'finance' && (
+          <FinanceTab
+            projectId={project.id}
+            stages={(project.stages || project.projectWorkflows?.flatMap((pw) => (pw.stages || [])) || []) as ProjectStage[]}
+          />
+        )}
 
         {activeTab === 'followups' && (
           <div className="space-y-3">

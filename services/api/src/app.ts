@@ -20,6 +20,7 @@ import { seedRouter } from './routes/seed';
 import { projectWorkflowsRouter } from './routes/project-workflows';
 import { deviceTokenRouter } from './routes/deviceTokens';
 import { notificationPreferencesRouter } from './routes/notificationPreferences';
+import { financeRouter } from './routes/finance';
 
 export const app = express();
 
@@ -75,6 +76,7 @@ app.use('/api/project-workflows', projectWorkflowsRouter);
 app.use('/api/seed', seedRouter);
 app.use('/api/users', deviceTokenRouter);
 app.use('/api/users', notificationPreferencesRouter);
+app.use('/api/finance', financeRouter);
 
 // 404 handler
 app.use((_req, res) => {

@@ -326,6 +326,14 @@ stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, 
       }
     }
 
+    // Auto-mark linked payment milestones as "due" when stage is completed
+    if (newStatus === 'completed' && previousStatus !== 'completed') {
+      await prisma.paymentMilestone.updateMany({
+        where: { linkedStageId: stage.id, status: 'pending' },
+        data: { status: 'due' },
+      });
+    }
+
     // AC-2: Push for stage status update — notify all project team members (exclude acting user)
     if (status !== undefined && status !== previousStatus) {
       const projectForPush = await prisma.project.findUnique({
