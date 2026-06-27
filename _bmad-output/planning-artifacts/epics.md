@@ -1,6 +1,6 @@
 ---
 stepsCompleted: [1, 2, 3, 4]
-epics: [0, 1, 2, 3, 4]
+epics: [0, 1, 2, 3, 4, 5]
 inputDocuments:
   - '_bmad-output/planning-artifacts/prds/prd-Flowtiq-2026-06-19/prd.md'
   - '_bmad-output/planning-artifacts/architecture.md'
@@ -153,3 +153,10 @@ Vastudeep Associates can distribute their own branded Flowtiq app from the App S
 **Stories:** 4.1 Tenant config system · 4.2 Android signing + build · 4.3 iOS signing + build · 4.4 Deep link domain config · 4.5 GitHub Actions pipeline · 4.6 Vastudeep reference build + store submission
 
 **Dependency chain:** E1 → E3; E2 → E3; E3 → E4. E1 and E2 can be developed in parallel.
+
+### Epic 5: Data Export & Backup System
+Admins can download a complete Excel workbook of all project and financial data on demand, push data into a configured Google Sheet with one click, and configure a daily or weekly automatic backup that runs without any manual action.
+**Features covered:** On-demand Excel export, Google Sheets Service Account sync, scheduled cron backup, Cloudinary Excel archival, backup history log, admin notifications on backup completion.
+**Stories:** 5.1 On-demand Excel export · 5.2 Google Sheets integration & manual sync · 5.3 Scheduled auto-backup (daily/weekly)
+
+**Dependency chain:** 5.1 must complete before 5.2 (Settings tab). 5.2 must complete before 5.3 (uses TenantExportConfig model and sync logic). E5 is independent of E1–E4.

@@ -114,6 +114,11 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
 
   const prevUnreadRef = useRef<number | null>(null);
   useEffect(() => {
+    // Skip while data hasn't loaded yet — unreadCount defaults to 0 before the
+    // first fetch completes, which would make every page refresh look like new
+    // notifications arriving (0 → N triggers the toast incorrectly).
+    if (!notifData) return;
+
     if (prevUnreadRef.current !== null && unreadCount > prevUnreadRef.current) {
       playNotificationSound();
       const newest = previewNotifs[0];
@@ -131,7 +136,7 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
       }
     }
     prevUnreadRef.current = unreadCount;
-  }, [unreadCount, previewNotifs]);
+  }, [unreadCount, previewNotifs, notifData]);
   const initials = user ? getInitials(user.firstName, user.lastName) : '';
   const avatarColor = user ? getAvatarColor(`${user.firstName} ${user.lastName}`) : 'bg-blue-500';
 

@@ -4,7 +4,7 @@ baseline_commit: 7762c2c38406151366caf98dfc687bb738582c84
 
 # Story: Cashflow Management — Phase 1 & 2
 
-**Status:** in-progress
+**Status:** review
 
 ## Story
 As an admin, I want to track the financial health of each project — setting contract values, defining payment milestones linked to workflow stages, raising invoices, and recording payments — so I can maintain full cashflow visibility per project without leaving the portal.
@@ -36,7 +36,7 @@ As an admin, I want to track the financial health of each project — setting co
   - [x] T3.2: Contract summary card (invoiced vs received vs outstanding)
   - [x] T3.3: Payment milestones section (list + create/edit/delete modal)
   - [x] T3.4: Invoices section (list + create modal + payment recording)
-- [ ] T4: Push and verify no regressions
+- [x] T4: Push and verify no regressions
 
 ## Dev Agent Record
 
@@ -52,3 +52,10 @@ As an admin, I want to track the financial health of each project — setting co
 - 2026-06-27: Story created, implementation starting
 
 ### Completion Notes
+- Prisma schema: 4 new models (ProjectFinancial, PaymentMilestone, Invoice, InvoicePayment) with Decimal(15,2) for money. Relations added on Project, ProjectStage, Tenant. db:push confirmed sync.
+- Shared-types: 10+ new exported types and interfaces covering all finance entities.
+- Backend /api/finance router: GET snapshot, POST/PATCH contract, full CRUD for milestones, invoices, payments. Invoice status auto-updates (draft→sent→partial/paid) on payment record/delete. Tenant-scoped throughout.
+- stages.ts hook: `paymentMilestone.updateMany({ status: 'due' })` fires when a stage transitions to `completed`.
+- Frontend FinanceTab.tsx (~600 lines): ContractModal, MilestoneModal, InvoiceModal, RecordPaymentModal, InvoiceRow (expandable with payment list), SummaryCard with dual progress bars, milestone status inline dropdown, invoice health snapshot. All forms use react-hook-form + zod. All mutations use TanStack React Query with cache invalidation.
+- Finance tab added to project detail page alongside existing Workflows/Documents/Follow-ups tabs — no existing tab or functionality altered.
+- Full monorepo type-check: 3/3 packages pass, 0 errors.
