@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { setupForegroundMessages } from '@/lib/webPush';
@@ -10,7 +10,13 @@ import { NotificationToast } from '@/components/NotificationToast';
 
 export function ServiceWorkerRegistrar() {
   const router = useRouter();
+  const routerRef = useRef(router);
   const isAuthenticated = useAuthStore((s) => !!s.user);
+
+  // Keep routerRef current without causing the FCM effect to re-run
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   useEffect(() => {
     // Only register in production — in dev the SW caches stale JS chunks and breaks HMR
@@ -22,7 +28,10 @@ export function ServiceWorkerRegistrar() {
     });
   }, []);
 
-  // Show foreground push notifications as custom toasts while the app tab is open
+  // Show foreground push notifications as custom toasts while the app tab is open.
+  // Effect runs once per auth session — router is accessed via ref to avoid
+  // re-subscribing the FCM listener on every navigation (which would cause
+  // buffered messages to re-deliver on each page change).
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -36,7 +45,7 @@ export function ServiceWorkerRegistrar() {
             t={t}
             title={title}
             body={body}
-            onNavigate={() => router.push(deepLinkUrl)}
+            onNavigate={() => routerRef.current.push(deepLinkUrl)}
           />
         ),
         { duration: 7000 },
@@ -48,7 +57,7 @@ export function ServiceWorkerRegistrar() {
     return () => {
       unsub?.();
     };
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated]); // intentionally excludes router — use routerRef instead
 
   return null;
 }
