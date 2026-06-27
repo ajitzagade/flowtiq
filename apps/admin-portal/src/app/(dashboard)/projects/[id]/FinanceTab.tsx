@@ -59,6 +59,8 @@ const INVOICE_STATUS_MAP: Record<InvoiceStatus, { label: string; cls: string }> 
 };
 
 function fmt(amount: number, currency = 'INR') {
+  if (amount >= 10000000) return `${currency} ${(amount / 10000000).toFixed(1)}Cr`;
+  if (amount >= 100000) return `${currency} ${(amount / 100000).toFixed(1)}L`;
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
 }
 
@@ -80,22 +82,22 @@ function SummaryCard({ summary }: { summary: ContractSummary }) {
         </div>
         <h3 className="font-semibold text-slate-800">Contract Summary</h3>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Contract Value</p>
-          <p className="text-xl font-bold text-slate-900">{fmt(summary.totalContractValue, summary.currency)}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5">
+        <div className="space-y-0.5">
+          <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wide">Contract</p>
+          <p className="text-base sm:text-xl font-bold text-slate-900 break-all">{fmt(summary.totalContractValue, summary.currency)}</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Invoiced</p>
-          <p className="text-xl font-bold text-blue-600">{fmt(summary.totalInvoiced, summary.currency)}</p>
+        <div className="space-y-0.5">
+          <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wide">Invoiced</p>
+          <p className="text-base sm:text-xl font-bold text-blue-600 break-all">{fmt(summary.totalInvoiced, summary.currency)}</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Received</p>
-          <p className="text-xl font-bold text-emerald-600">{fmt(summary.totalReceived, summary.currency)}</p>
+        <div className="space-y-0.5">
+          <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wide">Received</p>
+          <p className="text-base sm:text-xl font-bold text-emerald-600 break-all">{fmt(summary.totalReceived, summary.currency)}</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Outstanding</p>
-          <p className="text-xl font-bold text-amber-600">{fmt(summary.outstanding, summary.currency)}</p>
+        <div className="space-y-0.5">
+          <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wide">Outstanding</p>
+          <p className="text-base sm:text-xl font-bold text-amber-600 break-all">{fmt(summary.outstanding, summary.currency)}</p>
         </div>
       </div>
       <div className="space-y-2.5">
@@ -580,13 +582,14 @@ function InvoiceRow({
       <div className="border border-slate-200 rounded-xl overflow-hidden transition-shadow hover:shadow-sm">
         {/* Main row */}
         <div className="p-4 bg-white">
-          <div className="flex items-center gap-3">
+          {/* Top row: icon + info + chevron + delete */}
+          <div className="flex items-start gap-3">
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="flex-1 flex items-center gap-3 text-left min-w-0"
+              className="flex-1 flex items-start gap-3 text-left min-w-0"
             >
-              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <Receipt size={16} className="text-blue-600" />
               </div>
               <div className="flex-1 min-w-0">
@@ -595,52 +598,50 @@ function InvoiceRow({
                   <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', statusInfo.cls)}>{statusInfo.label}</span>
                 </div>
                 <p className="text-xs text-slate-500 truncate mt-0.5">{invoice.title}</p>
-              </div>
-              <div className="text-right flex-shrink-0 hidden sm:block">
-                <p className="font-bold text-slate-900 text-sm">{fmt(invoice.totalAmount, currency)}</p>
+                <p className="text-sm font-bold text-slate-800 mt-1">{fmt(invoice.totalAmount, currency)}</p>
                 {invoice.dueDate && (
                   <p className="text-xs text-slate-400">Due {formatDate(invoice.dueDate)}</p>
                 )}
               </div>
-              {expanded ? <ChevronUp size={16} className="text-slate-400 flex-shrink-0" /> : <ChevronDown size={16} className="text-slate-400 flex-shrink-0" />}
+              {expanded ? <ChevronUp size={15} className="text-slate-400 flex-shrink-0 mt-1" /> : <ChevronDown size={15} className="text-slate-400 flex-shrink-0 mt-1" />}
             </button>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(true)}
-                  className="btn-primary text-xs py-1.5 px-2.5"
-                >
-                  <Banknote size={13} /> Record Payment
-                </button>
-              )}
+            <button
+              type="button"
+              onClick={deleteInvoice}
+              className="btn-ghost p-1.5 text-red-400 hover:text-red-600 flex-shrink-0"
+              title="Delete invoice"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+          {/* Progress bar + Record Payment button */}
+          <div className="mt-3 ml-12 space-y-2">
+            {paidPct > 0 && (
+              <div>
+                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${paidPct}%` }} />
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{fmt(invoice.totalPaid, currency)} received</p>
+              </div>
+            )}
+            {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
               <button
                 type="button"
-                onClick={deleteInvoice}
-                className="btn-ghost p-1.5 text-red-400 hover:text-red-600"
-                title="Delete invoice"
+                onClick={() => setShowPaymentModal(true)}
+                className="btn-primary text-xs py-1.5 px-3 w-full sm:w-auto"
               >
-                <Trash2 size={14} />
+                <Banknote size={13} /> Record Payment
               </button>
-            </div>
+            )}
           </div>
-          {/* Progress bar */}
-          {paidPct > 0 && (
-            <div className="mt-3 ml-12">
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${paidPct}%` }} />
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">{fmt(invoice.totalPaid, currency)} received</p>
-            </div>
-          )}
         </div>
 
         {/* Expanded: payment history + status controls */}
         {expanded && (
           <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Payment History</p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <label className="text-xs text-slate-500">Status:</label>
                 <select
                   value={invoice.status}
@@ -859,54 +860,44 @@ export function FinanceTab({
               {milestones.map((m) => {
                 const info = MILESTONE_STATUS_MAP[m.status as MilestoneStatus] ?? MILESTONE_STATUS_MAP.pending;
                 return (
-                  <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors bg-white">
-                    <div className={cn('w-2 h-2 rounded-full flex-shrink-0', {
-                      'bg-slate-300': m.status === 'pending',
-                      'bg-amber-400': m.status === 'due',
-                      'bg-blue-500': m.status === 'invoiced',
-                      'bg-emerald-500': m.status === 'paid',
-                    })} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-slate-800 truncate">{m.name}</p>
-                        <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', info.cls)}>{info.label}</span>
-                        {m.linkedStage && (
-                          <span className="text-xs text-slate-400">
-                            → {(m.linkedStage as unknown as { stageName: string }).stageName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400">
-                        <span className="font-semibold text-slate-700">{fmt(m.amount, summary.currency)}</span>
-                        {m.percentage && <span>{m.percentage}%</span>}
-                        {m.dueDate && <span><Clock size={11} className="inline mr-0.5" />Due {formatDate(m.dueDate)}</span>}
+                  <div key={m.id} className="p-3 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors bg-white">
+                    {/* Top: dot + name + status badge */}
+                    <div className="flex items-start gap-2">
+                      <div className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', {
+                        'bg-slate-300': m.status === 'pending',
+                        'bg-amber-400': m.status === 'due',
+                        'bg-blue-500': m.status === 'invoiced',
+                        'bg-emerald-500': m.status === 'paid',
+                      })} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-slate-800">{m.name}</p>
+                          <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0', info.cls)}>{info.label}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs text-slate-400">
+                          <span className="font-semibold text-slate-700">{fmt(m.amount, summary.currency)}</span>
+                          {m.percentage && <span>{m.percentage}%</span>}
+                          {m.dueDate && <span><Clock size={10} className="inline mr-0.5" />Due {formatDate(m.dueDate)}</span>}
+                          {m.linkedStage && <span className="text-slate-400">→ {(m.linkedStage as unknown as { stageName: string }).stageName}</span>}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Bottom: status select + actions */}
+                    <div className="flex items-center gap-1.5 mt-2 ml-4">
                       <select
                         value={m.status}
                         onChange={(e) => updateMilestoneStatus.mutate({ id: m.id, status: e.target.value as MilestoneStatus })}
-                        className="text-xs border border-slate-200 rounded px-1.5 py-1 bg-white"
+                        className="text-xs border border-slate-200 rounded px-1.5 py-1 bg-white flex-1 sm:flex-none"
                         title="Update status"
                       >
                         {Object.entries(MILESTONE_STATUS_MAP).map(([k, v]) => (
                           <option key={k} value={k}>{v.label}</option>
                         ))}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => setEditMilestone(m)}
-                        className="btn-ghost p-1.5"
-                        title="Edit"
-                      >
+                      <button type="button" onClick={() => setEditMilestone(m)} className="btn-ghost p-1.5" title="Edit">
                         <Edit2 size={13} className="text-slate-400" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteMilestone(m.id)}
-                        className="btn-ghost p-1.5"
-                        title="Delete"
-                      >
+                      <button type="button" onClick={() => deleteMilestone(m.id)} className="btn-ghost p-1.5" title="Delete">
                         <Trash2 size={13} className="text-red-400 hover:text-red-600" />
                       </button>
                     </div>
@@ -956,19 +947,19 @@ export function FinanceTab({
 
         {/* Invoice health snapshot */}
         {invoices.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
               { label: 'Unpaid', count: invoices.filter(i => i.status === 'draft' || i.status === 'sent').length, icon: AlertCircle, color: 'text-amber-600 bg-amber-50' },
               { label: 'Partial', count: invoices.filter(i => i.status === 'partial').length, icon: Clock, color: 'text-blue-600 bg-blue-50' },
               { label: 'Paid', count: invoices.filter(i => i.status === 'paid').length, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
             ].map(({ label, count, icon: Icon, color }) => (
-              <div key={label} className="card p-4 flex items-center gap-3">
-                <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', color)}>
-                  <Icon size={16} />
+              <div key={label} className="card p-3 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3 text-center sm:text-left">
+                <div className={cn('w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0', color)}>
+                  <Icon size={15} />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-slate-900">{count}</p>
-                  <p className="text-xs text-slate-400">{label}</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{count}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-400">{label}</p>
                 </div>
               </div>
             ))}
