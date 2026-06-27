@@ -37,7 +37,23 @@ export function ServiceWorkerRegistrar() {
 
     let unsub: (() => void) | null = null;
 
-    setupForegroundMessages((title, body, deepLinkUrl) => {
+    setupForegroundMessages((title, body, deepLinkUrl, messageId) => {
+      // Deduplicate: Firebase re-delivers buffered messages to new onMessage
+      // listeners on every page refresh via BroadcastChannel. Skip if we've
+      // already shown this messageId within the last 2 minutes.
+      if (messageId) {
+        try {
+          const seen: Record<string, number> = JSON.parse(localStorage.getItem('fcm-shown') ?? '{}');
+          if (seen[messageId] && Date.now() - seen[messageId] < 2 * 60 * 1000) return;
+          // Prune old entries to keep storage small
+          const keys = Object.keys(seen);
+          if (keys.length > 30) delete seen[keys[0]];
+          seen[messageId] = Date.now();
+          localStorage.setItem('fcm-shown', JSON.stringify(seen));
+        } catch {
+          // localStorage unavailable — proceed without dedup
+        }
+      }
       playNotificationSound();
       toast.custom(
         (t) => (

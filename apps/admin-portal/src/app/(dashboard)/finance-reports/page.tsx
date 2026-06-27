@@ -187,10 +187,10 @@ function ProjectCard({ row }: { row: ProjectRow }) {
           <p className="text-[10px] text-emerald-500 font-medium">Received</p>
           <p className="text-xs font-bold text-emerald-700 mt-0.5">{row.received > 0 ? fmt(row.received, row.currency) : '—'}</p>
         </div>
-        <div className={cn('rounded-lg p-2', row.outstanding > 0.5 ? 'bg-amber-50' : 'bg-slate-50')}>
-          <p className={cn('text-[10px] font-medium', row.outstanding > 0.5 ? 'text-amber-500' : 'text-slate-400')}>Outstanding</p>
-          <p className={cn('text-xs font-bold mt-0.5', row.outstanding > 0.5 ? 'text-amber-700' : 'text-emerald-600')}>
-            {row.outstanding > 0.5 ? fmt(row.outstanding, row.currency) : 'Paid'}
+        <div className={cn('rounded-lg p-2', row.invoiced === 0 ? 'bg-slate-50' : row.outstanding > 0.5 ? 'bg-amber-50' : 'bg-slate-50')}>
+          <p className={cn('text-[10px] font-medium', row.invoiced === 0 ? 'text-slate-400' : row.outstanding > 0.5 ? 'text-amber-500' : 'text-slate-400')}>Outstanding</p>
+          <p className={cn('text-xs font-bold mt-0.5', row.invoiced === 0 ? 'text-slate-400' : row.outstanding > 0.5 ? 'text-amber-700' : 'text-emerald-600')}>
+            {row.invoiced === 0 ? '—' : row.outstanding > 0.5 ? fmt(row.outstanding, row.currency) : 'Paid'}
           </p>
         </div>
       </div>
@@ -504,7 +504,11 @@ export default function FinanceReportsPage() {
                             {row.received > 0 ? fmt(row.received, row.currency) : <span className="text-slate-300">—</span>}
                           </td>
                           <td className="px-4 py-3 text-amber-700 font-medium text-sm">
-                            {row.outstanding > 0.5 ? fmt(row.outstanding, row.currency) : <span className="text-emerald-500 text-xs font-semibold">Fully Paid</span>}
+                            {row.invoiced === 0
+                              ? <span className="text-slate-300">—</span>
+                              : row.outstanding > 0.5
+                                ? fmt(row.outstanding, row.currency)
+                                : <span className="text-emerald-500 text-xs font-semibold">Fully Paid</span>}
                           </td>
                           <td className="px-4 py-3 text-slate-500 text-sm">{row.invoiceCount}</td>
                           <td className="px-4 py-3">
