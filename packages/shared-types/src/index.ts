@@ -864,3 +864,41 @@ export interface PushNotificationPayload {
   entityId: string;
   deepLinkUrl: string;
 }
+
+// ── Export & Backup ───────────────────────────────────────────────────────────
+
+export type BackupSchedule = 'off' | 'daily' | 'weekly';
+export type BackupRunType = 'excel_cloudinary' | 'google_sheets';
+export type BackupRunStatus = 'success' | 'error';
+
+export interface TenantExportConfig {
+  id: string;
+  tenantId: string;
+  googleSpreadsheetId: string | null;
+  googleSyncEnabled: boolean;
+  lastSyncedAt: string | null;
+  lastSyncStatus: 'success' | 'error' | null;
+  lastSyncError: string | null;
+  backupSchedule: BackupSchedule;
+  backupScheduleDay: number | null;
+  backupScheduleHour: number;
+  createdAt: string;
+  updatedAt: string;
+  // Note: googleServiceAccountJson is intentionally excluded — never sent to frontend
+}
+
+export interface TenantExportConfigPublic extends TenantExportConfig {
+  hasServiceAccount: boolean;
+}
+
+export interface TenantBackupRun {
+  id: string;
+  tenantId: string;
+  type: BackupRunType;
+  status: BackupRunStatus;
+  errorMessage: string | null;
+  cloudinaryUrl: string | null;
+  sheetsUpdated: number | null;
+  triggeredBy: 'schedule' | 'manual';
+  createdAt: string;
+}

@@ -21,6 +21,7 @@ import { projectWorkflowsRouter } from './routes/project-workflows';
 import { deviceTokenRouter } from './routes/deviceTokens';
 import { notificationPreferencesRouter } from './routes/notificationPreferences';
 import { financeRouter } from './routes/finance';
+import { exportRouter } from './routes/export';
 
 export const app = express();
 
@@ -77,6 +78,7 @@ app.use('/api/seed', seedRouter);
 app.use('/api/users', deviceTokenRouter);
 app.use('/api/users', notificationPreferencesRouter);
 app.use('/api/finance', financeRouter);
+app.use('/api/export', exportRouter);
 
 // 404 handler
 app.use((_req, res) => {

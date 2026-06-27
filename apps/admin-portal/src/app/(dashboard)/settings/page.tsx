@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { get, patch, post, uploadFile } from '@/lib/api';
+import { get, patch, post, put, uploadFile } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { Palette, Bell, Shield, Building2, Save, Upload, X, Image, CheckCircle, XCircle, RefreshCw, Send } from 'lucide-react';
+import { Palette, Bell, Shield, Building2, Save, Upload, X, Image, CheckCircle, XCircle, RefreshCw, Send, Download, Loader2, Database, Sheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import { cn, getErrorMessage } from '@/lib/utils';
@@ -16,6 +16,7 @@ const TABS = [
   { key: 'general', label: 'General', icon: Building2 },
   { key: 'notifications', label: 'Notifications', icon: Bell },
   { key: 'security', label: 'Security', icon: Shield },
+  { key: 'export-backup', label: 'Export & Backup', icon: Download },
 ] as const;
 
 type LocalSettings = {
@@ -204,6 +205,405 @@ function PushNotificationPreferences({ qc }: { qc: ReturnType<typeof useQueryCli
             </label>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Types for Export Config ───────────────────────────────────────────────────
+
+interface ExportConfigData {
+  googleSpreadsheetId: string | null;
+  googleSyncEnabled: boolean;
+  hasServiceAccount: boolean;
+  lastSyncedAt: string | null;
+  lastSyncStatus: 'success' | 'error' | null;
+  lastSyncError: string | null;
+  backupSchedule: 'off' | 'daily' | 'weekly';
+  backupScheduleDay: number | null;
+  backupScheduleHour: number;
+}
+
+interface BackupRun {
+  id: string;
+  type: string;
+  status: string;
+  errorMessage: string | null;
+  cloudinaryUrl: string | null;
+  sheetsUpdated: number | null;
+  triggeredBy: string;
+  createdAt: string;
+}
+
+// ── Export & Backup Tab ────────────────────────────────────────────────────────
+
+const UTC_HOURS = Array.from({ length: 24 }, (_, i) => ({
+  value: i,
+  label: `${String(i).padStart(2, '0')}:00 UTC`,
+}));
+
+const WEEK_DAYS = [
+  { value: 0, label: 'Sunday' }, { value: 1, label: 'Monday' }, { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' }, { value: 4, label: 'Thursday' }, { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+];
+
+function ExportBackupTab() {
+  const qc = useQueryClient();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [serviceAccountJson, setServiceAccountJson] = useState('');
+  const [spreadsheetId, setSpreadsheetId] = useState('');
+
+  // Schedule state
+  const [backupSchedule, setBackupSchedule] = useState<'off' | 'daily' | 'weekly'>('off');
+  const [backupScheduleDay, setBackupScheduleDay] = useState<number>(1);
+  const [backupScheduleHour, setBackupScheduleHour] = useState<number>(2);
+
+  const { data: config, isLoading: configLoading } = useQuery<ExportConfigData>({
+    queryKey: ['export-config'],
+    queryFn: () => get<ExportConfigData>('/export/google-sheets/config'),
+  });
+
+  const { data: runsData } = useQuery<{ items: BackupRun[]; total: number }>({
+    queryKey: ['backup-runs'],
+    queryFn: () => get<{ items: BackupRun[]; total: number }>('/export/backup-runs?limit=10'),
+  });
+
+  // Pre-fill form when config loads
+  useEffect(() => {
+    if (config) {
+      setSpreadsheetId(config.googleSpreadsheetId ?? '');
+      setBackupSchedule(config.backupSchedule ?? 'off');
+      setBackupScheduleDay(config.backupScheduleDay ?? 1);
+      setBackupScheduleHour(config.backupScheduleHour ?? 2);
+    }
+  }, [config]);
+
+  const saveMutation = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      put<ExportConfigData>('/export/google-sheets/config', body),
+    onSuccess: () => {
+      toast.success('Google Sheets configuration saved');
+      qc.invalidateQueries({ queryKey: ['export-config'] });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const saveScheduleMutation = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      put<ExportConfigData>('/export/google-sheets/config', body),
+    onSuccess: () => {
+      toast.success('Backup schedule saved');
+      qc.invalidateQueries({ queryKey: ['export-config'] });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const handleSaveConfig = () => {
+    const body: Record<string, unknown> = { googleSpreadsheetId: spreadsheetId };
+    if (serviceAccountJson.trim()) body.googleServiceAccountJson = serviceAccountJson.trim();
+    saveMutation.mutate(body);
+  };
+
+  const handleSaveSchedule = () => {
+    saveScheduleMutation.mutate({
+      backupSchedule,
+      backupScheduleDay: backupSchedule === 'weekly' ? backupScheduleDay : null,
+      backupScheduleHour,
+    });
+  };
+
+  const handleDownloadExcel = async () => {
+    setIsDownloading(true);
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const response = await fetch('/api/export/excel', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `Export failed (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const today = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `flowtiq-export-${today}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Excel file downloaded successfully');
+      qc.invalidateQueries({ queryKey: ['backup-runs'] });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    try {
+      await post('/export/google-sheets/sync', {});
+      toast.success('Google Sheets synced successfully');
+      qc.invalidateQueries({ queryKey: ['export-config'] });
+      qc.invalidateQueries({ queryKey: ['backup-runs'] });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const syncReady = config?.hasServiceAccount && !!config?.googleSpreadsheetId;
+
+  const statusBadge = configLoading ? null : config?.hasServiceAccount && config?.googleSpreadsheetId
+    ? config.lastSyncStatus === 'error'
+      ? { label: 'Last sync failed', cls: 'bg-red-100 text-red-700' }
+      : { label: 'Configured', cls: 'bg-emerald-100 text-emerald-700' }
+    : { label: 'Not configured', cls: 'bg-slate-100 text-slate-500' };
+
+  const lastSyncLine = config?.lastSyncedAt
+    ? (() => {
+        const mins = Math.floor((Date.now() - new Date(config.lastSyncedAt).getTime()) / 60000);
+        const relative = mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
+        return config.lastSyncStatus === 'error'
+          ? `Failed ${relative} — ${config.lastSyncError ?? 'Unknown error'}`
+          : `Synced ${relative}`;
+      })()
+    : 'Never synced';
+
+  return (
+    <div className="space-y-4">
+      {/* ── Excel Download ── */}
+      <div className="card">
+        <div className="card-header">
+          <h3>Download Data Export</h3>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-500">
+            Export all project, financial, follow-up, and user data as an Excel workbook (7 sheets:
+            Projects, Financials, Milestones, Invoices, Payments, Follow-ups, Users).
+          </p>
+          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Download size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-slate-800 text-sm">Excel Workbook (.xlsx)</p>
+              <p className="text-xs text-slate-500">All data across projects, finance, follow-ups, and users</p>
+            </div>
+            <button
+              onClick={handleDownloadExcel}
+              disabled={isDownloading}
+              className="btn-primary flex items-center gap-2 flex-shrink-0"
+            >
+              {isDownloading ? <><Loader2 size={15} className="animate-spin" />Preparing...</> : <><Download size={15} />Download Excel (.xlsx)</>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Google Sheets Sync ── */}
+      <div className="card">
+        <div className="card-header flex items-center justify-between">
+          <h3>Google Sheets Sync</h3>
+          {statusBadge && (
+            <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', statusBadge.cls)}>
+              {statusBadge.label}
+            </span>
+          )}
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-500">
+            Push all data into a Google Sheet automatically. Requires a{' '}
+            <strong>Google Service Account</strong> JSON and a Spreadsheet ID.
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="form-label">Service Account JSON</label>
+              <textarea
+                rows={5}
+                value={serviceAccountJson}
+                onChange={(e) => setServiceAccountJson(e.target.value)}
+                placeholder={config?.hasServiceAccount ? '(Already saved — paste new JSON to replace)' : 'Paste your Google Service Account JSON here...'}
+                className="form-input font-mono text-xs resize-none"
+              />
+            </div>
+            <div>
+              <label className="form-label">Google Spreadsheet ID</label>
+              <input
+                type="text"
+                value={spreadsheetId}
+                onChange={(e) => setSpreadsheetId(e.target.value)}
+                placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                className="form-input font-mono text-sm"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Found in the sheet URL: docs.google.com/spreadsheets/d/<strong>&lt;ID&gt;</strong>/edit
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
+            <button
+              onClick={handleSaveConfig}
+              disabled={saveMutation.isPending}
+              className="btn-secondary flex items-center gap-2"
+            >
+              {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save Configuration
+            </button>
+            <button
+              onClick={handleSyncNow}
+              disabled={!syncReady || isSyncing}
+              className="btn-primary flex items-center gap-2 disabled:opacity-40"
+            >
+              {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Sheet size={14} />}
+              Sync Now
+            </button>
+            <p className={cn(
+              'text-xs flex-1',
+              config?.lastSyncStatus === 'error' ? 'text-red-500' : 'text-slate-400',
+            )}>
+              {lastSyncLine}
+            </p>
+          </div>
+
+          {config?.hasServiceAccount && !config.googleSpreadsheetId && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              Add a Spreadsheet ID and share it with your service account email as Editor, then click Sync Now.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Automatic Backup Schedule ── */}
+      <div className="card">
+        <div className="card-header">
+          <h3>Automatic Backup Schedule</h3>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-500">
+            Schedule automatic backups that upload an Excel file to cloud storage and optionally sync Google Sheets.
+          </p>
+
+          <div className="space-y-3">
+            {/* Schedule radio */}
+            <div>
+              <label className="form-label">Backup Schedule</label>
+              <div className="flex items-center gap-6">
+                {(['off', 'daily', 'weekly'] as const).map((opt) => (
+                  <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="backupSchedule"
+                      value={opt}
+                      checked={backupSchedule === opt}
+                      onChange={() => setBackupSchedule(opt)}
+                      className="accent-blue-600"
+                    />
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Day of week (Weekly only) */}
+            {backupSchedule === 'weekly' && (
+              <div>
+                <label className="form-label">Day of Week</label>
+                <select
+                  value={backupScheduleDay}
+                  onChange={(e) => setBackupScheduleDay(Number(e.target.value))}
+                  className="form-input w-48"
+                >
+                  {WEEK_DAYS.map((d) => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* UTC Hour */}
+            {backupSchedule !== 'off' && (
+              <div>
+                <label className="form-label">Run at (UTC)</label>
+                <select
+                  value={backupScheduleHour}
+                  onChange={(e) => setBackupScheduleHour(Number(e.target.value))}
+                  className="form-input w-48"
+                >
+                  {UTC_HOURS.map((h) => (
+                    <option key={h.value} value={h.value}>{h.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleSaveSchedule}
+            disabled={saveScheduleMutation.isPending}
+            className="btn-primary flex items-center gap-2"
+          >
+            {saveScheduleMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Save Schedule
+          </button>
+        </div>
+      </div>
+
+      {/* ── Backup History ── */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="flex items-center gap-2">
+            <Database size={15} className="text-slate-400" />
+            Backup History
+          </h3>
+        </div>
+        <div className="card-body">
+          {!runsData?.items.length ? (
+            <p className="text-sm text-slate-400 text-center py-6">No backups recorded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {runsData.items.map((run) => (
+                <div key={run.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-slate-800">
+                        {run.type === 'excel_cloudinary' ? 'Excel (Cloud)' : 'Google Sheets'}
+                      </span>
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                        run.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
+                      )}>
+                        {run.status === 'success' ? 'Success' : 'Failed'}
+                      </span>
+                      <span className="text-xs text-slate-400 capitalize">{run.triggeredBy}</span>
+                    </div>
+                    {run.errorMessage && (
+                      <p className="text-xs text-red-500 mt-0.5 truncate">{run.errorMessage}</p>
+                    )}
+                    {run.cloudinaryUrl && (
+                      <a href={run.cloudinaryUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline mt-0.5 block">
+                        View file
+                      </a>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-400 flex-shrink-0 whitespace-nowrap">
+                    {new Date(run.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -580,6 +980,11 @@ export default function SettingsPage() {
                 {/* User-level push notification preferences */}
                 <PushNotificationPreferences qc={qc} />
               </div>
+            )}
+
+            {/* ── EXPORT & BACKUP TAB ── */}
+            {activeTab === 'export-backup' && (
+              <ExportBackupTab />
             )}
 
             {/* ── SECURITY TAB ── */}

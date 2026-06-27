@@ -41,6 +41,8 @@ model Tenant {
   projectFinancials       ProjectFinancial[]
   paymentMilestones       PaymentMilestone[]
   invoices                Invoice[]
+  exportConfig            TenantExportConfig?
+  backupRuns              TenantBackupRun[]
 
   @@map("tenants")
 }
@@ -591,6 +593,51 @@ model Invoice {
   @@unique([tenantId, invoiceNumber])
   @@index([projectId])
   @@map("invoices")
+}
+
+// =============================================
+// EXPORT & BACKUP
+// =============================================
+
+// backupSchedule: off | daily | weekly
+model TenantExportConfig {
+  id                       String    @id @default(cuid())
+  tenantId                 String    @unique
+  googleServiceAccountJson String?
+  googleSpreadsheetId      String?
+  googleSyncEnabled        Boolean   @default(false)
+  lastSyncedAt             DateTime?
+  lastSyncStatus           String?
+  lastSyncError            String?
+  backupSchedule           String    @default("off")
+  backupScheduleDay        Int?
+  backupScheduleHour       Int       @default(2)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_export_configs")
+}
+
+// type: excel_cloudinary | google_sheets
+// status: success | error
+// triggeredBy: schedule | manual
+model TenantBackupRun {
+  id             String   @id @default(cuid())
+  tenantId       String
+  type           String
+  status         String
+  errorMessage   String?
+  cloudinaryUrl  String?
+  sheetsUpdated  Int?
+  triggeredBy    String   @default("manual")
+  createdAt      DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_backup_runs")
 }
 
 // mode: bank_transfer | cheque | cash | upi | other

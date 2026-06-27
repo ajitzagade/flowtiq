@@ -83,6 +83,11 @@ export async function patch<T>(url: string, body?: unknown): Promise<T> {
   return data.data;
 }
 
+export async function put<T>(url: string, body?: unknown): Promise<T> {
+  const { data } = await api.put<{ success: boolean; data: T }>(url, body);
+  return data.data;
+}
+
 export async function del<T>(url: string, body?: unknown): Promise<T> {
   const { data } = await api.delete<{ success: boolean; data: T }>(
     url,
