@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import WebView from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,6 +43,7 @@ export function MainScreen() {
   const pendingDeepLinkRef = useRef<string | null>(null);
   const hasFCMDeepLink = useRef(false);
   const wasOfflineRef = useRef(false);
+  const canGoBackRef = useRef(false);
 
   const hasLoadedRef = useRef(false);
 
@@ -223,6 +225,22 @@ export function MainScreen() {
     maybeRequestPush();
   }, [isOnLoginPage]);
 
+  // ── Android hardware back button ──────────────────────────────────────
+  // On login page: let Android exit the app (return false).
+  // On any other page where the WebView can go back: navigate back in WebView history.
+  // On any other page where WebView cannot go back: let Android exit the app.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!isOnLoginPage && canGoBackRef.current) {
+        localRef.current?.goBack();
+        return true; // event consumed — do not exit app
+      }
+      return false; // let Android handle (exit/minimize)
+    });
+    return () => handler.remove();
+  }, [isOnLoginPage]);
+
   // ── WebView event handlers ────────────────────────────────────────────
   const handleLoadEnd = useCallback(() => {
     if (!hasLoadedRef.current) {
@@ -251,8 +269,9 @@ export function MainScreen() {
   );
 
   const handleNavigationStateChange = useCallback(
-    (navState: { url: string }) => {
+    (navState: { url: string; canGoBack: boolean }) => {
       currentUrlRef.current = navState.url;
+      canGoBackRef.current = navState.canGoBack;
 
       let isLogin = false;
       try {

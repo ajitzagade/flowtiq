@@ -31,3 +31,4 @@ ios/GoogleService-Info.plist
 
 # Metro bundler cache
 .metro-health-check-*
+.vercel

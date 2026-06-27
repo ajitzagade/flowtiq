@@ -3,6 +3,8 @@ apply plugin: "com.facebook.react"
 apply plugin: "kotlin-android"
 // Story 3.4: Apply Google Services plugin for Firebase
 apply plugin: "com.google.gms.google-services"
+// react-native-config: inject .env values into BuildConfig so JS can read them via RNConfig
+apply from: "../../node_modules/react-native-config/android/dotenv.gradle"
 
 react {
     // Story 3.1: Enable Hermes engine
