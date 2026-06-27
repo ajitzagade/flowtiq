@@ -551,7 +551,8 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
     );
   }
 
-  const projects = allProjectsData?.items ?? [];
+  // Exclude completed projects from kanban — they live on the Completed Projects page
+  const projects = (allProjectsData?.items ?? []).filter((p) => p.status !== 'completed');
 
   // Group projects under EACH workflow they belong to via projectWorkflows
   const byWorkflow = new Map<string | null, Project[]>();
