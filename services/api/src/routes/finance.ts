@@ -8,6 +8,176 @@ import { createAuditLog } from '../lib/audit';
 export const financeRouter = Router();
 financeRouter.use(authenticate);
 
+// ── GET /api/finance/report ──────────────────────
+// Cross-project cashflow report (must come before /:projectId to avoid route conflict)
+financeRouter.get('/report', requirePermission('reports:view'), async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const tenantId = tenantScope(authReq);
+
+    const rawStart = req.query.startDate as string | undefined;
+    const rawEnd = req.query.endDate as string | undefined;
+    const now = new Date();
+
+    // Default: last 12 months
+    const start = rawStart ? new Date(rawStart) : new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    const end = rawEnd ? new Date(rawEnd) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // All projects in scope (not cancelled, not deleted)
+    const projects = await prisma.project.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { id: true, name: true, projectNumber: true, status: true },
+    });
+    const projectIds = projects.map((p) => p.id);
+    const projectMap = new Map(projects.map((p) => [p.id, p]));
+
+    // All financial data
+    const [financials, allInvoices, allPayments, allMilestones] = await Promise.all([
+      prisma.projectFinancial.findMany({ where: { projectId: { in: projectIds } } }),
+      prisma.invoice.findMany({
+        where: { projectId: { in: projectIds }, tenantId },
+        include: { payments: true },
+      }),
+      prisma.invoicePayment.findMany({
+        where: {
+          invoice: { projectId: { in: projectIds }, tenantId },
+          paymentDate: { gte: start, lte: end },
+        },
+        include: { invoice: { select: { projectId: true, invoiceNumber: true } } },
+        orderBy: { paymentDate: 'asc' },
+      }),
+      prisma.paymentMilestone.findMany({
+        where: { projectId: { in: projectIds }, tenantId },
+      }),
+    ]);
+
+    const financialMap = new Map(financials.map((f) => [f.projectId, f]));
+
+    // ── KPI totals ──────────────────────────────────
+    const totalContractValue = financials.reduce((s, f) => s + toNum(f.contractValue), 0);
+    const currency = financials[0]?.currency ?? 'INR';
+    const totalInvoiced = allInvoices
+      .filter((inv) => inv.status !== 'cancelled')
+      .reduce((s, inv) => s + toNum(inv.totalAmount), 0);
+    const totalReceived = allInvoices.reduce(
+      (s, inv) => s + inv.payments.reduce((ps, p) => ps + toNum(p.amount), 0),
+      0,
+    );
+    const outstanding = totalInvoiced - totalReceived;
+
+    // Overdue invoices
+    const overdueInvoices = allInvoices.filter(
+      (inv) => inv.dueDate && new Date(inv.dueDate) < now && !['paid', 'cancelled'].includes(inv.status),
+    );
+
+    // ── Monthly payment trend (within date range) ────
+    const months: Record<string, { label: string; received: number; invoiced: number }> = {};
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Pre-fill months in range
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur <= end) {
+      const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+      months[key] = { label: `${monthLabels[cur.getMonth()]} ${cur.getFullYear()}`, received: 0, invoiced: 0 };
+      cur.setMonth(cur.getMonth() + 1);
+    }
+
+    // Fill received payments
+    for (const pmt of allPayments) {
+      const d = new Date(pmt.paymentDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (months[key]) months[key].received += toNum(pmt.amount);
+    }
+
+    // Fill invoiced amounts by createdAt month
+    for (const inv of allInvoices.filter((i) => i.status !== 'cancelled')) {
+      const d = new Date(inv.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (months[key]) months[key].invoiced += toNum(inv.totalAmount);
+    }
+
+    const monthlyTrend = Object.values(months);
+
+    // ── Payment mode breakdown (in range) ───────────
+    const modeMap: Record<string, number> = {};
+    for (const pmt of allPayments) {
+      modeMap[pmt.mode] = (modeMap[pmt.mode] ?? 0) + toNum(pmt.amount);
+    }
+    const paymentModes = Object.entries(modeMap).map(([mode, amount]) => ({ mode, amount }));
+
+    // ── Invoice status distribution ──────────────────
+    const statusMap: Record<string, number> = {};
+    for (const inv of allInvoices) {
+      statusMap[inv.status] = (statusMap[inv.status] ?? 0) + 1;
+    }
+    const invoiceStatusDist = Object.entries(statusMap).map(([status, count]) => ({ status, count }));
+
+    // ── Per-project summary table ────────────────────
+    const projectSummary = projects.map((p) => {
+      const fin = financialMap.get(p.id);
+      const projInvoices = allInvoices.filter((i) => i.projectId === p.id && i.status !== 'cancelled');
+      const projInvoiced = projInvoices.reduce((s, i) => s + toNum(i.totalAmount), 0);
+      const projReceived = projInvoices.reduce(
+        (s, i) => s + i.payments.reduce((ps, pm) => ps + toNum(pm.amount), 0), 0,
+      );
+      return {
+        id: p.id,
+        name: p.name,
+        projectNumber: p.projectNumber,
+        status: p.status,
+        contractValue: toNum(fin?.contractValue ?? 0),
+        currency: fin?.currency ?? currency,
+        invoiced: projInvoiced,
+        received: projReceived,
+        outstanding: projInvoiced - projReceived,
+        invoiceCount: projInvoices.length,
+      };
+    }).sort((a, b) => b.contractValue - a.contractValue);
+
+    // ── Milestone pipeline ───────────────────────────
+    const milestonePipeline = {
+      pending: allMilestones.filter((m) => m.status === 'pending').reduce((s, m) => s + toNum(m.amount), 0),
+      due: allMilestones.filter((m) => m.status === 'due').reduce((s, m) => s + toNum(m.amount), 0),
+      invoiced: allMilestones.filter((m) => m.status === 'invoiced').reduce((s, m) => s + toNum(m.amount), 0),
+      paid: allMilestones.filter((m) => m.status === 'paid').reduce((s, m) => s + toNum(m.amount), 0),
+    };
+
+    // ── Overdue details ──────────────────────────────
+    const overdueDetails = overdueInvoices.map((inv) => {
+      const proj = projectMap.get(inv.projectId);
+      const paid = inv.payments.reduce((s, p) => s + toNum(p.amount), 0);
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        title: inv.title,
+        projectName: proj?.name ?? '—',
+        projectNumber: proj?.projectNumber ?? '—',
+        dueDate: inv.dueDate,
+        outstanding: toNum(inv.totalAmount) - paid,
+        status: inv.status,
+        currency: financialMap.get(inv.projectId)?.currency ?? currency,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        period: { start: start.toISOString(), end: end.toISOString() },
+        currency,
+        kpi: { totalContractValue, totalInvoiced, totalReceived, outstanding, overdueCount: overdueInvoices.length },
+        monthlyTrend,
+        paymentModes,
+        invoiceStatusDist,
+        projectSummary,
+        milestonePipeline,
+        overdueDetails,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── Helpers ─────────────────────────────────────
 
 function toNum(d: unknown): number {
