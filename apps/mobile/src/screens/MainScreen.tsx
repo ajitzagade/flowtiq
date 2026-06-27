@@ -6,6 +6,7 @@ import {
   Alert,
   ActivityIndicator,
   BackHandler,
+  PermissionsAndroid,
 } from 'react-native';
 import WebView from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -210,12 +211,34 @@ export function MainScreen() {
             text: 'Enable Notifications',
             onPress: async () => {
               try {
-                await messaging().requestPermission();
                 await AsyncStorage.setItem(PUSH_PERM_KEY, 'true');
-                const token = await messaging().getToken();
-                if (token) setPushToken(token);
+                if (Platform.OS === 'android') {
+                  // Android 13+ (API 33) requires POST_NOTIFICATIONS runtime permission.
+                  // On older Android, notifications are on by default — skip the request.
+                  if (Platform.Version >= 33) {
+                    const result = await PermissionsAndroid.request(
+                      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                    );
+                    if (result === PermissionsAndroid.RESULTS.GRANTED) {
+                      const token = await messaging().getToken();
+                      if (token) setPushToken(token);
+                    } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+                      // User permanently denied — open app settings so they can enable manually
+                      Linking.openSettings();
+                    }
+                  } else {
+                    // Android < 13: permission not needed, just get token
+                    const token = await messaging().getToken();
+                    if (token) setPushToken(token);
+                  }
+                } else {
+                  // iOS: use FCM permission request
+                  await messaging().requestPermission();
+                  const token = await messaging().getToken();
+                  if (token) setPushToken(token);
+                }
               } catch {
-                AsyncStorage.setItem(PUSH_PERM_KEY, 'true').catch(() => {});
+                // Permission flow failed silently — already marked as requested above
               }
             },
           },

@@ -13,8 +13,8 @@
 # React Native Keychain
 -keep class com.oblador.keychain.** { *; }
 
-# React Native Config (env vars)
--keep class com.lugg.ReactNativeConfig.** { *; }
+# React Native Config (env vars) — package is com.lugg.RNCConfig (not ReactNativeConfig)
+-keep class com.lugg.RNCConfig.** { *; }
 
 # React Native WebView
 -keep class com.reactnativecommunity.webview.** { *; }
