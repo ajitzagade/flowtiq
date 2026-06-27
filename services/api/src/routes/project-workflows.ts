@@ -209,7 +209,7 @@ projectWorkflowsRouter.patch('/:id', requirePermission('projects:edit'), async (
         where: { projectId: pw.projectId },
         select: { status: true },
       });
-      if (allProjectWorkflows.every((w) => w.status === 'completed')) {
+      if (allProjectWorkflows.length > 0 && allProjectWorkflows.every((w) => w.status === 'completed')) {
         await prisma.project.update({
           where: { id: pw.projectId },
           data: { status: 'completed', completionDate: new Date() },
