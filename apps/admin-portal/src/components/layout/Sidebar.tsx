@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FolderKanban, Clock, FileText, Users, Shield,
   GitBranch, ClipboardList, Bell, Settings, Building2, Layers, LogOut,
-  ChevronLeft, ChevronRight, X, BarChart2,
+  ChevronLeft, ChevronRight, X, BarChart2, CheckCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -16,6 +16,7 @@ import { deregisterPushTokenIfNative } from '@/lib/pushToken';
 const NAV_ITEMS: Array<{ key: string; label: string; href: string; icon: React.ElementType; requiredPermission: string | null }> = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, requiredPermission: null },
   { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban, requiredPermission: 'projects:view' },
+  { key: 'completed-projects', label: 'Completed Projects', href: '/completed-projects', icon: CheckCircle, requiredPermission: 'projects:view' },
   { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2, requiredPermission: 'reports:view' },
   { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock, requiredPermission: 'follow_ups:create' },
   { key: 'documents', label: 'Documents', href: '/documents', icon: FileText, requiredPermission: 'documents:download' },

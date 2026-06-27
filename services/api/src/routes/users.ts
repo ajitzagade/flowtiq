@@ -129,6 +129,22 @@ usersRouter.patch('/notification-preferences', async (req, res, next) => {
   }
 });
 
+// GET /api/users/members — lightweight list for dropdowns (any authenticated user)
+usersRouter.get('/members', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const tenantId = tenantScope(authReq);
+    const members = await prisma.user.findMany({
+      where: { tenantId, isActive: true },
+      select: { id: true, firstName: true, lastName: true, email: true, avatar: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+    res.json({ success: true, data: members });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/users/:id
 usersRouter.get('/:id', requirePermission('users:view'), async (req, res, next) => {
   try {

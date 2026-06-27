@@ -271,14 +271,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <p className="text-xs font-semibold text-blue-800 mb-2">Demo Credentials</p>
-            <div className="space-y-1 text-xs text-blue-700">
-              <p><span className="font-medium">Admin:</span> admin@vastudeep.com</p>
-              <p><span className="font-medium">PM:</span> pm@vastudeep.com</p>
-              <p><span className="font-medium">Password:</span> Admin@123</p>
-            </div>
-          </div>
         </div>
       </div>
 

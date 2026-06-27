@@ -267,12 +267,8 @@ function WorkflowKanban({
   }, []);
 
   const noStageProjects = buckets['__no_stage__'] ?? [];
-  const completedProjects = buckets['__completed__'] ?? [];
   const columns: StageColumn[] = [
     ...stages,
-    ...(completedProjects.length > 0
-      ? [{ key: '__completed__', name: 'Completed', order: 998, color: '#10b981', isCompleted: true }]
-      : []),
     ...(noStageProjects.length > 0
       ? [{ key: '__no_stage__', name: 'No Stage', order: 999, color: '#94a3b8', isNoStage: true }]
       : []),
@@ -682,9 +678,9 @@ function ProjectModal({
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const { data: users } = useQuery<{ items: User[] }>({
-    queryKey: ['users', 'active'],
-    queryFn: () => get<{ items: User[] }>('/users', { pageSize: 200, isActive: 'true' }),
+  const { data: users } = useQuery<User[]>({
+    queryKey: ['users', 'members'],
+    queryFn: () => get<User[]>('/users/members'),
   });
 
   const { data: workflows } = useQuery<WorkflowTemplate[]>({
@@ -750,7 +746,7 @@ function ProjectModal({
     }
   };
 
-  const userList = users?.items || [];
+  const userList = users || [];
   const workflowList = workflows || [];
 
   return (
