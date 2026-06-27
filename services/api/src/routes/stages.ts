@@ -285,6 +285,17 @@ stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, 
             where: { id: stage.projectWorkflowId },
             data: { status: 'completed', completedAt: new Date() },
           });
+          // Check if ALL workflows for this project are now complete → auto-complete the project
+          const allProjectWorkflows = await prisma.projectWorkflow.findMany({
+            where: { projectId: stage.projectId },
+            select: { status: true },
+          });
+          if (allProjectWorkflows.length > 0 && allProjectWorkflows.every((w) => w.status === 'completed')) {
+            await prisma.project.update({
+              where: { id: stage.projectId },
+              data: { status: 'completed', completionDate: new Date() },
+            });
+          }
         } else {
           // Ensure workflow is in_progress
           await prisma.projectWorkflow.updateMany({
