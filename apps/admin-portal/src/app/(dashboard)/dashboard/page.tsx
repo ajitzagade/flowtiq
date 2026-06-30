@@ -650,7 +650,7 @@ export default function DashboardPage() {
   const isSuperAdmin = user?.isSuperAdmin;
   const userPermissions = (user?.permissions as string[] | undefined) ?? [];
   const canCreateProject = isSuperAdmin || userPermissions.includes('projects:create');
-  const canViewFinance = isSuperAdmin || userPermissions.includes('reports:view');
+  const canViewFinance = isSuperAdmin || userPermissions.includes('reports:view') || userPermissions.includes('reports:read');
 
   return (
     <>

@@ -44,10 +44,15 @@ export function Sidebar() {
     ? [...SUPER_ADMIN_ITEMS, ...NAV_ITEMS]
     : NAV_ITEMS;
 
+  // reports:view (production) and reports:read (local seed) are equivalent
+  const effectivePermissions = userPermissions.includes('reports:read') && !userPermissions.includes('reports:view')
+    ? [...userPermissions, 'reports:view']
+    : userPermissions;
+
   const navItems = user?.isSuperAdmin
     ? allItems
     : allItems.filter((item) =>
-        item.requiredPermission === null || userPermissions.includes(item.requiredPermission),
+        item.requiredPermission === null || effectivePermissions.includes(item.requiredPermission),
       );
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
