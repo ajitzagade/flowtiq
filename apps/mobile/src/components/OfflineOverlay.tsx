@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+
+const logo = require('../assets/vastudeep_logo.png');
 
 interface Props {
   onRetry: () => void;
@@ -8,6 +10,7 @@ interface Props {
 export function OfflineOverlay({ onRetry }: Props) {
   return (
     <View style={styles.container}>
+      <Image source={logo} style={styles.logo} resizeMode="contain" />
       <Text style={styles.icon}>{'\uD83D\uDEAB'}</Text>
       <Text style={styles.heading}>No Internet Connection</Text>
       <Text style={styles.subtext}>Please check your connection and try again.</Text>
@@ -26,6 +29,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     zIndex: 100,
+  },
+  logo: {
+    width: 140,
+    height: 56,
+    marginBottom: 32,
   },
   icon: {
     fontSize: 56,

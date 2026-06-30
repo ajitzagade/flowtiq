@@ -80,8 +80,8 @@ test.describe('Kanban / Board view', () => {
 
   test('board search input filters visible projects', async ({ page }) => {
     await page.locator('[data-project-id]').first().waitFor({ timeout: 15000 });
-    // Board has a "Search board..." input
-    const searchInput = page.locator('input[placeholder*="Search board" i]');
+    // Board search input is in the toolbar
+    const searchInput = page.locator('input[placeholder*="Search projects or clients" i]');
     if (await searchInput.count() > 0) {
       await searchInput.fill('xxxxxx_does_not_exist');
       await page.waitForTimeout(500);

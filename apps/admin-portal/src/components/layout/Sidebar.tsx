@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FolderKanban, Clock, FileText, Users, Shield,
-  GitBranch, ClipboardList, Bell, Settings, Building2, Layers, LogOut,
+  GitBranch, ClipboardList, Bell, Settings, Building2, LogOut,
   ChevronLeft, ChevronRight, X, BarChart2, CheckCircle, TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -103,7 +103,8 @@ export function Sidebar() {
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <Layers size={18} className="text-white" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src="/vastudeep_logo.png" alt="Logo" className="w-full h-full object-contain p-1" />
               )}
             </div>
             <div className="min-w-0">
@@ -130,7 +131,8 @@ export function Sidebar() {
                 className="w-full h-full object-contain"
               />
             ) : (
-              <Layers size={18} className="text-white" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/vastudeep_logo.png" alt="Logo" className="w-full h-full object-contain p-1" />
             )}
           </div>
         )}

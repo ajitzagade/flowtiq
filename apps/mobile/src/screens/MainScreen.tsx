@@ -7,7 +7,10 @@ import {
   ActivityIndicator,
   BackHandler,
   PermissionsAndroid,
+  Image,
 } from 'react-native';
+
+const logo = require('../assets/vastudeep_logo.png');
 import WebView from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
@@ -342,7 +345,8 @@ export function MainScreen() {
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#ffffff" />
+            <Image source={logo} style={styles.loadingLogo} resizeMode="contain" />
+            <ActivityIndicator size="large" color="#ffffff" style={styles.loadingSpinner} />
           </View>
         )}
       />
@@ -361,5 +365,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loadingLogo: {
+    width: 160,
+    height: 64,
+    marginBottom: 24,
+  },
+  loadingSpinner: {
+    marginTop: 0,
   },
 });

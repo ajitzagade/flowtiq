@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, Building2, X } from 'lucide-react';
+import { Eye, EyeOff, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
@@ -135,20 +135,12 @@ export default function LoginPage() {
       {/* Left panel — tenant branding */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 p-12" style={{ backgroundColor: '#0d1b2e' }}>
         <div className="flex items-center gap-3">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={tenantName} className="h-10 max-w-[160px] object-contain" />
-          ) : (
-            <>
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: 'var(--brand-primary)' }}
-              >
-                <Building2 className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">{tenantName}</span>
-            </>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoUrl || '/vastudeep_logo.png'}
+            alt={tenantName}
+            className="h-10 max-w-[160px] object-contain"
+          />
         </div>
 
         <div>
@@ -190,20 +182,12 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-10 lg:hidden">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={tenantName} className="h-9 max-w-[140px] object-contain" />
-            ) : (
-              <>
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--brand-primary)' }}
-                >
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-slate-900">{tenantName}</span>
-              </>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoUrl || '/vastudeep_logo.png'}
+              alt={tenantName}
+              className="h-9 max-w-[140px] object-contain"
+            />
           </div>
 
           <div className="mb-8">

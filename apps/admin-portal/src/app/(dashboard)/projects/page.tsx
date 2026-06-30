@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Search, FolderKanban, Edit, Eye, Trash2, X,
   ChevronLeft, ChevronRight, LayoutList, Kanban, ChevronDown, GitBranch,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, GripVertical,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { ProjectProgress } from '@/components/ProjectProgress';
@@ -136,7 +136,14 @@ function KanbanCard({
           {project.status.replace('_', ' ')}
         </span>
       </div>
-      <ProjectProgress currentStage={project.currentStage} status={project.status} compact />
+      <ProjectProgress
+        currentStage={project.currentStage}
+        status={project.status}
+        progressPct={project.overallProgressPct}
+        completedStages={project.completedStages}
+        totalStages={project.totalStages}
+        compact
+      />
       {project.dueDate && (
         <p className={cn('text-[10px] font-medium mt-2', theme.dueColor)}>Due {formatDate(project.dueDate)}</p>
       )}
@@ -249,7 +256,9 @@ function WorkflowKanban({
     const projectId = e.dataTransfer.getData('text/plain') || draggingIdRef.current;
     if (projectId) {
       const project = filtered.find((p) => p.id === projectId);
-      const currentKey = project?.currentStage ?? '__no_stage__';
+      const pws = project?.projectWorkflows as Array<{ workflowTemplateId: string; currentStageKey?: string | null }> | undefined;
+      const pw = pws?.find((w) => w.workflowTemplateId === sectionWorkflowId);
+      const currentKey = (sectionWorkflowId ? (pw?.currentStageKey ?? null) : project?.currentStage) ?? '__no_stage__';
       if (currentKey !== stageKey) {
         moveMutation.mutate({ id: projectId, stageKey });
       }
@@ -267,8 +276,12 @@ function WorkflowKanban({
   }, []);
 
   const noStageProjects = buckets['__no_stage__'] ?? [];
+  const completedWfProjects = buckets['__completed__'] ?? [];
   const columns: StageColumn[] = [
     ...stages,
+    ...(completedWfProjects.length > 0
+      ? [{ key: '__completed__', name: 'Workflow Done', order: 998, color: '#10b981', isCompleted: true }]
+      : []),
     ...(noStageProjects.length > 0
       ? [{ key: '__no_stage__', name: 'No Stage', order: 999, color: '#94a3b8', isNoStage: true }]
       : []),
@@ -379,6 +392,12 @@ function WorkflowSection({
   isHighlighted,
   highlightStageKey,
   sectionRef,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onDrop,
+  isDragOver,
 }: {
   workflow: WorkflowTemplate | null;
   projects: Project[];
@@ -390,6 +409,12 @@ function WorkflowSection({
   isHighlighted?: boolean;
   highlightStageKey?: string | null;
   sectionRef?: React.RefObject<HTMLDivElement>;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  isDragOver?: boolean;
 }) {
   const [manualExpanded, setManualExpanded] = useState(defaultExpanded || !!isHighlighted);
   // If highlighted from outside, force expand
@@ -412,8 +437,17 @@ function WorkflowSection({
   return (
     <div
       ref={sectionRef}
-      className={cn('overflow-hidden transition-all duration-300 rounded-xl border bg-white', isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : '')}
-      style={{ borderColor: '#dde3f8', boxShadow: '0 4px 16px rgba(59,130,246,0.08), 0 1px 4px rgba(0,0,0,0.06)' }}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onDrop={onDrop}
+      className={cn(
+        'overflow-hidden transition-all duration-200 rounded-xl border bg-white',
+        isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : '',
+        isDragOver ? 'ring-2 ring-blue-300 ring-offset-1 scale-[1.01]' : '',
+      )}
+      style={{ borderColor: isDragOver ? '#93c5fd' : '#dde3f8', boxShadow: '0 4px 16px rgba(59,130,246,0.08), 0 1px 4px rgba(0,0,0,0.06)' }}
     >
       <button
         type="button"
@@ -422,6 +456,16 @@ function WorkflowSection({
         className={cn('w-full px-5 py-4 flex items-center justify-between transition-colors text-left', isHighlighted ? 'bg-blue-50/60' : 'bg-gradient-to-r from-slate-50 to-white hover:from-indigo-50/60 hover:to-white')}
       >
         <div className="flex items-center gap-3">
+          {draggable && (
+            <div
+              className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing flex-shrink-0 transition-colors"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              title="Drag to reorder"
+            >
+              <GripVertical size={16} />
+            </div>
+          )}
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
             <GitBranch size={15} className="text-white" />
           </div>
@@ -488,13 +532,15 @@ function WorkflowSection({
 }
 
 // ── KanbanBoard — groups projects by workflowId, renders accordion sections ────
-function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
+function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey, boardSearch }: {
   onEdit: (p: Project) => void;
   highlightWorkflowId?: string | null;
   highlightStageKey?: string | null;
+  boardSearch: string;
 }) {
-  const [boardSearch, setBoardSearch] = useState('');
   const highlightRef = useRef<HTMLDivElement>(null);
+  const draggedId = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -585,21 +631,43 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
     localStorage.setItem('kanban-section-order', JSON.stringify(newOrder));
   };
 
+  const handleDragStart = (e: React.DragEvent, wfId: string) => {
+    draggedId.current = wfId;
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, wfId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedId.current && draggedId.current !== wfId) setDragOverId(wfId);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const srcId = draggedId.current;
+    if (!srcId || srcId === targetId) { setDragOverId(null); return; }
+    const current = orderedWorkflows.map((w) => w.id);
+    const fromIdx = current.indexOf(srcId);
+    const toIdx = current.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) { setDragOverId(null); return; }
+    const newOrder = [...current];
+    newOrder.splice(fromIdx, 1);
+    newOrder.splice(toIdx, 0, srcId);
+    setSectionOrder(newOrder);
+    localStorage.setItem('kanban-section-order', JSON.stringify(newOrder));
+    draggedId.current = null;
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    draggedId.current = null;
+    setDragOverId(null);
+  };
+
   const noWorkflowProjects = byWorkflow.get(null) ?? [];
 
   return (
     <div className="space-y-3">
-      {/* Board search */}
-      <div className="relative max-w-xs">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          className="form-input pl-8 py-2 text-sm"
-          placeholder="Search board..."
-          value={boardSearch}
-          onChange={(e) => setBoardSearch(e.target.value)}
-        />
-      </div>
-
       {/* One accordion section per workflow — each with its OWN stage columns */}
       {orderedWorkflows.map((workflow, idx) => {
         const workflowProjects = byWorkflow.get(workflow.id) ?? [];
@@ -617,6 +685,12 @@ function KanbanBoard({ onEdit, highlightWorkflowId, highlightStageKey }: {
             isHighlighted={isHighlighted}
             highlightStageKey={highlightStageKey}
             sectionRef={isHighlighted ? highlightRef : undefined}
+            draggable
+            onDragStart={(e) => handleDragStart(e, workflow.id)}
+            onDragOver={(e) => handleDragOver(e, workflow.id)}
+            onDrop={(e) => handleDrop(e, workflow.id)}
+            onDragEnd={handleDragEnd}
+            isDragOver={dragOverId === workflow.id}
           />
         );
       })}
@@ -900,11 +974,18 @@ function ProjectsPageInner() {
   const [showModal, setShowModal] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [boardSearch, setBoardSearch] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<'list' | 'kanban'>(() =>
     searchParams.get('view') === 'list' ? 'list' : 'kanban'
   );
+
+  // Auto-open create modal when navigated to with ?new=1
+  useEffect(() => {
+    if (searchParams.get('new') === '1') setShowModal(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [highlightWorkflowId] = useState<string | null>(() => searchParams.get('workflowId'));
   const [highlightStageKey, setHighlightStageKey] = useState<string | null>(() => searchParams.get('stage'));
 
@@ -976,7 +1057,7 @@ function ProjectsPageInner() {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     className="form-input pl-9"
-                    placeholder="Search projects, clients..."
+                    placeholder="Search by name, client, or location..."
                     value={search}
                     onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                   />
@@ -1015,7 +1096,27 @@ function ProjectsPageInner() {
                 </select>
               </>
             )}
-            {view === 'kanban' && <div className="flex-1" />}
+            {view === 'kanban' && (
+              <>
+                <div className="relative flex-1 min-w-48">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="form-input pl-9"
+                    placeholder="Search projects or clients..."
+                    value={boardSearch}
+                    onChange={(e) => setBoardSearch(e.target.value)}
+                  />
+                </div>
+                {data?.total != null && !search && !status && !priority && !workflowFilter && (
+                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 flex-shrink-0">
+                    <FolderKanban size={14} className="text-slate-400" />
+                    <span className="text-sm text-slate-500">
+                      <span className="font-semibold text-slate-700">{data.total}</span> project{data.total !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* View toggle */}
             <div className="flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50 gap-0.5">
@@ -1053,6 +1154,7 @@ function ProjectsPageInner() {
             onEdit={(p) => setEditProject(p)}
             highlightWorkflowId={highlightWorkflowId}
             highlightStageKey={highlightStageKey}
+            boardSearch={boardSearch}
           />
         )}
 
@@ -1140,6 +1242,9 @@ function ProjectsPageInner() {
                         <ProjectProgress
                           currentStage={project.currentStage}
                           status={project.status}
+                          progressPct={project.overallProgressPct}
+                          completedStages={project.completedStages}
+                          totalStages={project.totalStages}
                         />
                       </td>
                       <td>{project.dueDate ? formatDate(project.dueDate) : <span className="text-slate-300">—</span>}</td>

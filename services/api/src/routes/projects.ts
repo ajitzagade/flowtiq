@@ -99,10 +99,8 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
               status: true,
               order: true,
               stages: {
-                where: { status: 'in_progress' },
-                select: { stageKey: true },
+                select: { stageKey: true, status: true },
                 orderBy: { stageOrder: 'asc' },
-                take: 1,
               },
             },
           },
@@ -123,22 +121,32 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
     res.json({
       success: true,
       data: {
-        items: projects.map((p) => ({
-          ...p,
-          documentsCount: p._count.documents,
-          followUpsCount: p._count.followUps,
-          workflowsCount: p.projectWorkflows.length,
-          pendingFollowUps: followUpMap.get(p.id) || 0,
-          // Expose current active stage key per workflow for kanban placement
-          projectWorkflows: p.projectWorkflows.map((pw) => ({
-            id: pw.id,
-            workflowTemplateId: pw.workflowTemplateId,
-            name: pw.name,
-            status: pw.status,
-            order: pw.order,
-            currentStageKey: (pw.stages as Array<{ stageKey: string }> | undefined)?.[0]?.stageKey ?? null,
-          })),
-        })),
+        items: projects.map((p) => {
+          const allStages = p.projectWorkflows.flatMap((pw) => pw.stages as Array<{ stageKey: string; status: string }>);
+          const { progressPct: overallProgressPct, completedStages, totalStages } = computeProgress(allStages);
+          return {
+            ...p,
+            documentsCount: p._count.documents,
+            followUpsCount: p._count.followUps,
+            workflowsCount: p.projectWorkflows.length,
+            pendingFollowUps: followUpMap.get(p.id) || 0,
+            overallProgressPct: p.status === 'completed' ? 100 : overallProgressPct,
+            completedStages,
+            totalStages,
+            // Expose current active stage key per workflow for kanban placement
+            projectWorkflows: p.projectWorkflows.map((pw) => {
+              const stages = pw.stages as Array<{ stageKey: string; status: string }>;
+              return {
+                id: pw.id,
+                workflowTemplateId: pw.workflowTemplateId,
+                name: pw.name,
+                status: pw.status,
+                order: pw.order,
+                currentStageKey: stages.find((s) => s.status === 'in_progress')?.stageKey ?? null,
+              };
+            }),
+          };
+        }),
         total,
         page: parseInt(page),
         pageSize: parseInt(pageSize),
@@ -393,17 +401,18 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
         });
         if (!tmpl) continue;
 
+        const templateStages = tmpl.stages as Array<Record<string, unknown>>;
         const pw = await prisma.projectWorkflow.create({
           data: {
             projectId: project.id,
             workflowTemplateId: tmpl.id,
             name: tmpl.name,
             order: idx + 1,
-            status: 'not_started',
+            status: templateStages.length > 0 ? 'in_progress' : 'not_started',
+            ...(templateStages.length > 0 && { startedAt: new Date() }),
           },
         });
 
-        const templateStages = tmpl.stages as Array<Record<string, unknown>>;
         if (templateStages.length > 0) {
           await prisma.projectStage.createMany({
             data: templateStages.map((s) => ({
@@ -413,10 +422,11 @@ projectsRouter.post('/', requirePermission('projects:create'), async (req, res, 
               stageKey: (s.key || s.stageKey) as string,
               stageOrder: s.order as number,
               isRequired: (s.isRequired ?? true) as boolean,
-              status: 'pending',
+              // Auto-start the first stage so it appears in stage column (not "No Stage")
+              status: (s.order as number) === 1 ? 'in_progress' : 'pending',
               checklist: (s.checklist as object[]) || [],
-              // Inherit default member from workflow template stage configuration
               ...(s.defaultMemberId ? { assignedTo: s.defaultMemberId as string } : {}),
+              ...((s.order as number) === 1 && { startDate: new Date() }),
             })),
           });
         }
@@ -509,28 +519,31 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
     });
 
     // Kanban drag-drop: update ProjectStage records for the target workflow
-    // When workflowTemplateId is provided, update the specific workflow's stages
-    if (rest.currentStage && dragWorkflowTemplateId) {
+    // Runs for both stage moves AND drops to __no_stage__ (currentStage = null)
+    if (dragWorkflowTemplateId) {
       const pw = await prisma.projectWorkflow.findFirst({
         where: { projectId: req.params.id, workflowTemplateId: dragWorkflowTemplateId as string },
         select: { id: true },
       });
       if (pw) {
-        // Clear any existing in_progress stages in this workflow
+        // Always clear existing in_progress stages in this workflow first
         await prisma.projectStage.updateMany({
           where: { projectWorkflowId: pw.id, status: 'in_progress' },
           data: { status: 'pending' },
         });
-        // Set the target stage to in_progress
-        await prisma.projectStage.updateMany({
-          where: { projectWorkflowId: pw.id, stageKey: rest.currentStage as string },
-          data: { status: 'in_progress', startDate: new Date() },
-        });
-        // Ensure workflow is marked in_progress
-        await prisma.projectWorkflow.update({
-          where: { id: pw.id },
-          data: { status: 'in_progress' },
-        });
+        if (rest.currentStage) {
+          // Set the target stage to in_progress
+          await prisma.projectStage.updateMany({
+            where: { projectWorkflowId: pw.id, stageKey: rest.currentStage as string },
+            data: { status: 'in_progress', startDate: new Date() },
+          });
+          await prisma.projectWorkflow.update({
+            where: { id: pw.id },
+            data: { status: 'in_progress' },
+          });
+        }
+        // If currentStage is null (dropped to __no_stage__), stages are now all cleared
+        // and the workflow status stays as-is (user explicitly removed the active stage)
       }
     }
 
@@ -555,10 +568,17 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
           if (!tmpl) continue;
           if (!firstNewTmplId) firstNewTmplId = tmpl.id;
           orderIdx++;
-          const pw = await prisma.projectWorkflow.create({
-            data: { projectId: req.params.id, workflowTemplateId: tmpl.id, name: tmpl.name, order: orderIdx, status: 'not_started' },
-          });
           const templateStages = tmpl.stages as Array<Record<string, unknown>>;
+          const pw = await prisma.projectWorkflow.create({
+            data: {
+              projectId: req.params.id,
+              workflowTemplateId: tmpl.id,
+              name: tmpl.name,
+              order: orderIdx,
+              status: templateStages.length > 0 ? 'in_progress' : 'not_started',
+              ...(templateStages.length > 0 && { startedAt: new Date() }),
+            },
+          });
           if (templateStages.length > 0) {
             await prisma.projectStage.createMany({
               data: templateStages.map((s) => ({
@@ -568,13 +588,21 @@ projectsRouter.patch('/:id', requirePermission('projects:edit'), async (req, res
                 stageKey: (s.key || s.stageKey) as string,
                 stageOrder: s.order as number,
                 isRequired: (s.isRequired ?? true) as boolean,
-                status: 'pending',
+                status: (s.order as number) === 1 ? 'in_progress' : 'pending',
                 checklist: [],
-                // Inherit default member from workflow template stage configuration
                 ...(s.defaultMemberId ? { assignedTo: s.defaultMemberId as string } : {}),
+                ...((s.order as number) === 1 && { startDate: new Date() }),
               })),
             });
           }
+        }
+      }
+
+      // Remove workflows that were deselected — delete stages first, then the workflow record
+      for (const existingPw of existingPws) {
+        if (!desiredIds.has(existingPw.workflowTemplateId)) {
+          await prisma.projectStage.deleteMany({ where: { projectWorkflowId: existingPw.id } });
+          await prisma.projectWorkflow.delete({ where: { id: existingPw.id } });
         }
       }
 

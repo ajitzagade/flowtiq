@@ -289,6 +289,9 @@ export interface Project {
   documentsCount?: number;
   followUpsCount?: number;
   pendingFollowUps?: number;
+  overallProgressPct?: number | null;
+  completedStages?: number;
+  totalStages?: number;
 }
 
 // =============================================

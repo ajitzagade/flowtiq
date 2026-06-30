@@ -7,7 +7,7 @@ import { Header } from '@/components/layout/Header';
 import { useAuthStore } from '@/store/auth';
 import {
   FolderKanban, Clock, FileText, CheckCircle2, AlertTriangle,
-  TrendingUp, Users, Building2, ArrowRight, GitBranch, ChevronDown,
+  TrendingUp, Users, Building2, ArrowRight, GitBranch, ChevronDown, Plus,
 } from 'lucide-react';
 import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
 import { ProjectProgress } from '@/components/ProjectProgress';
@@ -307,6 +307,8 @@ export default function DashboardPage() {
   }
 
   const isSuperAdmin = user?.isSuperAdmin;
+  const userPermissions = (user?.permissions as string[] | undefined) ?? [];
+  const canCreateProject = isSuperAdmin || userPermissions.includes('projects:create');
 
   return (
     <>
@@ -340,9 +342,19 @@ export default function DashboardPage() {
                 <h3 className="font-semibold text-slate-900">Active Projects</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Sorted by priority — urgent first</p>
               </div>
-              <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                View all <ArrowRight size={14} />
-              </Link>
+              <div className="flex items-center gap-2">
+                {canCreateProject && (
+                  <Link
+                    href="/projects?new=1"
+                    className="inline-flex items-center gap-1.5 btn-primary py-1.5 px-3 text-xs"
+                  >
+                    <Plus size={13} /> New Project
+                  </Link>
+                )}
+                <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                  View all <ArrowRight size={14} />
+                </Link>
+              </div>
             </div>
             <div className="divide-y flex-1 overflow-y-auto" style={{ borderColor: '#eef0f8' }}>
               {stats?.recentProjects?.length === 0 && (
