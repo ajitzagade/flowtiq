@@ -10,6 +10,11 @@ export const metadata: Metadata = {
     template: '%s | Workflow Management',
   },
   description: 'Enterprise workflow and project management platform for modern teams',
+  icons: {
+    icon: '/vastudeep_logo.png',
+    shortcut: '/vastudeep_logo.png',
+    apple: '/vastudeep_logo.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

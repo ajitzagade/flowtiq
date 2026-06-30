@@ -4,18 +4,17 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
 
 export function FaviconUpdater() {
-  const logo = useAuthStore((s) => s.tenant?.branding?.logo);
+  const logoUrl = useAuthStore((s) => (s.tenant?.branding as { logoUrl?: string } | undefined)?.logoUrl);
 
   useEffect(() => {
-    if (!logo) return;
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (!link) {
       link = document.createElement('link');
       link.rel = 'icon';
       document.head.appendChild(link);
     }
-    link.href = logo;
-  }, [logo]);
+    link.href = logoUrl || '/vastudeep_logo.png';
+  }, [logoUrl]);
 
   return null;
 }

@@ -1,19 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { get } from '@/lib/api';
+import { useState, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { get, post } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import { useAuthStore } from '@/store/auth';
 import {
   FolderKanban, Clock, FileText, CheckCircle2, AlertTriangle,
   TrendingUp, Users, Building2, ArrowRight, GitBranch, ChevronDown, Plus,
+  DollarSign, Search, X, Banknote,
 } from 'lucide-react';
-import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn } from '@/lib/utils';
+import { formatDate, formatRelative, getStatusBadgeClass, getPriorityBadgeClass, cn, getErrorMessage } from '@/lib/utils';
 import { ProjectProgress } from '@/components/ProjectProgress';
 import { SkeletonCard, SkeletonTable } from '@/components/Skeleton';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
 
 interface DashboardStats {
   totalProjects: number;
@@ -261,6 +266,342 @@ function WorkflowPipelineSection({ pipeline }: {
   );
 }
 
+// ── Quick Finance Widget ──────────────────────────────────────────────────────
+
+const QUICK_PAYMENT_MODES = [
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'other', label: 'Other' },
+];
+
+function fmtAmt(amount: number, currency = 'INR') {
+  if (amount >= 10000000) return `${currency} ${(amount / 10000000).toFixed(1)}Cr`;
+  if (amount >= 100000) return `${currency} ${(amount / 100000).toFixed(1)}L`;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
+}
+
+const quickPaymentSchema = z.object({
+  amount: z.coerce.number().positive('Must be > 0'),
+  paymentDate: z.string().min(1, 'Required'),
+  mode: z.enum(['bank_transfer', 'cheque', 'cash', 'upi', 'other']).default('bank_transfer'),
+  reference: z.string().optional(),
+  notes: z.string().optional(),
+});
+type QuickPaymentForm = z.infer<typeof quickPaymentSchema>;
+
+interface FinanceQuickData {
+  financial: { contractValue: number; currency: string; billingType: string } | null;
+  invoices: Array<{
+    id: string; invoiceNumber: string; title: string;
+    totalAmount: number; status: string; outstanding: number; totalPaid: number; dueDate?: string;
+  }>;
+  summary: { totalContractValue: number; totalReceived: number; outstanding: number; currency: string };
+}
+
+function QuickPaymentModal({
+  project, onClose,
+}: {
+  project: { id: string; name: string; projectNumber: string; clientName: string };
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const ref = useRef<HTMLDivElement>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  const { data, isLoading } = useQuery<FinanceQuickData>({
+    queryKey: ['finance', project.id],
+    queryFn: () => get<FinanceQuickData>(`/finance/${project.id}`),
+  });
+
+  const openInvoices = data?.invoices.filter(
+    (inv) => inv.status !== 'paid' && inv.status !== 'cancelled' && inv.outstanding > 0
+  ) ?? [];
+  const selectedInvoice = openInvoices.find((inv) => inv.id === selectedInvoiceId) ?? openInvoices[0] ?? null;
+
+  const currency = data?.summary.currency ?? 'INR';
+
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<QuickPaymentForm>({
+    resolver: zodResolver(quickPaymentSchema),
+    defaultValues: { paymentDate: new Date().toISOString().slice(0, 10), mode: 'bank_transfer', amount: 0 },
+  });
+
+  useEffect(() => {
+    if (selectedInvoice) setValue('amount', selectedInvoice.outstanding);
+  }, [selectedInvoice?.id, setValue]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const watchedAmount = watch('amount');
+  const watchedMode = watch('mode');
+  const watchedDate = watch('paymentDate');
+
+  const onSubmit = async (values: QuickPaymentForm) => {
+    if (!selectedInvoice) return;
+    if (!confirming) { setConfirming(true); return; }
+    try {
+      await post(`/finance/invoices/${selectedInvoice.id}/payments`, { ...values, amount: Number(values.amount) });
+      qc.invalidateQueries({ queryKey: ['finance', project.id] });
+      toast.success(`Payment of ${fmtAmt(Number(values.amount), currency)} recorded for ${project.name}`);
+      onClose();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={ref} className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="qp-title">
+        <div className="card-header">
+          <div>
+            <h3 id="qp-title" className="font-semibold text-slate-900">Record Payment</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{project.projectNumber} · {project.name} · {project.clientName}</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost p-1.5"><X size={18} /></button>
+        </div>
+
+        {isLoading && (
+          <div className="p-8 text-center text-sm text-slate-400">Loading finance data...</div>
+        )}
+
+        {!isLoading && !data?.financial && (
+          <div className="p-8 text-center">
+            <DollarSign size={32} className="mx-auto mb-2 text-slate-200" />
+            <p className="text-sm text-slate-500 mb-3">No contract set up for this project.</p>
+            <Link href={`/projects/${project.id}`} onClick={onClose} className="btn-secondary text-sm">
+              Open Project
+            </Link>
+          </div>
+        )}
+
+        {!isLoading && data?.financial && openInvoices.length === 0 && (
+          <div className="p-8 text-center">
+            <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-300" />
+            <p className="text-sm text-slate-500 mb-3">No open invoices — all paid or no invoices raised yet.</p>
+            <Link href={`/projects/${project.id}`} onClick={onClose} className="btn-secondary text-sm">
+              Open Finance Tab
+            </Link>
+          </div>
+        )}
+
+        {!isLoading && data?.financial && openInvoices.length > 0 && (
+          <>
+            {/* Summary strip */}
+            <div className="px-5 pt-4 grid grid-cols-3 gap-2">
+              {[
+                { label: 'Contract', value: fmtAmt(data.summary.totalContractValue, currency), cls: 'bg-slate-50' },
+                { label: 'Received', value: fmtAmt(data.summary.totalReceived, currency), cls: 'bg-emerald-50' },
+                { label: 'Outstanding', value: fmtAmt(data.summary.outstanding, currency), cls: 'bg-amber-50' },
+              ].map(({ label, value, cls }) => (
+                <div key={label} className={`${cls} rounded-lg p-3`}>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+                  <p className="text-sm font-bold text-slate-800 break-all">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
+              {/* Invoice selector */}
+              {openInvoices.length > 1 ? (
+                <div>
+                  <label className="form-label">Invoice to Pay</label>
+                  <select
+                    className="form-input"
+                    value={selectedInvoice?.id ?? ''}
+                    onChange={(e) => { setSelectedInvoiceId(e.target.value); setConfirming(false); }}
+                  >
+                    {openInvoices.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.invoiceNumber} — {inv.title} ({fmtAmt(inv.outstanding, currency)} due)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <p className="text-xs font-medium text-blue-700">{selectedInvoice?.invoiceNumber} — {selectedInvoice?.title}</p>
+                  <p className="text-xs text-blue-500 mt-0.5">Outstanding: {fmtAmt(selectedInvoice?.outstanding ?? 0, currency)}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Amount *</label>
+                  <input
+                    {...register('amount')}
+                    type="number" step="0.01" className="form-input"
+                    onChange={(e) => { register('amount').onChange(e); setConfirming(false); }}
+                  />
+                  {errors.amount && <p className="form-error">{errors.amount.message}</p>}
+                </div>
+                <div>
+                  <label className="form-label">Payment Date *</label>
+                  <input
+                    {...register('paymentDate')}
+                    type="date" className="form-input"
+                    onChange={(e) => { register('paymentDate').onChange(e); setConfirming(false); }}
+                  />
+                  {errors.paymentDate && <p className="form-error">{errors.paymentDate.message}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Payment Mode</label>
+                <select
+                  {...register('mode')}
+                  className="form-input"
+                  onChange={(e) => { register('mode').onChange(e); setConfirming(false); }}
+                >
+                  {QUICK_PAYMENT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Reference / Transaction ID</label>
+                <input {...register('reference')} className="form-input" placeholder="Optional" />
+              </div>
+
+              <div>
+                <label className="form-label">Notes</label>
+                <textarea {...register('notes')} className="form-input" rows={2} />
+              </div>
+
+              {/* Confirmation panel */}
+              {confirming && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+                  <p className="text-sm font-semibold text-amber-800">Confirm this payment?</p>
+                  <p className="text-sm text-amber-700">
+                    <span className="font-bold">{fmtAmt(Number(watchedAmount), currency)}</span>
+                    {' '}via {QUICK_PAYMENT_MODES.find((m) => m.value === watchedMode)?.label} on {watchedDate}
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    Invoice: {selectedInvoice?.invoiceNumber} · Project: {project.name}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                {confirming ? (
+                  <>
+                    <button type="button" onClick={() => setConfirming(false)} className="btn-secondary">Back</button>
+                    <button type="submit" disabled={isSubmitting} className="btn-primary !bg-emerald-600 hover:!bg-emerald-700">
+                      <Banknote size={14} /> {isSubmitting ? 'Saving...' : 'Confirm & Record'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+                    <button type="submit" className="btn-primary">
+                      Review & Confirm
+                    </button>
+                  </>
+                )}
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuickFinanceWidget() {
+  const [search, setSearch] = useState('');
+  const [selectedProject, setSelectedProject] = useState<{
+    id: string; name: string; projectNumber: string; clientName: string;
+  } | null>(null);
+
+  const { data: searchData, isLoading: searching } = useQuery({
+    queryKey: ['projects', 'quick-finance-search', search],
+    queryFn: () => get<{ items: Array<{ id: string; name: string; projectNumber: string; clientName: string; status: string }> }>(
+      `/projects?search=${encodeURIComponent(search)}&pageSize=6`
+    ),
+    enabled: search.trim().length >= 2,
+  });
+
+  return (
+    <>
+      {selectedProject && (
+        <QuickPaymentModal
+          project={selectedProject}
+          onClose={() => { setSelectedProject(null); setSearch(''); }}
+        />
+      )}
+      <div className="card">
+        <div className="card-header">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <DollarSign size={15} className="text-emerald-600" />
+            </div>
+            <h3 className="font-semibold text-slate-900">Quick Payment Update</h3>
+          </div>
+          <Link href="/finance-reports" className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium">
+            Finance Reports <ArrowRight size={12} />
+          </Link>
+        </div>
+        <div className="p-4">
+          <div className="relative mb-3">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="form-input pl-9"
+              placeholder="Search project by name or client..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {search.trim().length < 2 && (
+            <p className="text-sm text-slate-400 text-center py-4">
+              Type at least 2 characters to search projects
+            </p>
+          )}
+
+          {search.trim().length >= 2 && searching && (
+            <p className="text-sm text-slate-400 text-center py-4">Searching...</p>
+          )}
+
+          {search.trim().length >= 2 && !searching && (searchData?.items?.length ?? 0) === 0 && (
+            <p className="text-sm text-slate-400 text-center py-4">No projects found</p>
+          )}
+
+          {search.trim().length >= 2 && !searching && (searchData?.items?.length ?? 0) > 0 && (
+            <div className="space-y-1.5">
+              {searchData!.items.map((project) => (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={() => setSelectedProject(project)}
+                  className="w-full text-left p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">{project.name}</p>
+                      <p className="text-xs text-slate-500">{project.clientName} · {project.projectNumber}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={getStatusBadgeClass(project.status)}>{project.status}</span>
+                      <Banknote size={14} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Action label helper ───────────────────────────────────────────────────────
+
 function getActionLabel(action: string): string {
   const map: Record<string, string> = {
     CREATED: 'created',
@@ -309,6 +650,7 @@ export default function DashboardPage() {
   const isSuperAdmin = user?.isSuperAdmin;
   const userPermissions = (user?.permissions as string[] | undefined) ?? [];
   const canCreateProject = isSuperAdmin || userPermissions.includes('projects:create');
+  const canViewFinance = isSuperAdmin || userPermissions.includes('reports:view');
 
   return (
     <>
@@ -478,6 +820,9 @@ export default function DashboardPage() {
         {!isSuperAdmin && stats?.workflowPipeline && stats.workflowPipeline.length > 0 && (
           <WorkflowPipelineSection pipeline={stats.workflowPipeline} />
         )}
+
+        {/* Quick Finance Update — admin only */}
+        {canViewFinance && <QuickFinanceWidget />}
 
         {/* Actionable summary row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
