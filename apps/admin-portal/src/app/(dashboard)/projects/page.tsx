@@ -278,12 +278,12 @@ function WorkflowKanban({
   const noStageProjects = buckets['__no_stage__'] ?? [];
   const completedWfProjects = buckets['__completed__'] ?? [];
   const columns: StageColumn[] = [
+    ...(noStageProjects.length > 0
+      ? [{ key: '__no_stage__', name: 'No Stage', order: 0, color: '#94a3b8', isNoStage: true }]
+      : []),
     ...stages,
     ...(completedWfProjects.length > 0
       ? [{ key: '__completed__', name: 'Workflow Done', order: 998, color: '#10b981', isCompleted: true }]
-      : []),
-    ...(noStageProjects.length > 0
-      ? [{ key: '__no_stage__', name: 'No Stage', order: 999, color: '#94a3b8', isNoStage: true }]
       : []),
   ];
 
