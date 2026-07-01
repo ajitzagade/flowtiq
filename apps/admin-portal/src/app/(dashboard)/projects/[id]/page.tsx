@@ -1300,7 +1300,6 @@ export default function ProjectDetailPage() {
     { key: 'workflows', label: `Workflows (${projectWorkflows.length})`, icon: GitBranch },
     { key: 'documents', label: 'Documents', icon: FileText },
     { key: 'followups', label: 'Follow-ups', icon: Clock },
-    { key: 'finance', label: 'Finance', icon: DollarSign },
   ] as const;
 
   return (

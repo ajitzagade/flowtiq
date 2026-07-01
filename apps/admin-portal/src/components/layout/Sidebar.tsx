@@ -18,7 +18,6 @@ const NAV_ITEMS: Array<{ key: string; label: string; href: string; icon: React.E
   { key: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban, requiredPermission: 'projects:view' },
   { key: 'completed-projects', label: 'Completed Projects', href: '/completed-projects', icon: CheckCircle, requiredPermission: 'projects:view' },
   { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart2, requiredPermission: 'reports:view' },
-  { key: 'finance-reports', label: 'Finance Reports', href: '/finance-reports', icon: TrendingUp, requiredPermission: 'reports:view' },
   { key: 'follow-ups', label: 'Follow-ups', href: '/follow-ups', icon: Clock, requiredPermission: 'follow_ups:create' },
   { key: 'documents', label: 'Documents', href: '/documents', icon: FileText, requiredPermission: 'documents:download' },
   { key: 'users', label: 'Users', href: '/users', icon: Users, requiredPermission: 'users:view' },

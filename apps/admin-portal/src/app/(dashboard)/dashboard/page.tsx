@@ -821,8 +821,8 @@ export default function DashboardPage() {
           <WorkflowPipelineSection pipeline={stats.workflowPipeline} />
         )}
 
-        {/* Quick Finance Update — admin only */}
-        {canViewFinance && <QuickFinanceWidget />}
+        {/* Quick Finance Update — hidden until finance module is enabled */}
+        {false && canViewFinance && <QuickFinanceWidget />}
 
         {/* Actionable summary row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
