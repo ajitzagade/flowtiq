@@ -151,7 +151,7 @@ function KanbanCard({
           <p className={cn('text-[10px] font-medium', theme.dueColor)}>Due {formatDate(project.dueDate)}</p>
         )}
         {project.updatedAt && (
-          <p className="text-[10px] text-slate-400 ml-auto">Updated {formatDate(project.updatedAt)}</p>
+          <p className="text-[10px] font-medium text-slate-900 ml-auto">Updated {formatDate(project.updatedAt)}</p>
         )}
       </div>
     </div>

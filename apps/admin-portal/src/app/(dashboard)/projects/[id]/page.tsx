@@ -1198,6 +1198,15 @@ export default function ProjectDetailPage() {
   const qc = useQueryClient();
 
   const focusWorkflowId = searchParams.get('workflowId');
+  const focusWorkflowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focusWorkflowId || !focusWorkflowRef.current) return;
+    const timer = setTimeout(() => {
+      focusWorkflowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [focusWorkflowId, focusWorkflowRef.current]);
 
   const initialTab = (() => {
     const t = searchParams.get('tab');
@@ -1440,6 +1449,7 @@ export default function ProjectDetailPage() {
             {orderedWorkflows.map((pw) => (
               <div
                 key={pw.id}
+                ref={pw.workflowTemplateId === focusWorkflowId ? focusWorkflowRef : undefined}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = 'move';
