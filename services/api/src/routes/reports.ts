@@ -137,10 +137,10 @@ reportsRouter.get('/summary', async (req, res, next) => {
     const start = rawStart ? startOf(new Date(rawStart)) : startOf(addMonths(now, -1));
     const end = rawEnd ? endOf(new Date(rawEnd)) : endOf(now);
 
-    // Build base where
+    // Build base where — always excludes soft-deleted projects, no status filter
     const baseWhere: Record<string, unknown> = isSuperAdmin
-      ? {}
-      : { tenantId: tenantId as string };
+      ? { deletedAt: null }
+      : { tenantId: tenantId as string, deletedAt: null };
 
     const canViewAll = isSuperAdmin || (permissions || []).includes('projects:view_all');
     if (!canViewAll) {
@@ -150,15 +150,13 @@ reportsRouter.get('/summary', async (req, res, next) => {
       ];
     }
 
-    // Status filter applied to period queries
-    // Note: stageFilter is used for stageDistribution only (via ProjectStage records), not for project counts
-    const periodExtra: Record<string, unknown> = {};
-    if (statusFilter !== 'all') periodExtra.status = statusFilter;
-
-    const periodWhere = { ...baseWhere, ...periodExtra };
+    // tableWhere — status filter only applies to the projects list table, not KPI aggregates
+    const tableWhere: Record<string, unknown> = { ...baseWhere };
+    if (statusFilter !== 'all') tableWhere.status = statusFilter;
 
     // ── KPI ──────────────────────────────────────────────────────────────────
 
+    // KPI totals are always current snapshots (unaffected by status/date filters)
     const [
       totalProjects,
       completedProjects,
@@ -169,27 +167,27 @@ reportsRouter.get('/summary', async (req, res, next) => {
       startedInPeriod,
       completedInPeriod,
     ] = await Promise.all([
-      prisma.project.count({ where: periodWhere }),
-      prisma.project.count({ where: { ...periodWhere, status: 'completed' } }),
-      prisma.project.count({ where: { ...periodWhere, status: 'active' } }),
-      prisma.project.count({ where: { ...periodWhere, status: 'on_hold' } }),
-      prisma.project.count({ where: { ...periodWhere, status: 'cancelled' } }),
+      prisma.project.count({ where: baseWhere }),
+      prisma.project.count({ where: { ...baseWhere, status: 'completed' } }),
+      prisma.project.count({ where: { ...baseWhere, status: 'active' } }),
+      prisma.project.count({ where: { ...baseWhere, status: 'on_hold' } }),
+      prisma.project.count({ where: { ...baseWhere, status: 'cancelled' } }),
       prisma.project.count({
         where: {
-          ...periodWhere,
+          ...baseWhere,
           status: { in: ['active', 'on_hold'] },
           dueDate: { lt: now },
         },
       }),
       prisma.project.count({
         where: {
-          ...periodWhere,
+          ...baseWhere,
           createdAt: { gte: start, lte: end },
         },
       }),
       prisma.project.count({
         where: {
-          ...periodWhere,
+          ...baseWhere,
           status: 'completed',
           updatedAt: { gte: start, lte: end },
         },
@@ -201,15 +199,17 @@ reportsRouter.get('/summary', async (req, res, next) => {
     // Get project IDs in scope for stage distribution
     const scopedProjectIds = (
       await prisma.project.findMany({
-        where: periodWhere,
+        where: baseWhere,
         select: { id: true },
       })
     ).map((p) => p.id);
 
+    // Count only in-progress stages so the chart shows where projects are currently active
     const stageGroups = await prisma.projectStage.groupBy({
       by: ['stageKey', 'stageName'],
       where: {
         projectId: { in: scopedProjectIds },
+        status: 'in_progress',
         ...(stageFilter !== 'all' && { stageKey: stageFilter }),
       },
       _count: { id: true },
@@ -226,7 +226,7 @@ reportsRouter.get('/summary', async (req, res, next) => {
 
     const statusGroups = await prisma.project.groupBy({
       by: ['status'],
-      where: { ...baseWhere, ...periodExtra },
+      where: baseWhere,
       _count: { id: true },
     });
 
@@ -254,11 +254,11 @@ reportsRouter.get('/summary', async (req, res, next) => {
 
     const [createdProjects, completedTrendProjects] = await Promise.all([
       prisma.project.findMany({
-        where: { ...periodWhere, createdAt: { gte: start, lte: end } },
+        where: { ...baseWhere, createdAt: { gte: start, lte: end } },
         select: { createdAt: true },
       }),
       prisma.project.findMany({
-        where: { ...periodWhere, status: 'completed', updatedAt: { gte: start, lte: end } },
+        where: { ...baseWhere, status: 'completed', updatedAt: { gte: start, lte: end } },
         select: { updatedAt: true },
       }),
     ]);
@@ -289,14 +289,24 @@ reportsRouter.get('/summary', async (req, res, next) => {
 
     // ── Projects list (for export) ────────────────────────────────────────────
 
-    const projects = await prisma.project.findMany({
-      where: { ...periodWhere, createdAt: { gte: start, lte: end } },
+    const rawProjects = await prisma.project.findMany({
+      where: { ...tableWhere, createdAt: { gte: start, lte: end } },
       orderBy: { createdAt: 'desc' },
       take: 500,
       include: {
         owner: { select: { firstName: true, lastName: true, email: true } },
       },
     });
+
+    const projects = rawProjects.map((p) => ({
+      id: p.id,
+      title: p.name,
+      status: p.status,
+      currentStage: p.currentStage,
+      createdAt: p.createdAt,
+      dueDate: p.dueDate,
+      owner: p.owner,
+    }));
 
     res.json({
       success: true,
@@ -332,7 +342,7 @@ reportsRouter.get('/stages', async (req, res, next) => {
 
     // Get project IDs in scope
     const scopedProjects = await prisma.project.findMany({
-      where: isSuperAdmin ? {} : { tenantId: tenantId as string },
+      where: isSuperAdmin ? { deletedAt: null } : { tenantId: tenantId as string, deletedAt: null },
       select: { id: true },
     });
     const projectIds = scopedProjects.map((p) => p.id);

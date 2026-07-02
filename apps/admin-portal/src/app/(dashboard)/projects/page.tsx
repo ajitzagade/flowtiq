@@ -45,12 +45,14 @@ function KanbanCard({
   onDragStart,
   onDragEnd,
   onEdit,
+  sectionWorkflowId,
 }: {
   project: Project;
   isDragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onEdit: (p: Project) => void;
+  sectionWorkflowId?: string | null;
 }) {
   const router = useRouter();
 
@@ -107,7 +109,7 @@ function KanbanCard({
         onDragStart(project.id);
       }}
       onDragEnd={onDragEnd}
-      onClick={() => router.push(`/projects/${project.id}`)}
+      onClick={() => router.push(`/projects/${project.id}${sectionWorkflowId ? `?workflowId=${sectionWorkflowId}` : ''}`)}
       className={cn(
         'border rounded-xl p-3 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
         theme.bg,
@@ -144,9 +146,14 @@ function KanbanCard({
         totalStages={project.totalStages}
         compact
       />
-      {project.dueDate && (
-        <p className={cn('text-[10px] font-medium mt-2', theme.dueColor)}>Due {formatDate(project.dueDate)}</p>
-      )}
+      <div className={cn('flex items-center justify-between mt-2', !project.dueDate && 'mt-2')}>
+        {project.dueDate && (
+          <p className={cn('text-[10px] font-medium', theme.dueColor)}>Due {formatDate(project.dueDate)}</p>
+        )}
+        {project.updatedAt && (
+          <p className="text-[10px] text-slate-400 ml-auto">Updated {formatDate(project.updatedAt)}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -369,6 +376,7 @@ function WorkflowKanban({
                     onDragStart={(id) => { draggingIdRef.current = id; setDraggingId(id); }}
                     onDragEnd={handleDragEnd}
                     onEdit={onEdit}
+                    sectionWorkflowId={sectionWorkflowId}
                   />
                 ))}
               </div>

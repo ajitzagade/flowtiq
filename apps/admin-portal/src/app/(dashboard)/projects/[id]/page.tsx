@@ -872,7 +872,7 @@ function StageCard({
 // =============================================
 
 function WorkflowCard({
-  workflow, projectId, users, onRefresh, isDragging, isDragOver,
+  workflow, projectId, users, onRefresh, isDragging, isDragOver, defaultCollapsed,
 }: {
   workflow: ProjectWorkflow & { stages?: (ProjectStage & { history?: unknown[]; documents?: DocType[]; subTasks?: StageSubTask[] })[] };
   projectId: string;
@@ -880,8 +880,9 @@ function WorkflowCard({
   onRefresh: () => void;
   isDragging?: boolean;
   isDragOver?: boolean;
+  defaultCollapsed?: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed ?? true);
 
   const stages = workflow.stages || [];
   const completed = stages.filter((s) => s.status === 'completed').length;
@@ -1196,6 +1197,8 @@ export default function ProjectDetailPage() {
   const searchParams = useSearchParams();
   const qc = useQueryClient();
 
+  const focusWorkflowId = searchParams.get('workflowId');
+
   const initialTab = (() => {
     const t = searchParams.get('tab');
     if (t === 'documents' || t === 'followups' || t === 'finance') return t;
@@ -1463,6 +1466,7 @@ export default function ProjectDetailPage() {
                   onRefresh={handleRefresh}
                   isDragging={draggingWfId === pw.id}
                   isDragOver={dragOverWfId === pw.id && draggingWfId !== pw.id}
+                  defaultCollapsed={focusWorkflowId ? pw.workflowTemplateId !== focusWorkflowId : true}
                 />
               </div>
             ))}
