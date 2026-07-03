@@ -102,6 +102,19 @@ jobs:
 
           echo "iOS native project generated successfully"
 
+      # ── Link transitive pnpm deps needed by Podfile ─────────────────────────
+      # pnpm only hoists direct deps into apps/mobile/node_modules/.
+      # The Podfile requires @react-native-community/cli-platform-ios directly,
+      # which is only a transitive dep (dep of react-native). Symlink it in.
+      - name: Link cli-platform-ios for CocoaPods
+        working-directory: apps/mobile
+        run: |
+          PKG="@react-native-community/cli-platform-ios"
+          PKG_PATH=$(node -e "console.log(require.resolve('$PKG/package.json').replace('/package.json',''))")
+          mkdir -p "node_modules/@react-native-community"
+          ln -sfn "$PKG_PATH" "node_modules/$PKG"
+          echo "Linked $PKG -> $PKG_PATH"
+
       # ── Ruby / Bundler / fastlane ────────────────────────────────────────────
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
