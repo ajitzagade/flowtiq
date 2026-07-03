@@ -79,12 +79,12 @@ jobs:
           cp -r _tmp_rn/ios/FlowtiqMobile.xcodeproj ios/
           cp -r _tmp_rn/ios/FlowtiqMobileTests       ios/ 2>/dev/null || true
 
-          # Native source files (AppDelegate, main.m, LaunchScreen etc.)
-          # Copy only files not already present so we don't clobber committed ones
+          # Native source files (AppDelegate, main.m, LaunchScreen, xcassets etc.)
+          # Copy only items not already present so we don't clobber committed ones
           for f in _tmp_rn/ios/FlowtiqMobile/*; do
             fname="$(basename "$f")"
-            if [ ! -f "ios/FlowtiqMobile/$fname" ]; then
-              cp "$f" "ios/FlowtiqMobile/$fname"
+            if [ ! -e "ios/FlowtiqMobile/$fname" ]; then
+              cp -r "$f" "ios/FlowtiqMobile/$fname"
             fi
           done
 
