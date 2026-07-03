@@ -1,7 +1,7 @@
 # Flowtiq Mobile — iOS Fastlane configuration
 # Requires: Ruby, Bundler (`bundle install` in apps/mobile/ios/)
 #
-# Environment variables required:
+# Environment variables required (beta/release lanes):
 #   APPLE_TEAM_ID                     — Apple Developer Team ID
 #   APP_STORE_CONNECT_API_KEY_ID      — ASC API Key ID
 #   APP_STORE_CONNECT_API_ISSUER_ID   — ASC API Issuer ID
@@ -9,10 +9,54 @@
 #   MATCH_PASSWORD                    — fastlane match repo encryption password
 #   MATCH_GIT_URL                     — private match certificates repo URL
 #   BUILD_NUMBER                      — build number (use GitHub run number in CI)
+#
+# Environment variables required (build_unsigned lane):
+#   BUILD_NUMBER (optional)           — injected into CFBundleVersion; defaults to timestamp
 
 default_platform(:ios)
 
 platform :ios do
+  # ── build_unsigned lane — no-code-signing IPA for ad-hoc distribution ───────
+  # Output: apps/mobile/ios/build/FlowtiqMobile-unsigned.ipa
+  # Prerequisites: Xcode selected, pod install done, FlowtiqMobile.xcworkspace present
+  lane :build_unsigned do
+    build_number = ENV["BUILD_NUMBER"] || Time.now.to_i.to_s
+
+    # Stamp the build number so it shows in the app's About screen / Settings
+    increment_build_number(build_number: build_number)
+
+    archive_path = File.expand_path("../build/FlowtiqMobile.xcarchive", __dir__)
+    ipa_dir      = File.expand_path("../build",                          __dir__)
+
+    # ── Step 1: archive without code signing ────────────────────────────────
+    sh(
+      "xcodebuild archive" \
+      " -workspace FlowtiqMobile.xcworkspace" \
+      " -scheme FlowtiqMobile" \
+      " -configuration Release" \
+      " -archivePath '#{archive_path}'" \
+      " CODE_SIGNING_REQUIRED=NO" \
+      " CODE_SIGN_IDENTITY=''" \
+      " CODE_SIGNING_ALLOWED=NO" \
+      " | xcpretty || true"
+    )
+
+    UI.user_error!("Archive not found — xcodebuild failed") unless File.exist?(archive_path)
+
+    # ── Step 2: package .app → unsigned .ipa ────────────────────────────────
+    app_path   = "#{archive_path}/Products/Applications/FlowtiqMobile.app"
+    payload_dir = "#{ipa_dir}/.unsigned_tmp/Payload"
+    ipa_path   = "#{ipa_dir}/FlowtiqMobile-unsigned.ipa"
+
+    sh("rm -rf '#{ipa_dir}/.unsigned_tmp'")
+    sh("mkdir -p '#{payload_dir}'")
+    sh("cp -r '#{app_path}' '#{payload_dir}/'")
+    sh("cd '#{ipa_dir}/.unsigned_tmp' && zip -qr '#{ipa_path}' Payload")
+    sh("rm -rf '#{ipa_dir}/.unsigned_tmp'")
+
+    UI.success("Unsigned IPA → #{ipa_path}")
+  end
+
   # ── beta lane — build and upload to TestFlight ──────────────────────────────
   lane :beta do
     # Authenticate with App Store Connect API key (no Apple ID / 2FA needed)
