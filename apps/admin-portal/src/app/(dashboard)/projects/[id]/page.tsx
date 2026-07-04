@@ -424,7 +424,7 @@ function StageCard({
             </div>
           )}
           {/* Colored status badge — hidden on very small screens */}
-          <span className={cn('hidden xs:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize', stageBadge[stage.status] || 'bg-slate-100 text-slate-500')}>
+          <span className={cn('hidden sm:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize', stageBadge[stage.status] || 'bg-slate-100 text-slate-500')}>
             {stage.status.replace('_', ' ')}
           </span>
           {/* Update Stage button */}
