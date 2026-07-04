@@ -205,7 +205,7 @@ function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTempla
                       onChange={(e) => updateStage(idx, 'name', e.target.value)}
                       placeholder="Stage name"
                     />
-                    <label className="flex items-center gap-1.5 text-xs flex-shrink-0 whitespace-nowrap cursor-pointer select-none">
+                    <label className="hidden sm:flex items-center gap-1.5 text-xs flex-shrink-0 whitespace-nowrap cursor-pointer select-none">
                       <input
                         type="checkbox"
                         className="rounded"
@@ -214,7 +214,7 @@ function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTempla
                       />
                       <span className={stage.isRequired ? 'text-red-600 font-medium' : 'text-slate-400'}>Required</span>
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-500 flex-shrink-0 whitespace-nowrap cursor-pointer select-none">
+                    <label className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 flex-shrink-0 whitespace-nowrap cursor-pointer select-none">
                       <input
                         type="checkbox"
                         className="rounded"
@@ -230,6 +230,16 @@ function WorkflowModal({ workflow, onClose, users }: { workflow?: WorkflowTempla
                     >
                       <X size={14} />
                     </button>
+                  </div>
+                  <div className="mt-1.5 flex sm:hidden items-center gap-4">
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                      <input type="checkbox" className="rounded" checked={stage.isRequired} onChange={(e) => updateStage(idx, 'isRequired', e.target.checked)} />
+                      <span className={stage.isRequired ? 'text-red-600 font-medium' : 'text-slate-400'}>Required</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
+                      <input type="checkbox" className="rounded" checked={stage.requiresApproval} onChange={(e) => updateStage(idx, 'requiresApproval', e.target.checked)} />
+                      Approval
+                    </label>
                   </div>
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <input

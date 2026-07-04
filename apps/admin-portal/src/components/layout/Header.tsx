@@ -215,7 +215,7 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
 
               {/* Results dropdown */}
               {debouncedQuery.length >= 2 && (
-                <div className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-200 z-50 overflow-hidden animate-slide-in">
+                <div className="fixed left-2 right-2 top-[72px] md:absolute md:left-auto md:right-0 md:top-full md:mt-1.5 md:w-72 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-200 z-50 overflow-hidden animate-slide-in">
                   {searchFetching ? (
                     <div className="px-4 py-6 text-center text-sm text-slate-400">Searching...</div>
                   ) : searchData?.items?.length === 0 ? (
