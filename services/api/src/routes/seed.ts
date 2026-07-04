@@ -68,6 +68,7 @@ seedRouter.post('/', async (req, res) => {
       { code: 'projects:create',   name: 'Create Projects',    module: 'projects',   action: 'create' },
       { code: 'projects:edit',     name: 'Edit Projects',      module: 'projects',   action: 'edit' },
       { code: 'projects:delete',   name: 'Delete Projects',    module: 'projects',   action: 'delete' },
+      { code: 'stages:update',     name: 'Update Stages',      module: 'stages',     action: 'update' },
       { code: 'documents:upload',  name: 'Upload Documents',   module: 'documents',  action: 'upload' },
       { code: 'documents:download',name: 'Download Documents', module: 'documents',  action: 'download' },
       { code: 'documents:delete',  name: 'Delete Documents',   module: 'documents',  action: 'delete' },
@@ -114,7 +115,7 @@ seedRouter.post('/', async (req, res) => {
     const followupRole = await prisma.role.create({
       data: {
         tenantId: tenant.id, name: 'Follow-up Executive', description: 'Manage follow-ups', color: '#f59e0b',
-        rolePermissions: { create: ['projects:view','follow_ups:view','follow_ups:create','follow_ups:edit'].map((c) => ({ permissionId: permMap[c] })) },
+        rolePermissions: { create: ['projects:view','stages:update','follow_ups:view','follow_ups:create','follow_ups:edit'].map((c) => ({ permissionId: permMap[c] })) },
       },
     });
 

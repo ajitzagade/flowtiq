@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireAnyPermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
 import { sendPushNotification } from '../lib/push';
 
@@ -132,7 +132,7 @@ async function syncProjectTeamMembers(projectId: string) {
 
 // PATCH /api/stages/:id
 // Records history for EVERY update (including duplicate values as required)
-stagesRouter.patch('/:id', requirePermission('projects:edit'), async (req, res, next) => {
+stagesRouter.patch('/:id', requireAnyPermission(['projects:edit', 'stages:update']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;
@@ -403,7 +403,7 @@ const createSubTaskSchema = z.object({
 });
 
 // POST /api/stages/:id/sub-tasks
-stagesRouter.post('/:id/sub-tasks', requirePermission('projects:edit'), async (req, res, next) => {
+stagesRouter.post('/:id/sub-tasks', requireAnyPermission(['projects:edit', 'stages:update']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;
@@ -493,7 +493,7 @@ stagesRouter.post('/:id/sub-tasks', requirePermission('projects:edit'), async (r
 });
 
 // PATCH /api/stages/:stageId/sub-tasks/:subTaskId
-stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:edit'), async (req, res, next) => {
+stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requireAnyPermission(['projects:edit', 'stages:update']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const { userId } = authReq.user;
@@ -586,7 +586,7 @@ stagesRouter.patch('/:stageId/sub-tasks/:subTaskId', requirePermission('projects
 });
 
 // DELETE /api/stages/:stageId/sub-tasks/:subTaskId
-stagesRouter.delete('/:stageId/sub-tasks/:subTaskId', requirePermission('projects:edit'), async (req, res, next) => {
+stagesRouter.delete('/:stageId/sub-tasks/:subTaskId', requireAnyPermission(['projects:edit', 'stages:update']), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const subTask = await prisma.stageSubTask.findFirst({
