@@ -283,7 +283,7 @@ export function Header({ title, subtitle }: { title?: string; subtitle?: string 
 
           {activePanel === 'bell' && (
             <div
-              className="absolute right-0 top-full mt-2 w-[min(380px,calc(100vw-1rem))] max-h-[480px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-200 flex flex-col animate-slide-in z-50"
+              className="fixed left-2 right-2 top-[72px] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-[380px] max-h-[480px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-200 flex flex-col animate-slide-in z-50"
               role="dialog"
               aria-label="Notifications"
             >
