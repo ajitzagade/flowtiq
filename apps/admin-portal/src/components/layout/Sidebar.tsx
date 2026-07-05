@@ -207,6 +207,20 @@ export function Sidebar() {
           <LogOut size={18} className="flex-shrink-0" aria-hidden="true" />
           {showLabels && <span>Sign out</span>}
         </button>
+        {showLabels && (
+          <a
+            href="https://www.azentis.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-center text-white/30 text-[10px] mt-2 pt-2 border-t hover:text-white/50 transition-colors"
+            style={{ borderColor: 'var(--sidebar-border)' }}
+          >
+            Developed by{' '}
+            <span className="font-semibold" style={{ color: 'var(--brand-primary)' }}>
+              AZENTIS
+            </span>
+          </a>
+        )}
       </div>
     </aside>
   );
