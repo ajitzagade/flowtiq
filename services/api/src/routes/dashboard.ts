@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { projectAccessOR, getAccessibleProjectIds } from '../lib/project-access';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
@@ -58,11 +59,7 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       status: { not: 'cancelled' }, // exclude cancelled
     };
     if (!canViewAll) {
-      projectWhere.OR = [
-        { ownerId: userId },
-        { teamMembers: { has: userId } },
-        { followUpOwnerId: userId },
-      ];
+      projectWhere.OR = projectAccessOR(userId);
     }
 
     const followUpWhere: Record<string, unknown> = { tenantId: tenantId as string };
@@ -258,11 +255,12 @@ dashboardRouter.get('/stats', async (req, res, next) => {
       },
     });
 
-    // Recent audit activity
-    const recentActivity = await prisma.auditLog.findMany({
+    // Recent audit activity — fetch a larger batch for restricted users so we
+    // still have 10 left after filtering out projects they can't access.
+    const activityBatch = await prisma.auditLog.findMany({
       where: { tenantId: tenantId as string },
       orderBy: { createdAt: 'desc' },
-      take: 10,
+      take: canViewAll ? 10 : 40,
       select: {
         id: true,
         action: true,
@@ -275,6 +273,57 @@ dashboardRouter.get('/stats', async (req, res, next) => {
         createdAt: true,
       },
     });
+
+    let recentActivity = activityBatch;
+    if (!canViewAll) {
+      const accessibleProjectIds = await getAccessibleProjectIds(tenantId as string, userId);
+      const PROJECT_SCOPED_MODULES = new Set(['projects', 'stages', 'project_workflows', 'followups', 'documents', 'finance']);
+
+      const followUpIds = activityBatch
+        .filter((a) => a.module === 'followups' && a.entityId)
+        .map((a) => a.entityId as string);
+      const documentIds = activityBatch
+        .filter((a) => a.module === 'documents' && a.entityId)
+        .map((a) => a.entityId as string);
+
+      const [relatedFollowUps, relatedDocuments] = await Promise.all([
+        followUpIds.length
+          ? prisma.followUp.findMany({ where: { id: { in: followUpIds } }, select: { id: true, projectId: true } })
+          : Promise.resolve([]),
+        documentIds.length
+          ? prisma.document.findMany({ where: { id: { in: documentIds } }, select: { id: true, projectId: true } })
+          : Promise.resolve([]),
+      ]);
+      const followUpProjectMap = new Map(relatedFollowUps.map((f) => [f.id, f.projectId]));
+      const documentProjectMap = new Map(relatedDocuments.map((d) => [d.id, d.projectId]));
+
+      const resolveProjectId = (log: (typeof activityBatch)[number]): string | null => {
+        const meta = log.metadata as Record<string, unknown> | null;
+        switch (log.module) {
+          case 'projects':
+            return log.entityId ?? null;
+          case 'stages':
+          case 'project_workflows':
+            return (meta?.projectId as string) ?? null;
+          case 'finance':
+            return (meta?.projectId as string) ?? (log.entityType === 'project_financial' ? log.entityId : null) ?? null;
+          case 'followups':
+            return log.entityId ? followUpProjectMap.get(log.entityId) ?? null : null;
+          case 'documents':
+            return log.entityId ? documentProjectMap.get(log.entityId) ?? null : null;
+          default:
+            return null;
+        }
+      };
+
+      recentActivity = activityBatch
+        .filter((log) => {
+          if (!PROJECT_SCOPED_MODULES.has(log.module)) return true;
+          const projectId = resolveProjectId(log);
+          return projectId !== null && accessibleProjectIds.has(projectId);
+        })
+        .slice(0, 10);
+    }
 
     const statusMap = Object.fromEntries(projectsByStatus.map((s) => [s.status, s._count.id]));
     const priorityMap = Object.fromEntries(projectsByPriority.map((p) => [p.priority, p._count.id]));

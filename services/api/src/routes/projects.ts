@@ -5,6 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { requirePermission, requireAnyPermission } from '../middleware/rbac';
 import { createAuditLog } from '../lib/audit';
 import { sendPushNotification } from '../lib/push';
+import { projectAccessOR } from '../lib/project-access';
 
 export const projectsRouter = Router();
 projectsRouter.use(authenticate);
@@ -47,12 +48,7 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
     const where: Record<string, unknown> = isSuperAdmin ? {} : { tenantId: tenantId as string };
 
     if (!canViewAll) {
-      where.OR = [
-        { ownerId: userId },
-        { teamMembers: { has: userId } },
-        { followUpOwnerId: userId },
-        { reportingOwnerId: userId },
-      ];
+      where.OR = projectAccessOR(userId);
     }
 
     if (search) {
@@ -162,10 +158,15 @@ projectsRouter.get('/', requireAnyPermission(['projects:view', 'projects:view_al
 projectsRouter.get('/:id', requirePermission('projects:view'), async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
-    const { tenantId } = authReq.user;
+    const { tenantId, userId, isSuperAdmin, permissions } = authReq.user;
+    const canViewAll = isSuperAdmin || permissions.includes('projects:view_all');
 
     let project = await prisma.project.findFirst({
-      where: { id: req.params.id, tenantId: tenantId as string },
+      where: {
+        id: req.params.id,
+        tenantId: tenantId as string,
+        ...(canViewAll ? {} : { OR: projectAccessOR(userId) }),
+      },
       include: {
         owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
         workflow: { select: { id: true, name: true, stages: true } },
