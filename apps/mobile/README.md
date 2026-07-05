@@ -108,7 +108,7 @@ Run once to create the Flowtiq signing keystore. Store it securely — never com
 
 ```bash
 keytool -genkey -v -keystore release.keystore \
-  -alias flowtiq \
+  -alias vastudeep \
   -keyalg RSA \
   -keysize 2048 \
   -validity 10000 \
@@ -128,7 +128,7 @@ Paste the result as the `ANDROID_KEYSTORE_BASE64` GitHub secret.
 ### Extracting the SHA-256 fingerprint (for assetlinks.json)
 
 ```bash
-keytool -list -v -keystore release.keystore -alias flowtiq -storepass YOUR_STORE_PASSWORD
+keytool -list -v -keystore release.keystore -alias vastudeep -storepass YOUR_STORE_PASSWORD
 ```
 
 Copy the `SHA256:` line from the output. Remove the colons and use as `PLACEHOLDER_SHA256_FINGERPRINT` in `apps/admin-portal/public/.well-known/assetlinks.json`.
@@ -141,11 +141,12 @@ pnpm config:tenant vastudeep
 
 # Then build
 cd apps/mobile/android
-KEYSTORE_FILE=app/release.keystore \
+KEYSTORE_FILE=release.keystore \
 KEYSTORE_PASSWORD=YOUR_STORE_PASSWORD \
-KEY_ALIAS=flowtiq \
+KEY_ALIAS=vastudeep \
 KEY_PASSWORD=YOUR_KEY_PASSWORD \
-./gradlew bundleRelease
+./gradlew assembleRelease   # .apk for sideloading / testing
+# or: ./gradlew bundleRelease  # .aab for Play Store upload
 ```
 
 Output: `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`
