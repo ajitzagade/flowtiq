@@ -833,7 +833,7 @@ function ProjectModal({
   const workflowList = workflows || [];
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={modalRef} className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">{project ? 'Edit Project' : 'New Project'}</h3>
@@ -979,6 +979,7 @@ function ProjectsPageInner() {
   const [priority, setPriority] = useState('');
   const [workflowFilter, setWorkflowFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'status' | 'progress'; direction: 'asc' | 'desc' } | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
@@ -1036,6 +1037,25 @@ function ProjectsPageInner() {
 
   const projects = data?.items || [];
   const totalPages = data?.totalPages || 1;
+
+  const toggleSort = (key: 'name' | 'status' | 'progress') => {
+    setSortConfig((prev) =>
+      prev?.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' }
+    );
+  };
+
+  const sortedProjects = useMemo(() => {
+    if (!sortConfig) return projects;
+    const dir = sortConfig.direction === 'asc' ? 1 : -1;
+    return [...projects].sort((a, b) => {
+      if (sortConfig.key === 'name') return a.name.localeCompare(b.name) * dir;
+      if (sortConfig.key === 'status') return a.status.localeCompare(b.status) * dir;
+      return ((a.overallProgressPct ?? 0) - (b.overallProgressPct ?? 0)) * dir;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, sortConfig]);
 
   return (
     <>
@@ -1173,12 +1193,45 @@ function ProjectsPageInner() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Project</th>
+                    <th>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('name')}
+                        className="flex items-center gap-1 hover:text-slate-700"
+                      >
+                        Project
+                        {sortConfig?.key === 'name' && (
+                          sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                        )}
+                      </button>
+                    </th>
                     <th>Client</th>
                     <th>Workflow</th>
-                    <th>Status</th>
+                    <th>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('status')}
+                        className="flex items-center gap-1 hover:text-slate-700"
+                      >
+                        Status
+                        {sortConfig?.key === 'status' && (
+                          sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                        )}
+                      </button>
+                    </th>
                     <th>Priority</th>
-                    <th className="min-w-[160px]">Progress</th>
+                    <th className="min-w-[160px]">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('progress')}
+                        className="flex items-center gap-1 hover:text-slate-700"
+                      >
+                        Progress
+                        {sortConfig?.key === 'progress' && (
+                          sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                        )}
+                      </button>
+                    </th>
                     <th>Due Date</th>
                     <th>Owner</th>
                     <th className="text-right">Actions</th>
@@ -1202,7 +1255,7 @@ function ProjectsPageInner() {
                       </td>
                     </tr>
                   )}
-                  {projects.map((project) => (
+                  {sortedProjects.map((project) => (
                     <tr
                       key={project.id}
                       className="row-clickable group"

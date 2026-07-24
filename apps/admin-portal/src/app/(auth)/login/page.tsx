@@ -260,10 +260,7 @@ export default function LoginPage() {
 
       {/* Forgot Password Modal */}
       {showForgot && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && setShowForgot(false)}
-        >
+        <div className="modal-overlay">
           <div className="modal-content max-w-sm w-full" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
             <div className="card-header">
               <h3 id="forgot-title" className="font-semibold text-slate-900">Reset your password</h3>

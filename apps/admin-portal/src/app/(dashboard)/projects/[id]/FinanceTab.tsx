@@ -167,7 +167,7 @@ function ContractModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={ref} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="contract-modal-title">
         <div className="card-header">
           <h3 id="contract-modal-title" className="font-semibold text-slate-900">
@@ -272,7 +272,7 @@ function MilestoneModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={ref} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="milestone-modal-title">
         <div className="card-header">
           <h3 id="milestone-modal-title" className="font-semibold text-slate-900">
@@ -372,7 +372,7 @@ function InvoiceModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={ref} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="invoice-modal-title">
         <div className="card-header">
           <h3 id="invoice-modal-title" className="font-semibold text-slate-900">Create Invoice</h3>
@@ -471,7 +471,7 @@ function RecordPaymentModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={ref} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
         <div className="card-header">
           <div>

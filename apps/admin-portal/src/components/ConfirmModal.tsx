@@ -41,10 +41,7 @@ export function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={(e) => e.target === e.currentTarget && onCancel()}
-    >
+    <div className="modal-overlay">
       <div
         ref={modalRef}
         className="modal-content max-w-sm w-full"
