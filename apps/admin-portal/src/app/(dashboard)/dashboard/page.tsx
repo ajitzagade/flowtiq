@@ -357,7 +357,7 @@ function QuickPaymentModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={ref} className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="qp-title">
         <div className="card-header">
           <div>

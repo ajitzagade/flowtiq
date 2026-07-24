@@ -261,8 +261,10 @@ stagesRouter.patch('/:id', requireAnyPermission(['projects:edit', 'stages:update
       },
     });
 
-    // If stage completed: advance to next stage in the workflow
-    if (status === 'completed' && status !== previousStatus) {
+    // If stage completed or skipped: advance to next stage in the workflow
+    // (a skipped stage is resolved just like a completed one — the workflow should
+    // keep progressing instead of leaving no stage "in_progress")
+    if ((status === 'completed' || status === 'skipped') && status !== previousStatus) {
       if (stage.projectWorkflowId) {
         // New multi-workflow system: advance within the workflow
         const nextStage = await prisma.projectStage.findFirst({
@@ -275,12 +277,12 @@ stagesRouter.patch('/:id', requireAnyPermission(['projects:edit', 'stages:update
           });
         }
 
-        // Check if all stages in this workflow are complete → mark workflow completed
+        // Check if all stages in this workflow are resolved (completed or skipped) → mark workflow completed
         const allStages = await prisma.projectStage.findMany({
           where: { projectWorkflowId: stage.projectWorkflowId },
           select: { status: true },
         });
-        if (allStages.every((s) => s.status === 'completed')) {
+        if (allStages.every((s) => s.status === 'completed' || s.status === 'skipped')) {
           await prisma.projectWorkflow.update({
             where: { id: stage.projectWorkflowId },
             data: { status: 'completed', completedAt: new Date() },

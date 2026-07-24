@@ -76,7 +76,7 @@ function UserModal({ user, roles, onClose }: {
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={modalRef} className="modal-content max-w-lg w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">{user ? 'Edit User' : 'New User'}</h3>

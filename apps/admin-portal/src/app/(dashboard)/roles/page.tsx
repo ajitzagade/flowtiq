@@ -80,7 +80,7 @@ function RoleModal({ role, permissions, onClose }: {
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={modalRef} className="modal-content max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">{role ? 'Edit Role' : 'New Role'}</h3>

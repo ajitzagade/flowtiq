@@ -136,7 +136,7 @@ function DocPreviewModal({ doc, onClose }: { doc: DocType; onClose: () => void }
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={modalRef} className="modal-content max-w-4xl w-full max-h-[90vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="doc-preview-title">
         <div className="card-header flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -1044,7 +1044,7 @@ function AddWorkflowModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={modalRef} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="add-workflow-title">
         <div className="card-header">
           <h3 id="add-workflow-title">Add Workflow to Project</h3>

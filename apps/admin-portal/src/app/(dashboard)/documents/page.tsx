@@ -110,7 +110,7 @@ function UploadModal({ onClose, initialProjectId = '' }: { onClose: () => void; 
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div ref={modalRef} className="modal-content max-w-md w-full" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="card-header">
           <h3 id="modal-title">Upload Document</h3>
