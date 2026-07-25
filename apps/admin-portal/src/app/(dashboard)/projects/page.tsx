@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Search, FolderKanban, Edit, Eye, Trash2, X,
   ChevronLeft, ChevronRight, LayoutList, Kanban, ChevronDown, GitBranch,
-  ArrowUp, ArrowDown, GripVertical,
+  ArrowUp, ArrowDown, GripVertical, LayoutGrid, Grid2x2, Rows3, Check,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { ProjectProgress } from '@/components/ProjectProgress';
@@ -38,6 +38,115 @@ const PALETTE = [
   '#ef4444', '#64748b', '#1d4ed8', '#0ea5e9', '#f97316', '#94a3b8',
 ];
 
+const PRIORITY_DOT: Record<string, string> = {
+  urgent: 'bg-rose-500',
+  high: 'bg-amber-500',
+  medium: 'bg-sky-500',
+  low: 'bg-slate-400',
+};
+
+// ── Per-workflow view mode (Large/Medium/Small cards or List) ──────────────────
+type WorkflowViewMode = 'kanban-large' | 'kanban-medium' | 'kanban-small' | 'list';
+
+const workflowViewKey = (id: string) => `workflow-view-mode-${id}`;
+
+const VIEW_OPTIONS: { mode: WorkflowViewMode; label: string; icon: typeof LayoutGrid; group: 'board' | 'list' }[] = [
+  { mode: 'kanban-large', label: 'Large cards', icon: LayoutGrid, group: 'board' },
+  { mode: 'kanban-medium', label: 'Medium cards', icon: Grid2x2, group: 'board' },
+  { mode: 'kanban-small', label: 'Small cards', icon: Rows3, group: 'board' },
+  { mode: 'list', label: 'List', icon: LayoutList, group: 'list' },
+];
+
+function WorkflowViewMenu({
+  value,
+  onChange,
+  onOpenChange,
+}: {
+  value: WorkflowViewMode;
+  onChange: (mode: WorkflowViewMode) => void;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { onOpenChange?.(open); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const active = VIEW_OPTIONS.find((o) => o.mode === value) ?? VIEW_OPTIONS[0];
+  const ActiveIcon = active.icon;
+
+  return (
+    <div
+      ref={ref}
+      className="relative flex-shrink-0"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <ActiveIcon size={14} />
+        View
+        <ChevronDown size={12} className={cn('transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1 z-20"
+        >
+          <p className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Board</p>
+          {VIEW_OPTIONS.filter((o) => o.group === 'board').map((o) => (
+            <button
+              key={o.mode}
+              type="button"
+              role="menuitem"
+              onClick={() => { onChange(o.mode); setOpen(false); }}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50 transition-colors',
+                value === o.mode ? 'text-blue-600 font-medium' : 'text-slate-600',
+              )}
+            >
+              <o.icon size={14} />
+              {o.label}
+              {value === o.mode && <Check size={13} className="ml-auto" />}
+            </button>
+          ))}
+          <div className="my-1 border-t border-slate-100" />
+          {VIEW_OPTIONS.filter((o) => o.group === 'list').map((o) => (
+            <button
+              key={o.mode}
+              type="button"
+              role="menuitem"
+              onClick={() => { onChange(o.mode); setOpen(false); }}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50 transition-colors',
+                value === o.mode ? 'text-blue-600 font-medium' : 'text-slate-600',
+              )}
+            >
+              <o.icon size={14} />
+              {o.label}
+              {value === o.mode && <Check size={13} className="ml-auto" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── KanbanCard ─────────────────────────────────────────────────────────────────
 function KanbanCard({
   project,
@@ -46,6 +155,7 @@ function KanbanCard({
   onDragEnd,
   onEdit,
   sectionWorkflowId,
+  size = 'large',
 }: {
   project: Project;
   isDragging: boolean;
@@ -53,6 +163,7 @@ function KanbanCard({
   onDragEnd: () => void;
   onEdit: (p: Project) => void;
   sectionWorkflowId?: string | null;
+  size?: 'large' | 'medium' | 'small';
 }) {
   const router = useRouter();
 
@@ -98,18 +209,78 @@ function KanbanCard({
 
   const theme = cardTheme[project.priority] ?? cardTheme.low;
 
+  const dragHandlers = {
+    draggable: true,
+    'data-project-id': project.id,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', project.id);
+      e.dataTransfer.setData('application/workflow-id', project.workflowId ?? '');
+      onDragStart(project.id);
+    },
+    onDragEnd,
+    onClick: () => router.push(`/projects/${project.id}${sectionWorkflowId ? `?workflowId=${sectionWorkflowId}` : ''}`),
+  };
+
+  if (size === 'small') {
+    return (
+      <div
+        {...dragHandlers}
+        className={cn(
+          'flex items-center gap-2 border rounded-lg px-2.5 py-2 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
+          theme.bg,
+          isDragging
+            ? 'opacity-40 rotate-1 shadow-lg border-blue-300'
+            : `${theme.border} hover:shadow-sm shadow-sm hover:brightness-95`,
+        )}
+      >
+        <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[project.priority] ?? PRIORITY_DOT.low)} />
+        <p className={cn('text-xs font-medium truncate flex-1', theme.titleColor)}>{project.name}</p>
+        {project.dueDate && (
+          <p className={cn('text-[10px] flex-shrink-0', theme.dueColor)}>{formatDate(project.dueDate)}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (size === 'medium') {
+    return (
+      <div
+        {...dragHandlers}
+        className={cn(
+          'border rounded-lg p-2.5 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
+          theme.bg,
+          isDragging
+            ? 'opacity-40 rotate-1 shadow-lg border-blue-300'
+            : `${theme.border} hover:shadow-md shadow-sm hover:brightness-95`,
+        )}
+      >
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className={cn('text-xs font-semibold leading-snug line-clamp-1 flex-1', theme.titleColor)}>{project.name}</p>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+            aria-label={`Edit ${project.name}`}
+            className={cn('p-1 rounded opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity text-slate-400', theme.editHover)}
+          >
+            <Edit size={12} />
+          </button>
+        </div>
+        <p className={cn('text-[11px] font-medium mb-1.5 truncate', theme.clientColor)}>{project.clientName}</p>
+        <div className="flex items-center justify-between gap-1">
+          <span className={cn('badge text-[10px] px-1.5 py-0', getPriorityBadgeClass(project.priority))}>
+            {project.priority}
+          </span>
+          {project.dueDate && (
+            <p className={cn('text-[10px] font-medium', theme.dueColor)}>Due {formatDate(project.dueDate)}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      draggable
-      data-project-id={project.id}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', project.id);
-        e.dataTransfer.setData('application/workflow-id', project.workflowId ?? '');
-        onDragStart(project.id);
-      }}
-      onDragEnd={onDragEnd}
-      onClick={() => router.push(`/projects/${project.id}${sectionWorkflowId ? `?workflowId=${sectionWorkflowId}` : ''}`)}
+      {...dragHandlers}
       className={cn(
         'border rounded-xl p-3 cursor-grab active:cursor-grabbing select-none group transition-all duration-150',
         theme.bg,
@@ -166,6 +337,7 @@ function WorkflowKanban({
   onEdit,
   sectionWorkflowId,
   highlightStageKey,
+  cardSize = 'large',
 }: {
   stages: StageColumn[];
   projects: Project[];
@@ -173,6 +345,7 @@ function WorkflowKanban({
   onEdit: (p: Project) => void;
   sectionWorkflowId: string | null;
   highlightStageKey?: string | null;
+  cardSize?: 'large' | 'medium' | 'small';
 }) {
   const qc = useQueryClient();
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -377,6 +550,7 @@ function WorkflowKanban({
                     onDragEnd={handleDragEnd}
                     onEdit={onEdit}
                     sectionWorkflowId={sectionWorkflowId}
+                    size={cardSize}
                   />
                 ))}
               </div>
@@ -384,6 +558,79 @@ function WorkflowKanban({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── WorkflowListTable — table view of ONE workflow's projects ──────────────────
+function WorkflowListTable({
+  stages,
+  projects,
+  searchTerm,
+  sectionWorkflowId,
+}: {
+  stages: StageColumn[];
+  projects: Project[];
+  searchTerm: string;
+  sectionWorkflowId: string | null;
+}) {
+  const router = useRouter();
+  const searchLower = searchTerm.toLowerCase();
+  const filtered = searchTerm
+    ? projects.filter((p) =>
+        p.name.toLowerCase().includes(searchLower) ||
+        p.projectNumber.toLowerCase().includes(searchLower) ||
+        p.clientName.toLowerCase().includes(searchLower)
+      )
+    : projects;
+
+  const stageNameFor = (p: Project) => {
+    const pws = p.projectWorkflows as Array<{ workflowTemplateId: string; currentStageKey?: string | null; status?: string }> | undefined;
+    const pw = pws?.find((w) => w.workflowTemplateId === sectionWorkflowId);
+    if (pw?.status === 'completed') return 'Workflow Done';
+    const key = pw?.currentStageKey ?? (pws && pws.length > 0 ? null : p.currentStage);
+    return stages.find((s) => s.key === key)?.name ?? 'No Stage';
+  };
+
+  if (filtered.length === 0) {
+    return <p className="text-sm text-slate-400 py-6 text-center">{searchTerm ? 'No matching projects' : 'No projects'}</p>;
+  }
+
+  return (
+    <div className="table-container">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Client</th>
+            <th>Stage</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Due Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((project) => (
+            <tr
+              key={project.id}
+              className="row-clickable"
+              onClick={() => router.push(`/projects/${project.id}${sectionWorkflowId ? `?workflowId=${sectionWorkflowId}` : ''}`)}
+            >
+              <td>
+                <div>
+                  <p className="font-medium text-slate-900">{truncate(project.name, 40)}</p>
+                  <p className="text-xs font-mono text-slate-400">{project.projectNumber}</p>
+                </div>
+              </td>
+              <td className="text-slate-600">{project.clientName}</td>
+              <td><span className="badge badge-blue text-[10px]">{stageNameFor(project)}</span></td>
+              <td><span className={getPriorityBadgeClass(project.priority)}>{project.priority}</span></td>
+              <td><span className={getStatusBadgeClass(project.status)}>{project.status.replace('_', ' ')}</span></td>
+              <td>{project.dueDate ? formatDate(project.dueDate) : <span className="text-slate-300">—</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -428,6 +675,22 @@ function WorkflowSection({
   // If highlighted from outside, force expand
   const expanded = searchTerm.length > 0 || isHighlighted ? true : manualExpanded;
 
+  // Per-workflow view preference (Large/Medium/Small cards or List) — persisted per workflow
+  const viewStorageId = workflow?.id ?? '__no_workflow__';
+  const [viewMode, setViewMode] = useState<WorkflowViewMode>(() => {
+    if (typeof window === 'undefined') return 'kanban-large';
+    try {
+      const saved = localStorage.getItem(workflowViewKey(viewStorageId));
+      return (saved as WorkflowViewMode) || 'kanban-large';
+    } catch { return 'kanban-large'; }
+  });
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+
+  const updateViewMode = (mode: WorkflowViewMode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(workflowViewKey(viewStorageId), mode); } catch { /* ignore */ }
+  };
+
   // Build stages from workflow template stages (with their colors)
   // Handle both { key, name } (new workflows) and { stageKey, stageName } (legacy) formats
   const stages: StageColumn[] = workflow?.stages
@@ -451,7 +714,8 @@ function WorkflowSection({
       onDragEnd={onDragEnd}
       onDrop={onDrop}
       className={cn(
-        'overflow-hidden transition-all duration-200 rounded-xl border bg-white',
+        'transition-all duration-200 rounded-xl border bg-white',
+        viewMenuOpen ? 'overflow-visible' : 'overflow-hidden',
         isHighlighted ? 'ring-2 ring-blue-400 ring-offset-1' : '',
         isDragOver ? 'ring-2 ring-blue-300 ring-offset-1 scale-[1.01]' : '',
       )}
@@ -493,6 +757,7 @@ function WorkflowSection({
           >
             {projects.length} project{projects.length !== 1 ? 's' : ''}
           </span>
+          <WorkflowViewMenu value={viewMode} onChange={updateViewMode} onOpenChange={setViewMenuOpen} />
           {(onMoveUp || onMoveDown) && (
             <div className="flex flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
               <button
@@ -525,14 +790,24 @@ function WorkflowSection({
 
       {expanded && (
         <div className="p-4" style={{ borderTop: '1px solid #eef0f8' }}>
-          <WorkflowKanban
-            stages={stages}
-            projects={projects}
-            searchTerm={searchTerm}
-            onEdit={onEdit}
-            sectionWorkflowId={workflow?.id ?? null}
-            highlightStageKey={isHighlighted ? highlightStageKey : null}
-          />
+          {viewMode === 'list' ? (
+            <WorkflowListTable
+              stages={stages}
+              projects={projects}
+              searchTerm={searchTerm}
+              sectionWorkflowId={workflow?.id ?? null}
+            />
+          ) : (
+            <WorkflowKanban
+              stages={stages}
+              projects={projects}
+              searchTerm={searchTerm}
+              onEdit={onEdit}
+              sectionWorkflowId={workflow?.id ?? null}
+              highlightStageKey={isHighlighted ? highlightStageKey : null}
+              cardSize={viewMode === 'kanban-medium' ? 'medium' : viewMode === 'kanban-small' ? 'small' : 'large'}
+            />
+          )}
         </div>
       )}
     </div>
